@@ -37,6 +37,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
             else None,
             round_ends_at=game.get("round_ends_at"),
             last_result=game.get("last_result"),
+            solo_summary=game.get("solo_summary"),
         )
         if game
         else None
@@ -45,6 +46,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
         id=room["id"],
         game_type=room["game_type"],
         game_name=game_name,
+        mode=room.get("mode", "versus"),
         status=room["status"],
         host_id=room["host_id"],
         host_handle=room["host_handle"],
@@ -63,6 +65,7 @@ async def create_room(
     game = get_game(body.game_type)
     if game is None:
         raise HTTPException(status_code=400, detail="Unknown game type")
+    mode = body.mode if body.mode in ("versus", "solo") else "versus"
 
     # Generate a unique room id (retry on the rare collision).
     for _ in range(5):
@@ -72,7 +75,7 @@ async def create_room(
     else:
         raise HTTPException(status_code=500, detail="Could not allocate room id")
 
-    await rooms.create_room(room_id, body.game_type, identity.model_dump())
+    await rooms.create_room(room_id, body.game_type, identity.model_dump(), mode=mode)
 
     # Persist the durable anchor (for invite-link OG preview + history).
     db.add(

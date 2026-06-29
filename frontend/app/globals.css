@@ -48,12 +48,15 @@ body {
   /* Prevent iOS rubber-band revealing white behind the dark canvas. */
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  /* Lock the page horizontally — `clip` (unlike `hidden`) kills the viewport
+     pan without creating a scroll container, even on mobile. */
+  overflow-x: clip;
 }
 
 body {
   min-height: 100dvh;
   margin: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
   background-image:
     radial-gradient(55% 45% at 50% -12%, #8b7cff40, transparent 68%),
     radial-gradient(35% 30% at 88% 12%, #67e8f929, transparent 70%),
@@ -144,4 +147,29 @@ button,
 a.btn {
   min-height: 48px;
   touch-action: manipulation;
+}
+
+/* ── Hub orbit ──────────────────────────────────────────────────────────
+   Continuous, CSS-only rotation. The ring carries the pill positions; each
+   pill counter-rotates at the same rate so its label stays upright. Both
+   animations share duration + start (the ring and pills mount together), so
+   the counter-rotation cancels exactly. On focus, JS freezes the current
+   angle and transitions the ring to park the chosen pill at 3 o'clock. */
+@keyframes hub-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hub-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+.orbit-ring {
+  animation: hub-spin 30s linear infinite;
+  will-change: transform;
+}
+.orbit-pill {
+  animation: hub-spin-rev 30s linear infinite;
+  will-change: transform;
 }

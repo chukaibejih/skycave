@@ -75,7 +75,7 @@ export function ColorClash({
 
       {locked && active && (
         <p className="text-sm text-[var(--color-warm)]">
-          locked out — wait for the next round
+          locked out · wait for the next round
         </p>
       )}
     </div>

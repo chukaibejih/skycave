@@ -58,11 +58,14 @@ async def save_room(room: dict[str, Any]) -> None:
 
 
 async def create_room(
-    room_id: str, game_type: str, host: dict[str, Any]
+    room_id: str, game_type: str, host: dict[str, Any], mode: str = "versus"
 ) -> dict[str, Any]:
     room = {
         "id": room_id,
         "game_type": game_type,
+        # "versus" = 1v1 (waits for an opponent); "solo" = single-player, starts
+        # as soon as the lone player is ready.
+        "mode": mode if mode in ("versus", "solo") else "versus",
         "status": "waiting",
         "host_id": host["id"],
         "host_handle": host["handle"],

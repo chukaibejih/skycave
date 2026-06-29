@@ -65,6 +65,16 @@ class WordDuel(BaseGame):
     round_time = 22.0
     result_delay = 4.5
     mode = SIMULTANEOUS
+    solo_kind = "words"  # one letter set, 60s; submit many words, score accumulates
+
+    def solo_word(self, letters: list[str], word: str) -> int:
+        """Length of the word if it's valid for the dealt letters, else 0."""
+        word = str(word).strip().upper()
+        return len(word) if _is_valid(word, letters) else 0
+
+    def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
+        words = len((game_state.get("solo_state") or {}).get("used", []))
+        return f"{score} pts · {words} words"
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
         letters = _deal_letters()

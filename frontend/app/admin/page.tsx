@@ -251,7 +251,7 @@ function GamesView({ games }: { games: GameRow[] | null }) {
             ? "draw"
             : g.player1_score > g.player2_score
               ? g.player1_handle
-              : g.player2_handle ?? "—";
+              : g.player2_handle ?? "-";
         return (
           <tr key={g.id} className="border-t border-[var(--color-border)]">
             <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
@@ -260,8 +260,8 @@ function GamesView({ games }: { games: GameRow[] | null }) {
             <Td>{gname(g.game_type)}</Td>
             <Td className="font-[var(--font-mono)] whitespace-nowrap">
               <span className="text-[var(--color-primary)]">{g.player1_handle}</span>{" "}
-              {g.player1_score}–{g.player2_score}{" "}
-              <span className="text-[var(--color-warm)]">{g.player2_handle ?? "—"}</span>
+              {g.player1_score}-{g.player2_score}{" "}
+              <span className="text-[var(--color-warm)]">{g.player2_handle ?? "-"}</span>
             </Td>
             <Td className={winner === "draw" ? "text-[var(--color-text-secondary)]" : "text-[var(--color-success)]"}>
               {winner}

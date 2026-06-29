@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { GameCard } from "@/components/ui/GameCard";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { createRoom, listGames } from "@/lib/api";
+import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
 import type { GameInfo } from "@/lib/types";
 
@@ -14,7 +15,9 @@ export default function Home() {
   const { identity, loaded, hydrate } = useAuth();
   const [games, setGames] = useState<GameInfo[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
-  const [pending, setPending] = useState<GameInfo | null>(null);
+  // Game whose mode is being chosen, and the pending {game, mode} awaiting auth.
+  const [chooser, setChooser] = useState<GameInfo | null>(null);
+  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" } | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -22,10 +25,10 @@ export default function Home() {
     listGames().then(setGames).catch(() => setGames([]));
   }, [hydrate]);
 
-  const launch = async (game: GameInfo) => {
-    if (!identity) {
-      setPending(game);
-      setAuthOpen(true);
+  const go = async (game: GameInfo, m: "versus" | "solo") => {
+    if (m === "solo") {
+      // Solo skips the lobby — the /play route creates the room + drops in.
+      router.push(`/play/${gameSlug(game.type)}`);
       return;
     }
     setCreating(true);
@@ -35,6 +38,19 @@ export default function Home() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // Tapping any game opens the mode chooser (no hidden mode state).
+  const launch = (game: GameInfo) => setChooser(game);
+
+  const choose = async (game: GameInfo, m: "versus" | "solo") => {
+    setChooser(null);
+    if (!identity) {
+      setPending({ game, mode: m }); // auth first, then launch
+      setAuthOpen(true);
+      return;
+    }
+    await go(game, m);
   };
 
   return (
@@ -89,19 +105,13 @@ export default function Home() {
             Fast 1v1 games built for Bluesky links. Pick a room, post the
             invite, and let anyone drop straight into the match.
           </p>
-
-          <div className="mt-8 grid max-w-xl grid-cols-3 gap-2 rounded-[22px] border border-[var(--color-border)] bg-[var(--color-surface)]/55 p-2">
-            <Stat value={games.length ? String(games.length) : "—"} label="games" />
-            <Stat value="1v1" label="live rooms" />
-            <Stat value="0" label="account walls" />
-          </div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1, duration: 0.7 }}
-          className="relative mx-auto flex aspect-square w-full max-w-[520px] items-center justify-center"
+          className="relative mx-auto flex aspect-square w-full max-w-[300px] items-center justify-center sm:max-w-[440px] lg:max-w-[520px]"
         >
           <HubPortal games={games} onPlay={launch} />
         </motion.div>
@@ -118,7 +128,7 @@ export default function Home() {
             </h2>
           </div>
           <p className="hidden max-w-xs text-right text-sm text-[var(--color-text-secondary)] sm:block">
-            Every card creates a room and gives you a link ready for Bluesky.
+            Tap a game, then pick 1v1 or solo.
           </p>
         </div>
 
@@ -142,33 +152,75 @@ export default function Home() {
         </div>
       )}
 
+      <ModeChooser
+        game={chooser}
+        onClose={() => setChooser(null)}
+        onChoose={choose}
+      />
+
       <AuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onAuthed={(id) => {
+        onAuthed={() => {
           setAuthOpen(false);
-          const g = pending;
+          const p = pending;
           setPending(null);
-          if (g) {
-            // re-run launch now that we're authed
-            createRoom(g.type).then((room) => router.push(`/room/${room.id}`));
-          }
+          if (p) go(p.game, p.mode); // resume the chosen launch now that we're authed
         }}
       />
     </main>
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+// Tap a game -> choose 1v1 or solo. No hidden mode; the choice is explicit.
+function ModeChooser({
+  game,
+  onClose,
+  onChoose,
+}: {
+  game: GameInfo | null;
+  onClose: () => void;
+  onChoose: (game: GameInfo, mode: "versus" | "solo") => void;
+}) {
   return (
-    <div className="rounded-2xl bg-[#ffffff06] px-3 py-4 text-center">
-      <div className="font-[var(--font-display)] text-xl font-semibold text-[var(--color-text-primary)]">
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-        {label}
-      </div>
-    </div>
+    <AnimatePresence>
+      {game && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="w-full max-w-sm rounded-[24px] border border-[var(--color-border)] bg-[var(--color-elevated)] p-6"
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-5 text-center font-[var(--font-display)] text-xl font-bold">
+              {game.name}
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onChoose(game, "versus")}
+                className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
+              >
+                1v1
+              </button>
+              <button
+                onClick={() => onChoose(game, "solo")}
+                className="flex h-28 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
+              >
+                Solo
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -181,9 +233,25 @@ const ORBIT_ACCENT: Record<string, string> = {
   reaction_grid: "var(--color-primary)",
 };
 
-// Live, clickable orbit. Each game sits evenly around the ring and launches a
-// room on tap — so you can start any game from the top without scrolling. The
-// labels counter-rotate against a slowly spinning ring so they stay upright.
+// Decode the current rotation (degrees) from an element's computed transform —
+// used to freeze the live CSS spin at its exact angle before parking.
+function readAngle(el: HTMLElement): number {
+  const t = getComputedStyle(el).transform;
+  if (!t || t === "none") return 0;
+  try {
+    const m = new DOMMatrixReadOnly(t);
+    return (Math.atan2(m.b, m.a) * 180) / Math.PI;
+  } catch {
+    return 0;
+  }
+}
+
+const PARK_EASE = "transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)";
+
+// Live orbit. The ring spins forever via pure CSS (animation: hub-spin); each
+// pill counter-spins so its label stays upright. Tapping a pill parks it at 3
+// o'clock and lights up the center as "PLAY"; tapping center plays it.
+// Positions are derived from the game count, so adding a game just works.
 function HubPortal({
   games,
   onPlay,
@@ -191,22 +259,59 @@ function HubPortal({
   games: GameInfo[];
   onPlay: (g: GameInfo) => void;
 }) {
-  const launchRandom = () => {
-    if (games.length) onPlay(games[Math.floor(Math.random() * games.length)]);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<GameInfo | null>(null);
+  const n = Math.max(1, games.length);
+
+  // Base position of pill i around the ring (degrees, 0° = 3 o'clock).
+  const angleDeg = (i: number) => (i / n) * 360 - 90;
+
+  // Rotate the ring so pill `i` lands at 3 o'clock, freezing the live spin
+  // first so the transition starts from the current angle (no jump).
+  const park = (i: number) => {
+    const ring = ringRef.current;
+    if (!ring) return;
+    const pills = Array.from(ring.querySelectorAll<HTMLElement>(".orbit-pill"));
+    const cur = readAngle(ring);
+    const delta = ((-angleDeg(i) - cur + 540) % 360) - 180; // shortest path
+    const target = cur + delta;
+
+    // Freeze at the current angle (kill the keyframe animation), no transition.
+    for (const el of [ring, ...pills]) {
+      el.style.transition = "none";
+      el.style.animation = "none";
+    }
+    ring.style.transform = `rotate(${cur}deg)`;
+    for (const p of pills) p.style.transform = `rotate(${-cur}deg)`;
+    void ring.offsetWidth; // force reflow so the next change transitions
+
+    // Glide to the parked angle; pills counter-rotate to stay upright.
+    ring.style.transition = PARK_EASE;
+    ring.style.transform = `rotate(${target}deg)`;
+    for (const p of pills) {
+      p.style.transition = PARK_EASE;
+      p.style.transform = `rotate(${-target}deg)`;
+    }
   };
+
+  const pickPill = (g: GameInfo, i: number) => {
+    park(i);
+    setSelected(g);
+  };
+
+  const tapCenter = () => {
+    if (selected) onPlay(selected);
+    else if (games.length)
+      onPlay(games[Math.floor(Math.random() * games.length)]);
+  };
+
+  const R = 43; // ring radius, % from center
 
   return (
     <div className="portal-shadow relative h-full w-full">
-      <motion.div
-        className="absolute inset-[10%] rounded-full border border-[var(--color-border)]"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 38, repeat: Infinity, ease: "linear" }}
-      />
-      <motion.div
-        className="absolute inset-[18%] rounded-full border border-dashed border-[var(--color-primary)]/70"
-        animate={{ rotate: -360 }}
-        transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
-      />
+      {/* Static decorative core — never rotates. */}
+      <div className="absolute inset-[10%] rounded-full border border-[var(--color-border)]" />
+      <div className="absolute inset-[18%] rounded-full border border-dashed border-[var(--color-primary)]/40" />
       <motion.div
         className="absolute inset-[27%] rounded-full bg-[radial-gradient(circle,var(--color-primary-glow),transparent_68%)]"
         animate={{ scale: [1, 1.08, 1], opacity: [0.74, 1, 0.74] }}
@@ -214,59 +319,89 @@ function HubPortal({
       />
       <div className="absolute inset-[34%] rounded-full border border-[var(--color-cyan)]/50 bg-[radial-gradient(circle_at_50%_42%,#67e8f93d,#8b7cff20_45%,transparent_72%)] shadow-[inset_0_0_34px_#67e8f926,0_0_60px_var(--color-primary-glow)]" />
 
-      {/* Center: tap for a random duel */}
-      <motion.button
-        onClick={launchRandom}
-        whileTap={{ scale: 0.94 }}
-        title="Play a random game"
-        className="absolute left-1/2 top-1/2 z-20 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[#05060acc] active:bg-[#05060a]"
-      >
-        <div className="text-center">
-          <div className="font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-text-primary)]">
-            enter
-          </div>
-          <div className="mt-0.5 font-[var(--font-mono)] text-[9px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-            random
-          </div>
+      {/* Spinning ring + pills. Mounted together (only once games exist) so the
+          ring and counter-spin animations start on the same frame and stay in
+          perfect sync. */}
+      {games.length > 0 && (
+        <div ref={ringRef} className="orbit-ring absolute inset-0 z-10">
+          {games.map((g, i) => {
+            const a = (angleDeg(i) * Math.PI) / 180;
+            const x = 50 + R * Math.cos(a);
+            const y = 50 + R * Math.sin(a);
+            const accent = ORBIT_ACCENT[g.type] ?? "var(--color-primary)";
+            const isSel = selected?.type === g.type;
+            return (
+              <div
+                key={g.type}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${x}%`, top: `${y}%` }}
+              >
+                <button
+                  onClick={() => pickPill(g, i)}
+                  className="orbit-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border bg-[var(--color-surface)]/90 px-3 font-[var(--font-mono)] text-[11px] text-[var(--color-text-primary)] backdrop-blur-sm transition-colors active:bg-[var(--color-elevated)]"
+                  style={{
+                    borderColor: isSel
+                      ? accent
+                      : `color-mix(in srgb, ${accent} 55%, transparent)`,
+                    boxShadow: isSel
+                      ? `0 0 20px ${accent}, 0 4px 18px rgba(0,0,0,0.4)`
+                      : "0 4px 18px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
+                  />
+                  {g.name}
+                </button>
+              </div>
+            );
+          })}
         </div>
-      </motion.button>
+      )}
 
-      {/* Orbiting game nodes — evenly placed on the ring, each launches a room.
-          Static positions (reliable taps) with a gentle bob for life. */}
-      {games.map((g, i) => {
-        const rad = (i / Math.max(1, games.length)) * 2 * Math.PI - Math.PI / 2;
-        const R = 43; // % radius from center
-        const x = 50 + R * Math.cos(rad);
-        const y = 50 + R * Math.sin(rad);
-        const accent = ORBIT_ACCENT[g.type] ?? "var(--color-primary)";
-        return (
-          <div
-            key={g.type}
-            className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${x}%`, top: `${y}%` }}
-          >
-            <motion.button
-              onClick={() => onPlay(g)}
-              whileTap={{ scale: 0.92 }}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1, y: [0, -4, 0] }}
-              transition={{
-                opacity: { delay: 0.2 + i * 0.05 },
-                scale: { delay: 0.2 + i * 0.05 },
-                y: { duration: 3.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.35 },
-              }}
-              className="whitespace-nowrap rounded-full border bg-[var(--color-surface)]/90 px-3 py-2 font-[var(--font-mono)] text-[11px] text-[var(--color-text-primary)] shadow-[0_4px_18px_rgba(0,0,0,0.4)] backdrop-blur-sm transition-colors active:bg-[var(--color-elevated)]"
-              style={{ borderColor: `color-mix(in srgb, ${accent} 55%, transparent)` }}
+      {/* Fixed center — never rotates. Crossfades between ENTER/RANDOM and the
+          selected game's PLAY state. */}
+      <motion.button
+        onClick={tapCenter}
+        whileTap={{ scale: 0.94 }}
+        title={selected ? `Play ${selected.name}` : "Play a random game"}
+        className="absolute left-1/2 top-1/2 z-20 grid h-28 w-28 -translate-x-1/2 -translate-y-1/2 place-items-center overflow-hidden rounded-full bg-[#05060acc] px-3 text-center active:bg-[#05060a]"
+      >
+        <AnimatePresence mode="wait">
+          {selected ? (
+            <motion.div
+              key={selected.type}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.22 }}
             >
-              <span
-                className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
-                style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
-              />
-              {g.name}
-            </motion.button>
-          </div>
-        );
-      })}
+              <div className="font-[var(--font-display)] text-[13px] font-semibold leading-tight text-[var(--color-text-primary)]">
+                {selected.name}
+              </div>
+              <div className="mt-1 font-[var(--font-mono)] text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--color-primary)]">
+                play
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="random"
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-text-primary)]">
+                enter
+              </div>
+              <div className="mt-0.5 font-[var(--font-mono)] text-[9px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+                random
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }

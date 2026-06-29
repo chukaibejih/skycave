@@ -25,6 +25,7 @@ interface Props {
   submitted?: boolean; // from store — survives reconnect
   players?: PlayerSlot[];
   meId?: string;
+  solo?: boolean;
 }
 
 const P_COLOR = ["#6C63FF", "#FF6B6B"];
@@ -37,6 +38,7 @@ export function GeoGuess({
   submitted: submittedFromServer,
   players = [],
   meId,
+  solo,
 }: Props) {
   const active = phase === "active";
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
@@ -123,7 +125,7 @@ export function GeoGuess({
           {active ? (
             submitted ? (
               <p className="rounded-[var(--radius-card)] bg-[var(--color-surface)]/80 py-3 text-center text-sm text-[var(--color-text-secondary)] backdrop-blur-md">
-                locked in — waiting for opponent…
+                {solo ? "locked in · scoring…" : "locked in · waiting for opponent…"}
               </p>
             ) : (
               <Button full onClick={lockIn} disabled={!pin}>
@@ -131,7 +133,7 @@ export function GeoGuess({
               </Button>
             )
           ) : (
-            <ResultPanel answer={answer} guesses={guesses} players={players} meId={meId} colorFor={colorFor} />
+            <ResultPanel answer={answer} guesses={guesses} players={players} meId={meId} colorFor={colorFor} solo={solo} />
           )}
         </div>
       </div>
@@ -145,17 +147,20 @@ function ResultPanel({
   players,
   meId,
   colorFor,
+  solo,
 }: {
   answer?: { name?: string };
   guesses: Record<string, Guess>;
   players: PlayerSlot[];
   meId?: string;
   colorFor: (pid: string) => string;
+  solo?: boolean;
 }) {
   const rows = players
     .map((p) => ({ player: p, guess: guesses[p.id] }))
     .filter((r) => r.guess);
-  const best = Math.max(0, ...rows.map((r) => r.guess!.points));
+  // No per-round "winner" in solo — there's no one to beat.
+  const best = solo ? Infinity : Math.max(0, ...rows.map((r) => r.guess!.points));
 
   return (
     <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]/90 p-3 backdrop-blur-md">

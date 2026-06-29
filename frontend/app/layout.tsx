@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Skycave — play with anyone on Bluesky",
+  title: "Skycave: play with anyone on Bluesky",
   description:
     "Fast, casual multiplayer games. Post a link to Bluesky, your opponent taps in. No account needed.",
   metadataBase: new URL(

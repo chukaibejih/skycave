@@ -42,6 +42,11 @@ class OutlineQuiz(BaseGame):
     round_time = 10.0
     result_delay = 2.0
     mode = RACE
+    solo_kind = "timed"  # beat-the-clock: count correct in 60s
+    solo_advance_on_miss = True  # one shot per outline, right or wrong
+
+    def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
+        return f"{score} correct · 60 seconds"
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
         countries = _countries()

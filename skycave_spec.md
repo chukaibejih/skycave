@@ -57,6 +57,49 @@ A web-based real-time multiplayer game hub where Bluesky is the social layer. Us
 **Phase 2:** Word Duel + Draw & Guess + Tile Takeover.
 **Phase 3:** Number Rush + Reaction Grid + Outline Quiz + Chain Words.
 
+**Built so far:** GeoGuess, Color Clash, Flag Rush, Outline Quiz, Word Duel,
+Reaction Grid — all six with single-player mode (below).
+
+### Single-Player Mode (Solo)
+
+Every game also plays solo. Solo isn't a consolation mode — it's the growth
+engine. A player with no opponent still gets a score worth posting, the post
+carries the play link, and whoever sees it can tap in (play solo to beat the
+score, or challenge them to 1v1). Play alone → post → someone bites →
+multiplayer. It's how MapTap grew: a score in the feed is an invitation.
+
+Solo skips the lobby/portal entirely — pick a game, drop straight in.
+Route: `/play/{game}` (vs `/room/{id}` for 1v1).
+
+All six built games support single-player (gameplay permitting — they all do).
+Taken one at a time:
+
+1. **GeoGuess** — 5 rounds, drop a pin each round. Score = total distance points
+   (max 5,000/round, same scoring as 1v1 — there's just no opponent). The
+   purest solo game; it's essentially MapTap.
+2. **Color Clash** — beat the clock: 60 seconds, tap the correct ink color as
+   many times as you can. Score = number correct. A wrong tap costs a short
+   lockout (no negative score). Endless prompts, so the clock is the only limit.
+3. **Flag Rush** — beat the clock: 60 seconds, name as many flags as you can.
+   Score = number correct. Skips allowed (no penalty, just lost time).
+4. **Outline Quiz** — beat the clock: 60 seconds, name as many country/continent
+   outlines as you can. Score = number correct. Same shape as Flag Rush.
+5. **Word Duel** — one shared letter set, 60 seconds. Form as many valid words as
+   possible. Score = total length of all valid words (the longest word is
+   highlighted on the result). Solo is a pure anagram sprint.
+6. **Reaction Grid** — endless: the sequence grows by one tile each level,
+   reproduce it from memory. Score = highest level reached before a miss. This
+   one is *naturally* solo (it's a memory ladder); 1v1 just races two ladders.
+
+**Personal best:** logged-in (Bluesky) players have their PB per game stored
+(keyed by DID); the share post flags "personal best" when beaten. Guests get a
+device-local PB only — nothing persisted server-side, but still postable.
+
+**Server stays authoritative.** Solo scoring, timers, and answer validation run
+on the server exactly like 1v1 — the client only sends actions. (Solo runs in a
+single-occupant room so the existing WebSocket + Redis state machinery is
+reused; no separate client-trusted path.)
+
 ---
 
 ## 4. Core User Flows
@@ -251,6 +294,29 @@ opponent      311
 ```
 Plain text, reads naturally in a feed. Looks like someone typed it, not generated it.
 
+**Solo score post (after a single-player run):**
+```
+Color Clash · Jun 29
+
+34 correct · 60 seconds
+personal best
+
+[link]
+```
+Same plain-feed tone. Short, clean, invites comparison — someone sees 34 and
+thinks they can do better. The metric line is per game:
+- GeoGuess — `18,420 pts · 5 rounds`
+- Color Clash / Flag Rush / Outline Quiz — `34 correct · 60 seconds`
+- Word Duel — `24 words · 60 seconds` (longest word noted)
+- Reaction Grid — `reached level 14`
+
+The `personal best` line only appears when the run beat the player's prior best.
+
+**The `[link]` is always included** — in invite *and* score posts, solo and 1v1.
+The link is the invite mechanic itself, not just traffic-driving: anyone seeing
+it in their feed can click straight into a room, a solo game, or the results.
+Solo posts link to `/play/{game}`; 1v1 posts link to the room / results page.
+
 **Open Graph on invite link:**
 - Title: "[Player] is looking for an opponent"
 - Description: "[Game] · Join and play now. No account needed."
@@ -271,6 +337,7 @@ Plain text, reads naturally in a feed. Looks like someone typed it, not generate
 - [ ] Mobile-responsive UI
 
 ### Phase 2 — Growth
+- [ ] Single-player mode for all games (solo scoring + `/play/{game}` route + solo share format + personal best)
 - [ ] Word Duel + Draw & Guess + Tile Takeover
 - [ ] User stats page (linked to Bluesky profile)
 - [ ] Score card image generation (OG image via Playwright or canvas)

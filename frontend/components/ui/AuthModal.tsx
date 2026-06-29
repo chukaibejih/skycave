@@ -76,7 +76,7 @@ export function AuthModal({
               {title}
             </h2>
             <p className="mb-5 text-sm text-[var(--color-text-secondary)]">
-              No account needed — pick a name and jump in.
+              No account needed. Pick a name and jump in.
             </p>
 
             {/* Guest */}

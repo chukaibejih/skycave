@@ -26,6 +26,7 @@ def _public_room(room: dict, player_id: str) -> dict:
     safe = {
         "id": room["id"],
         "game_type": room["game_type"],
+        "mode": room.get("mode", "versus"),
         "status": room["status"],
         "host_id": room["host_id"],
         "host_handle": room["host_handle"],
@@ -50,6 +51,7 @@ def _public_room(room: dict, player_id: str) -> dict:
             else None,
             "round_ends_at": game.get("round_ends_at"),
             "last_result": game.get("last_result"),
+            "solo_summary": game.get("solo_summary"),
             "my_round_state": {
                 "locked": prior == "locked",
                 "submitted": prior is not None,
@@ -141,9 +143,11 @@ async def _handle_ready(room_id: str, player_id: str) -> None:
     await manager.broadcast(room_id, events.message(
         events.PLAYER_JOINED, {"players": room["players"]}
     ))
-    # Start when there are 2 players and all are ready.
+    # Solo starts with the lone player; versus waits for both. Either way, every
+    # present player must be ready and the room must still be waiting.
+    min_players = 1 if room.get("mode") == "solo" else 2
     if (
-        len(room["players"]) >= 2
+        len(room["players"]) >= min_players
         and all(p["ready"] for p in room["players"])
         and room["status"] == "waiting"
     ):

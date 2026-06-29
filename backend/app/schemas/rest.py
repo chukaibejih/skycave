@@ -46,6 +46,7 @@ class GameInfo(BaseModel):
 
 class CreateRoomRequest(BaseModel):
     game_type: str
+    mode: str = "versus"  # "versus" (1v1) | "solo"
 
 
 class PlayerSlot(BaseModel):
@@ -72,12 +73,15 @@ class GameSummary(BaseModel):
     round_data: dict | None = None
     round_ends_at: float | None = None
     last_result: dict | None = None
+    # Present only for finished solo games (score + metric + personal-best info).
+    solo_summary: dict | None = None
 
 
 class RoomResponse(BaseModel):
     id: str
     game_type: str
     game_name: str
+    mode: str = "versus"  # "versus" | "solo"
     status: str  # waiting | in_progress | finished
     host_id: str
     host_handle: str

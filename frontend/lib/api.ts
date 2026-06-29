@@ -84,10 +84,13 @@ export async function fetchMe(): Promise<Identity | null> {
 export const listGames = () => request<GameInfo[]>("/games");
 
 // ── Rooms ──
-export const createRoom = (gameType: string) =>
+export const createRoom = (
+  gameType: string,
+  mode: "versus" | "solo" = "versus"
+) =>
   request<Room>("/rooms", {
     method: "POST",
-    body: JSON.stringify({ game_type: gameType }),
+    body: JSON.stringify({ game_type: gameType, mode }),
   });
 
 export const getRoom = (roomId: string) => request<Room>(`/rooms/${roomId}`);

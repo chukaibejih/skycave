@@ -56,10 +56,10 @@ export function renderScoreCard(data: CardData): HTMLCanvasElement {
   ctx.font = "700 44px system-ui, sans-serif";
   ctx.textAlign = "left";
   ctx.fillStyle = C.primary;
-  ctx.fillText(trunc(ctx, p1?.display_name ?? "—", 380), 120, 175);
+  ctx.fillText(trunc(ctx, p1?.display_name ?? "-", 380), 120, 175);
   ctx.textAlign = "right";
   ctx.fillStyle = C.warm;
-  ctx.fillText(trunc(ctx, p2?.display_name ?? "—", 380), W - 120, 175);
+  ctx.fillText(trunc(ctx, p2?.display_name ?? "-", 380), W - 120, 175);
   ctx.textAlign = "center";
   ctx.fillStyle = C.muted;
   ctx.font = "400 28px system-ui, sans-serif";
@@ -94,7 +94,7 @@ export function renderScoreCard(data: CardData): HTMLCanvasElement {
   ctx.fillText(s1, mid - 50, 470);
   ctx.textAlign = "center";
   ctx.fillStyle = C.muted;
-  ctx.fillText("—", mid, 470);
+  ctx.fillText("-", mid, 470);
   ctx.textAlign = "left";
   ctx.fillStyle = C.warm;
   ctx.fillText(s2, mid + 50, 470);

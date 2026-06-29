@@ -7,6 +7,7 @@ import { ShareButton } from "@/components/lobby/ShareButton";
 import { Button } from "@/components/ui/Button";
 import { createRoom, getRoom, getScorecard } from "@/lib/api";
 import { downloadScoreCard } from "@/lib/scorecard-image";
+import { resolveSoloBest, soloShareText, gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
 import type { Room } from "@/lib/types";
 
@@ -16,6 +17,10 @@ export default function ResultsPage() {
   const meId = useAuth((s) => s.identity?.id);
   const [room, setRoom] = useState<Room | null>(null);
   const [shareText, setShareText] = useState("");
+  const [soloBest, setSoloBest] = useState<{
+    isBest: boolean;
+    prevBest: number | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch from the API so a direct load / refresh works (not just post-game).
@@ -24,7 +29,15 @@ export default function ResultsPage() {
       try {
         const r = await getRoom(id);
         setRoom(r);
-        getScorecard(id).then((s) => setShareText(s.text)).catch(() => {});
+        if (r.mode === "solo") {
+          // Reconcile personal best (server summary for users, localStorage for
+          // guests) — runs once, and persists a guest's new best.
+          setSoloBest(
+            resolveSoloBest(r.game_type, r.game?.solo_summary ?? null)
+          );
+        } else {
+          getScorecard(id).then((s) => setShareText(s.text)).catch(() => {});
+        }
       } catch {
         setRoom(null);
       } finally {
@@ -49,6 +62,90 @@ export default function ResultsPage() {
           Back to hub
         </Button>
       </Centered>
+    );
+  }
+
+  // ── Solo results ──
+  if (room.mode === "solo") {
+    const summary = room.game.solo_summary ?? null;
+    const score = summary?.score ?? Object.values(room.game.scores)[0] ?? 0;
+    const metric = summary?.metric ?? `${score.toLocaleString()} pts`;
+    const isBest = soloBest?.isBest ?? false;
+    const prevBest = soloBest?.prevBest ?? null;
+    const gameName = room.game_name ?? room.game_type;
+    const slug = gameSlug(room.game_type);
+
+    const text = soloShareText({ gameName, gameType: room.game_type, metric, isBest });
+
+    return (
+      <main className="mx-auto grid min-h-[100dvh] w-full max-w-6xl items-center gap-8 px-5 py-10 lg:grid-cols-[0.9fr_1.1fr]">
+        <section>
+          <p className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+            {gameName} · solo
+          </p>
+          <h1 className="mt-3 font-[var(--font-display)] text-5xl font-bold leading-none text-[#F0F0FF] sm:text-6xl">
+            {isBest ? "Personal best." : "Nice run."}
+          </h1>
+          <p className="mt-4 max-w-md font-[var(--font-body)] text-sm leading-6 text-[#8888AA]">
+            {isBest
+              ? "Your best yet. Post it, and whoever beats it has to tap your link to do it."
+              : prevBest !== null
+                ? `Your best is ${prevBest.toLocaleString()}. Run it back, or post this and bait a challenger.`
+                : "Post it and bait a challenger. The link drops them straight into the game."}
+          </p>
+
+          <div className="mt-8 flex flex-col gap-2.5">
+            <ShareButton text={text} label="Post to Bluesky" full />
+            <div className="flex items-center justify-center gap-4 pt-1">
+              <button
+                onClick={() => router.push(`/play/${slug}`)}
+                style={{ borderColor: "#2A2A3A", color: "#F0F0FF" }}
+                className="flex h-12 items-center justify-center rounded-[12px] border px-6 font-[var(--font-body)] text-base"
+              >
+                Play again
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                style={{ color: "#8888AA" }}
+                className="flex h-12 items-center justify-center px-3 font-[var(--font-body)] text-sm"
+              >
+                new game
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 26 }}
+          className="mx-auto w-full max-w-md"
+        >
+          <div
+            className="rounded-[16px] border bg-[#13131A] px-6 py-10 text-center"
+            style={{ borderColor: "#2A2A3A" }}
+          >
+            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[#8888AA]">
+              {gameName}
+            </div>
+            <div className="mt-6 font-[var(--font-display)] text-[64px] font-bold leading-none text-[#6C63FF]">
+              {score.toLocaleString()}
+            </div>
+            <div className="mt-3 font-[var(--font-body)] text-sm text-[#F0F0FF]">
+              {metric}
+            </div>
+            {isBest && (
+              <div className="mt-2 font-[var(--font-body)] text-[13px] text-[#4FFFB0]">
+                personal best
+              </div>
+            )}
+            <div className="mt-8 flex items-center justify-between font-[var(--font-mono)] text-[11px] text-[#8888AA]">
+              <span>Skycave</span>
+              <span>skycave.space</span>
+            </div>
+          </div>
+        </motion.div>
+      </main>
     );
   }
 

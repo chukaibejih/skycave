@@ -27,6 +27,16 @@ class ReactionGrid(BaseGame):
     round_time = 16.0
     result_delay = 2.0
     mode = RACE
+    solo_kind = "ladder"  # endless; each correct sequence advances a level
+
+    def solo_step_time(self, public: dict[str, Any]) -> float:
+        # Time to watch the flash + tap it back, scaling with sequence length.
+        seq_len = len(public.get("sequence", []))
+        flash_total = seq_len * (FLASH_MS / 1000.0)
+        return round(flash_total + 2.0 + seq_len * 1.1, 1)
+
+    def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
+        return f"reached level {score}" if score else "level 0"
 
     def _sequence(self, length: int) -> list[int]:
         seq: list[int] = []

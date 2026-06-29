@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
-import type { RoundResult } from "@/lib/store";
+import { useRoom, type RoundResult } from "@/lib/store";
 import type { PlayerSlot } from "@/lib/types";
 
 interface RoundData {
@@ -24,6 +24,7 @@ interface Props {
   submitted?: boolean;
   players?: PlayerSlot[];
   meId?: string;
+  solo?: boolean;
 }
 
 const MIN_LEN = 3;
@@ -37,8 +38,12 @@ export function WordDuel({
   submitted: submittedFromServer,
   players = [],
   meId,
+  solo,
 }: Props) {
   const active = phase === "active";
+
+  // Solo: one letter set for the whole 60s; submit as many words as you can.
+  if (solo) return <SoloWordDuel letters={roundData.letters} onAction={onAction} />;
   // `built` holds chosen tile indices (so repeated letters are tracked per tile).
   const [built, setBuilt] = useState<number[]>([]);
   const [submittedLocal, setSubmittedLocal] = useState(false);
@@ -100,7 +105,7 @@ export function WordDuel({
                     className="font-[var(--font-display)] text-base font-bold"
                     style={{ color: w?.valid ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
                   >
-                    {w?.word || "—"}
+                    {w?.word || "-"}
                   </span>
                   <span
                     className="font-[var(--font-display)] text-base font-bold"
@@ -151,7 +156,7 @@ export function WordDuel({
 
       {submitted ? (
         <p className="text-sm text-[var(--color-text-secondary)]">
-          locked in — waiting for opponent…
+          locked in · waiting for opponent…
         </p>
       ) : (
         <div className="flex w-full max-w-md items-center gap-2">
@@ -174,6 +179,105 @@ export function WordDuel({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SoloWordDuel({
+  letters,
+  onAction,
+}: {
+  letters: string[];
+  onAction: (data: Record<string, unknown>) => void;
+}) {
+  const soloWords = useRoom((s) => s.soloWords);
+  const feedback = useRoom((s) => s.feedback);
+  const [built, setBuilt] = useState<number[]>([]);
+  const [lastTried, setLastTried] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBuilt([]);
+    setLastTried(null);
+  }, [letters]);
+
+  const word = built.map((i) => letters[i]).join("");
+  const tap = (i: number) => {
+    if (built.includes(i)) return;
+    setBuilt((b) => [...b, i]);
+  };
+  const submit = () => {
+    if (word.length < MIN_LEN) return;
+    onAction({ word });
+    setLastTried(word);
+    setBuilt([]);
+  };
+
+  // A rejected word (wrong feedback) that isn't in the accepted list.
+  const rejected =
+    feedback === "wrong" && lastTried !== null && !soloWords.includes(lastTried);
+
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5">
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        Make as many words as you can. Min {MIN_LEN} letters.
+      </p>
+
+      <div className="flex min-h-[44px] items-center gap-1">
+        {built.length === 0 ? (
+          <span className="font-[var(--font-display)] text-2xl text-[var(--color-text-secondary)]">
+            {rejected ? `${lastTried} · not a word` : "tap letters…"}
+          </span>
+        ) : (
+          built.map((i, k) => <Tile key={k} letter={letters[i]} small />)
+        )}
+      </div>
+
+      <div className="grid grid-cols-6 gap-2">
+        {letters.map((l, i) => (
+          <motion.button
+            key={i}
+            whileTap={{ scale: 0.9 }}
+            disabled={built.includes(i)}
+            onClick={() => tap(i)}
+            className="flex h-14 w-12 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-elevated)] font-[var(--font-display)] text-2xl font-bold transition-opacity disabled:opacity-25"
+          >
+            {l}
+          </motion.button>
+        ))}
+      </div>
+
+      <div className="flex w-full max-w-md items-center gap-2">
+        <button
+          onClick={() => setBuilt((b) => b.slice(0, -1))}
+          disabled={!built.length}
+          className="h-12 rounded-[var(--radius-card)] border border-[var(--color-border)] px-4 text-sm text-[var(--color-text-secondary)] disabled:opacity-40"
+        >
+          ⌫
+        </button>
+        <button
+          onClick={() => setBuilt([])}
+          disabled={!built.length}
+          className="h-12 rounded-[var(--radius-card)] border border-[var(--color-border)] px-4 text-sm text-[var(--color-text-secondary)] disabled:opacity-40"
+        >
+          clear
+        </button>
+        <Button full onClick={submit} disabled={word.length < MIN_LEN}>
+          Submit ({word.length})
+        </Button>
+      </div>
+
+      {/* Accepted words so far. */}
+      <div className="flex max-h-28 w-full max-w-md flex-wrap content-start justify-center gap-1.5 overflow-y-auto">
+        {soloWords.map((w) => (
+          <span
+            key={w}
+            className="rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 font-[var(--font-mono)] text-xs"
+          >
+            {w}
+            <span className="ml-1 text-[var(--color-success)]">+{w.length}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

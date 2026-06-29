@@ -16,12 +16,13 @@ interface Props {
   locked: boolean;
   feedback: Feedback;
   result: RoundResult | null;
+  solo?: boolean;
   onAction: (data: Record<string, unknown>) => void;
 }
 
 type Stage = "watch" | "input";
 
-export function ReactionGrid({ roundData, phase, feedback, onAction }: Props) {
+export function ReactionGrid({ roundData, phase, feedback, solo, onAction }: Props) {
   const active = phase === "active";
   const { sequence, flash_ms } = roundData;
   const [stage, setStage] = useState<Stage>("watch");
@@ -81,7 +82,7 @@ export function ReactionGrid({ roundData, phase, feedback, onAction }: Props) {
     ? "round over"
     : stage === "watch"
       ? "watch the sequence…"
-      : `your turn — ${input.length}/${sequence.length}`;
+      : `your turn · ${input.length}/${sequence.length}`;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 px-5">
@@ -119,7 +120,11 @@ export function ReactionGrid({ roundData, phase, feedback, onAction }: Props) {
       </div>
 
       <p className="h-5 text-sm text-[var(--color-warm)]">
-        {feedback === "wrong" ? "wrong — watch again and retry" : ""}
+        {feedback === "wrong"
+          ? solo
+            ? "missed · run over"
+            : "wrong · watch again and retry"
+          : ""}
       </p>
     </div>
   );

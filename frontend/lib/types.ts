@@ -15,6 +15,16 @@ export interface PlayerSlot extends Identity {
 
 export type RoomStatus = "waiting" | "in_progress" | "finished";
 
+export type RoomMode = "versus" | "solo";
+
+export interface SoloSummary {
+  player_id: string;
+  score: number;
+  metric: string; // e.g. "18,420 pts · 5 rounds"
+  is_best: boolean | null; // null for guests (decided client-side)
+  prev_best: number | null;
+}
+
 export interface GameInfo {
   type: string;
   name: string;
@@ -37,12 +47,14 @@ export interface GameState {
   round_ends_at?: number | null;
   last_result?: Record<string, unknown> | null;
   my_round_state?: { locked?: boolean; submitted?: boolean } | null;
+  solo_summary?: SoloSummary | null;
 }
 
 export interface Room {
   id: string;
   game_type: string;
   game_name?: string;
+  mode?: RoomMode;
   status: RoomStatus;
   host_id: string;
   host_handle: string;

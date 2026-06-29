@@ -104,6 +104,9 @@ class GeoGuess(BaseGame):
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
         return {"lat": secret["lat"], "lng": secret["lng"], "name": secret["name"]}
 
+    def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
+        return f"{score:,} pts · {self.total_rounds} rounds"
+
     def result_details(
         self,
         public: dict[str, Any],

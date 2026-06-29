@@ -58,6 +58,7 @@ interface RoomState {
   submitted: boolean;
   roundEndsAt: number | null;
   opponentSubmitted: boolean;
+  soloWords: string[]; // accepted words this solo Word Duel session
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
 
   connect: (roomId: string) => void;
@@ -82,6 +83,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   submitted: false,
   roundEndsAt: null,
   opponentSubmitted: false,
+  soloWords: [],
   justJoined: false,
 
   connect: (roomId) => {
@@ -91,7 +93,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     if (!token) return;
 
     const socket = new SkycaveSocket(roomId, token);
-    set({ socket, room: null, game: null, gameEnd: null });
+    set({ socket, room: null, game: null, gameEnd: null, soloWords: [] });
 
     socket.onStatus((status) => set({ status }));
 
@@ -197,17 +199,27 @@ export const useRoom = create<RoomState>((set, get) => ({
     });
 
 	    socket.on(WS.PLAYER_ACTION, (data: any) => {
-	      const me = useAuth.getState().identity?.id;
-	      if (data.player_id && data.player_id === me) {
+      const me = useAuth.getState().identity?.id;
+      if (data.player_id && data.player_id === me) {
+        const patch: Partial<RoomState> = {};
         if (data.correct === false) {
-          set({ feedback: "wrong", locked: !!data.locked });
-	        } else if (data.correct === true) {
-	          set({ feedback: "correct", submitted: true });
-	        }
-	      } else if (data.submitted) {
-	        set({ opponentSubmitted: true });
-	      }
-	    });
+          patch.feedback = "wrong";
+          patch.locked = !!data.locked;
+        } else if (data.correct === true) {
+          patch.feedback = "correct";
+          patch.submitted = true;
+        }
+        // Word Duel solo: running score + accepted words ride PLAYER_ACTION.
+        if (typeof data.score === "number") {
+          const g = get().game;
+          if (g) patch.game = { ...g, scores: { ...g.scores, [me!]: data.score } };
+        }
+        if (Array.isArray(data.used)) patch.soloWords = data.used as string[];
+        set(patch);
+      } else if (data.submitted) {
+        set({ opponentSubmitted: true });
+      }
+    });
 
 	    socket.on(WS.ROUND_RESULT, (data: RoundResult) => {
 	      set((s) => ({
@@ -249,6 +261,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   resetTransient: () =>
     set({
       roundResult: null,
+      soloWords: [],
       feedback: null,
 	      locked: false,
       submitted: false,

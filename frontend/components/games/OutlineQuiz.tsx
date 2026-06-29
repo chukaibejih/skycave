@@ -15,6 +15,7 @@ interface Props {
   locked: boolean;
   feedback: Feedback;
   result: RoundResult | null;
+  solo?: boolean;
   onAction: (data: Record<string, unknown>) => void;
 }
 
@@ -24,6 +25,7 @@ export function OutlineQuiz({
   locked,
   feedback,
   result,
+  solo,
   onAction,
 }: Props) {
   const active = phase === "active";
@@ -86,7 +88,7 @@ export function OutlineQuiz({
 
       {locked && active && (
         <p className="text-sm text-[var(--color-warm)]">
-          locked out — wait for the next round
+          locked out · wait for the next round
         </p>
       )}
     </div>

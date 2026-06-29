@@ -28,6 +28,10 @@ export function GameShell() {
 
   const phase = game.phase;
   const durationSec = Number((roundData as any)?.round_time ?? 0);
+  // Solo = single occupant. Only the round-based solo game (GeoGuess) shows a
+  // round counter; the timed/ladder games show score + clock instead.
+  const solo = room.players.length === 1;
+  const showRounds = !solo || game.game_type === "geoguess";
   const gameProps = {
     roundData: (roundData ?? {}) as any,
     phase,
@@ -37,6 +41,7 @@ export function GameShell() {
     result: roundResult,
     players: room.players,
     meId,
+    solo,
     onAction: sendAction,
   };
 
@@ -54,6 +59,7 @@ export function GameShell() {
         endsAt={roundEndsAt}
         durationSec={durationSec}
         active={phase === "active"}
+        showRounds={showRounds}
       />
 
       {/* "Get ready" beat between GAME_START and round 1. */}

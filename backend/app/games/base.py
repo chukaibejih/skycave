@@ -36,6 +36,40 @@ class BaseGame:
     mode: str = RACE
     points_per_round: int = 1
 
+    # ---- single-player ----
+    # Whether this game supports a solo mode (all six built games do).
+    solo_enabled: bool = True
+    # How solo plays out:
+    #   "rounds" — same fixed-round flow as versus, just one player (GeoGuess)
+    #   "timed"  — continuous beat-the-clock; a fresh prompt after each correct
+    #              answer, count correct in `solo_duration`s (Color/Flag/Outline)
+    #   "words"  — one prompt for the whole session; submit many answers that
+    #              accumulate score (Word Duel)
+    #   "ladder" — endless; each correct answer advances a level, one miss ends
+    #              the run; score = levels cleared (Reaction Grid)
+    solo_kind: str = "rounds"
+    solo_duration: float = 60.0  # session length for "timed" / "words"
+    # "timed" only: if True a wrong answer also advances to the next prompt
+    # (one shot per prompt — no retry, no brute-forcing). If False, a miss just
+    # flashes and the same prompt stays (player can retry or skip).
+    solo_advance_on_miss: bool = False
+
+    def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
+        """Human-readable score line for the solo share post / results.
+
+        e.g. GeoGuess -> "18,420 pts · 5 rounds". Higher score is always better.
+        Overridden per game; the default is a bare point count.
+        """
+        return f"{score:,} pts"
+
+    def solo_step_time(self, public: dict[str, Any]) -> float:
+        """Per-step time limit for "ladder" solo (seconds). Default round_time."""
+        return self.round_time
+
+    def solo_word(self, letters: list[str], word: str) -> int:
+        """Score a single submitted word for "words" solo (0 = invalid)."""
+        return 0
+
     # ---- round generation ----
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
         """Return ``(public_data, secret_data)`` for the given round."""
