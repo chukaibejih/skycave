@@ -1,0 +1,42 @@
+# Root safety-net ignore (subdirs also have their own .gitignore).
+# Never commit secrets or build/dependency artifacts.
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+!.env.local.example
+*.pem
+*.key
+**/secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.sqlite3
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-error.log*
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Misc ---
+*.log

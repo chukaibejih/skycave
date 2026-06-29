@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────────────────
+   Skycave design system — "midnight arcade"
+   Tokens mirror spec §7. Tailwind v4 reads the @theme block to generate
+   utilities (bg-base, text-primary, rounded-card, etc.).
+   ─────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Color palette */
+  --color-base: #05060a; /* near-black space */
+  --color-surface: #10131c; /* panels */
+  --color-elevated: #171b27; /* modals, overlays */
+  --color-primary: #8b7cff; /* electric violet */
+  --color-primary-glow: #8b7cff38; /* violet ambient glow */
+  --color-warm: #ff725e; /* coral */
+  --color-cyan: #67e8f9; /* portal edge */
+  --color-gold: #ffd166; /* special highlight */
+  --color-text-primary: #f5f7ff; /* off-white */
+  --color-text-secondary: #9aa3ba; /* muted labels */
+  --color-success: #56f0aa; /* mint */
+  --color-border: #283044; /* subtle borders */
+
+  /* Typography (font families injected by next/font in layout.tsx) */
+  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-body: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radii */
+  --radius-card: 12px;
+  --radius-button: 24px;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-out-default: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Base element styling */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: var(--color-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  /* Prevent iOS rubber-band revealing white behind the dark canvas. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(55% 45% at 50% -12%, #8b7cff40, transparent 68%),
+    radial-gradient(35% 30% at 88% 12%, #67e8f929, transparent 70%),
+    radial-gradient(28% 24% at 12% 28%, #ff725e20, transparent 72%),
+    linear-gradient(180deg, #070914 0%, var(--color-base) 52%, #030407 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    linear-gradient(#ffffff07 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff05 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at 50% 12%, black, transparent 72%);
+}
+
+body::after {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 50% 0%, transparent 0 28%, #05060a99 70%),
+    linear-gradient(180deg, transparent, #05060a 86%);
+}
+
+/* Display headings + numbers use Space Grotesk */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+/* Form controls — inputs don't inherit `color` from body by default, so mobile
+   browsers render the text near-black on our dark surfaces. Force the light
+   palette and a muted placeholder. */
+input,
+textarea,
+select {
+  color: var(--color-text-primary);
+  caret-color: var(--color-primary);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1; /* Firefox dims placeholders by default */
+}
+
+/* Honor reduced-motion for all the spring/portal animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Utility: violet glow shadow (spec component token). */
+.glow {
+  box-shadow: 0 0 24px var(--color-primary-glow);
+}
+
+.panel {
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white 0%);
+  background:
+    linear-gradient(180deg, #ffffff08, transparent 40%),
+    color-mix(in srgb, var(--color-surface) 86%, transparent);
+  box-shadow: 0 20px 70px #00000045;
+}
+
+.portal-shadow {
+  filter: drop-shadow(0 0 20px #8b7cff55) drop-shadow(0 0 42px #67e8f922);
+}
+
+/* Touch targets: enforce the 48px minimum on interactive primitives. */
+button,
+[role="button"],
+a.btn {
+  min-height: 48px;
+  touch-action: manipulation;
+}
