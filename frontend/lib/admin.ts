@@ -71,8 +71,21 @@ export interface GameRow {
   created_at: string;
 }
 
+export interface FeedbackRow {
+  id: number;
+  message: string;
+  submitter_handle: string | null;
+  is_guest: boolean;
+  page: string | null;
+  created_at: string;
+}
+
 export const getOverview = () => adminGet<Overview>("/admin/overview");
 export const getUsers = (limit = 100) =>
   adminGet<{ total: number; users: UserRow[] }>(`/admin/users?limit=${limit}`);
 export const getGames = (limit = 100) =>
   adminGet<{ total: number; games: GameRow[] }>(`/admin/games?limit=${limit}`);
+export const getFeedback = (limit = 200) =>
+  adminGet<{ total: number; feedback: FeedbackRow[] }>(
+    `/admin/feedback?limit=${limit}`
+  );

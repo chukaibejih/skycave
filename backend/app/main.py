@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.redis_client import close_redis, get_redis
-from app.routers import admin, auth, games, rooms, share, users
+from app.routers import admin, auth, feedback, games, rooms, share, users
 from app.websocket.handler import websocket_endpoint
 
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +44,7 @@ app.include_router(rooms.router)
 app.include_router(users.router)
 app.include_router(share.router)
 app.include_router(admin.router)
+app.include_router(feedback.router)
 
 
 @app.get("/health", tags=["meta"])

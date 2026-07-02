@@ -105,6 +105,13 @@ export const joinRoom = (roomId: string) =>
 export const getInvite = (roomId: string) =>
   request<{ text: string; intent_url: string }>(`/share/invite/${roomId}`);
 
+// ── Feedback ──
+export const submitFeedback = (message: string, page?: string) =>
+  request<{ ok: boolean }>("/feedback", {
+    method: "POST",
+    body: JSON.stringify({ message, page }),
+  });
+
 export const getScorecard = (roomId: string) =>
   request<{ text: string; intent_url: string; image_url: string | null }>(
     "/share/scorecard",

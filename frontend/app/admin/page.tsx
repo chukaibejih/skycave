@@ -6,9 +6,11 @@ import {
   adminLogin,
   clearAdminToken,
   getAdminToken,
+  getFeedback,
   getGames,
   getOverview,
   getUsers,
+  type FeedbackRow,
   type GameRow,
   type Overview,
   type UserRow,
@@ -24,7 +26,7 @@ const GAME_NAME: Record<string, string> = {
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 
-type Section = "overview" | "users" | "games";
+type Section = "overview" | "users" | "games" | "feedback";
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -34,6 +36,7 @@ export default function AdminPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [users, setUsers] = useState<UserRow[] | null>(null);
   const [games, setGames] = useState<GameRow[] | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackRow[] | null>(null);
 
   // Login form
   const [password, setPassword] = useState("");
@@ -62,6 +65,7 @@ export default function AdminPage() {
     if (!authed) return;
     if (section === "users" && !users) getUsers().then((r) => setUsers(r.users)).catch(handleErr);
     if (section === "games" && !games) getGames().then((r) => setGames(r.games)).catch(handleErr);
+    if (section === "feedback" && !feedback) getFeedback().then((r) => setFeedback(r.feedback)).catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, authed]);
 
@@ -92,6 +96,7 @@ export default function AdminPage() {
     setOverview(null);
     setUsers(null);
     setGames(null);
+    setFeedback(null);
   };
 
   if (checking) {
@@ -151,7 +156,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="mb-6 flex gap-2">
-        {(["overview", "users", "games"] as Section[]).map((s) => (
+        {(["overview", "users", "games", "feedback"] as Section[]).map((s) => (
           <button
             key={s}
             onClick={() => setSection(s)}
@@ -170,7 +175,41 @@ export default function AdminPage() {
       {section === "overview" && overview && <OverviewView o={overview} />}
       {section === "users" && <UsersView users={users} />}
       {section === "games" && <GamesView games={games} />}
+      {section === "feedback" && <FeedbackView feedback={feedback} />}
     </main>
+  );
+}
+
+function FeedbackView({ feedback }: { feedback: FeedbackRow[] | null }) {
+  if (!feedback) return <Loading />;
+  if (feedback.length === 0) return <Empty label="No feedback yet." />;
+  return (
+    <div className="space-y-3">
+      {feedback.map((f) => (
+        <div
+          key={f.id}
+          className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+        >
+          <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
+            {f.message}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
+            <span>
+              {f.submitter_handle
+                ? (f.is_guest ? f.submitter_handle : `@${f.submitter_handle}`)
+                : "anonymous"}
+            </span>
+            <span className="rounded-full bg-[var(--color-elevated)] px-2 py-0.5">
+              {f.is_guest ? "guest" : "bluesky"}
+            </span>
+            {f.page && <span>{f.page}</span>}
+            <span className="ml-auto">
+              {new Date(f.created_at).toLocaleString()}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

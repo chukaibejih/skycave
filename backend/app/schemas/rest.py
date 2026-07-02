@@ -163,3 +163,28 @@ class AdminGameRow(BaseModel):
 class AdminGamesResponse(BaseModel):
     total: int
     games: list[AdminGameRow]
+
+
+# --- Feedback ---
+
+class FeedbackRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    page: str | None = Field(default=None, max_length=255)
+
+
+class FeedbackAck(BaseModel):
+    ok: bool = True
+
+
+class AdminFeedbackRow(BaseModel):
+    id: int
+    message: str
+    submitter_handle: str | None
+    is_guest: bool
+    page: str | None
+    created_at: datetime
+
+
+class AdminFeedbackResponse(BaseModel):
+    total: int
+    feedback: list[AdminFeedbackRow]

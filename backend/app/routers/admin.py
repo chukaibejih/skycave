@@ -18,8 +18,10 @@ from app.core.database import get_db
 from app.core.deps import AdminAuth
 from app.core.redis_client import get_redis
 from app.core.security import create_admin_token
-from app.models import GameSession, User
+from app.models import Feedback, GameSession, User
 from app.schemas.rest import (
+    AdminFeedbackResponse,
+    AdminFeedbackRow,
     AdminGameRow,
     AdminGamesResponse,
     AdminLoginRequest,
@@ -164,5 +166,37 @@ async def games(
                 created_at=g.created_at,
             )
             for g in rows
+        ],
+    )
+
+
+@router.get("/feedback", response_model=AdminFeedbackResponse)
+async def feedback(
+    _: AdminAuth,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> AdminFeedbackResponse:
+    total = await db.scalar(select(func.count()).select_from(Feedback)) or 0
+    rows = (
+        await db.execute(
+            select(Feedback)
+            .order_by(desc(Feedback.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+    return AdminFeedbackResponse(
+        total=total,
+        feedback=[
+            AdminFeedbackRow(
+                id=f.id,
+                message=f.message,
+                submitter_handle=f.submitter_handle,
+                is_guest=f.is_guest,
+                page=f.page,
+                created_at=f.created_at,
+            )
+            for f in rows
         ],
     )

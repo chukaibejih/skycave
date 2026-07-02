@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import Script from "next/script";
+import { FeedbackButton } from "@/components/ui/FeedbackButton";
 import "./globals.css";
 
 const sora = Sora({
@@ -60,7 +61,10 @@ export default function RootLayout({
       lang="en"
       className={`${sora.variable} ${geist.variable} ${geistMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <FeedbackButton />
+      </body>
       {/* Heetsesh analytics — production only (async, non-blocking, every page). */}
       {analyticsEnabled && (
         <Script
