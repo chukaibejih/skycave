@@ -102,19 +102,39 @@ export default function Home() {
             <span className="block text-[var(--color-primary)]">Skycave.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-7 text-[var(--color-text-secondary)]">
-            Fast 1v1 games built for Bluesky links. Pick a room, post the
-            invite, and let anyone drop straight into the match.
+            Fast games built for Bluesky. Play solo and post your score, or
+            open a 1v1 room and let anyone tap in straight from the link.
           </p>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1, duration: 0.7 }}
-          className="relative mx-auto flex aspect-square w-full max-w-[300px] items-center justify-center sm:max-w-[440px] lg:max-w-[520px]"
-        >
-          <HubPortal games={games} onPlay={launch} />
-        </motion.div>
+        <div className="flex flex-col items-center gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            style={{
+              borderColor: "color-mix(in srgb, var(--color-primary) 45%, transparent)",
+              background: "color-mix(in srgb, var(--color-primary) 14%, transparent)",
+            }}
+            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-primary)]"
+          >
+            <motion.span
+              className="h-1.5 w-1.5 rounded-full bg-[var(--color-primary)] shadow-[0_0_12px_var(--color-primary)]"
+              animate={{ scale: [1, 1.6, 1], opacity: [1, 0.5, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            />
+            tap a game to play
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.7 }}
+            className="relative mx-auto flex aspect-square w-full max-w-[300px] items-center justify-center sm:max-w-[440px] lg:max-w-[520px]"
+          >
+            <HubPortal games={games} onPlay={launch} />
+          </motion.div>
+        </div>
       </section>
 
       <section className="pb-12">
