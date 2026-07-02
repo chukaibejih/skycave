@@ -47,12 +47,13 @@ export function AuthModal({
   };
 
   const onBluesky = () => {
-    // Hands off to the OAuth sidecar; the browser navigates away and returns to
-    // /oauth, which finishes login. (Guest is the path for local testing until
-    // the sidecar is deployed behind https.)
+    // Requires a handle — hands off to the OAuth sidecar, which navigates away
+    // and returns to /oauth to finish login.
+    const h = handle.trim();
+    if (!h) return;
     setBusy(true);
     setError(null);
-    startBlueskyLogin(handle.trim() || undefined);
+    startBlueskyLogin(h);
   };
 
   return (
@@ -103,15 +104,37 @@ export function AuthModal({
             </div>
 
             {/* Bluesky */}
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Bluesky handle
+            </label>
             <input
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
-              placeholder="your.bsky.social (optional)"
-              className="mb-3 w-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 font-[var(--font-mono)] text-sm outline-none focus:border-[var(--color-primary)]"
+              placeholder="you.bsky.social"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="mb-3 w-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 font-[var(--font-mono)] text-sm outline-none focus:border-[#1185FE]"
+              onKeyDown={(e) => e.key === "Enter" && onBluesky()}
             />
-            <Button variant="secondary" full onClick={onBluesky} disabled={busy}>
-              <BlueskyLogo className="h-5 w-5 text-[#1185FE]" /> Continue with Bluesky
+            <Button
+              variant="secondary"
+              full
+              onClick={onBluesky}
+              disabled={busy || !handle.trim()}
+              className="active:brightness-95"
+              style={{
+                backgroundColor: "#1185FE",
+                color: "#ffffff",
+                borderColor: "#1185FE",
+                boxShadow: "0 0 24px #1185fe55",
+              }}
+            >
+              <BlueskyLogo className="h-5 w-5" /> Continue with Bluesky
             </Button>
+            <p className="mt-2 text-center text-xs text-[var(--color-text-secondary)]">
+              Enter your handle to log in with Bluesky.
+            </p>
 
             {error && (
               <p className="mt-3 text-center text-sm text-[var(--color-warm)]">
