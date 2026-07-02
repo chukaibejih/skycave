@@ -21,6 +21,10 @@ const BASE = (process.env.PUBLIC_OAUTH_BASE ?? "http://localhost:8001/oauth").re
   ""
 );
 const FRONTEND = process.env.FRONTEND_URL ?? "http://localhost:3000";
+// atproto requires client_uri to share the client_id's origin. The metadata is
+// hosted on the API origin (e.g. https://api.skycave.space), not the frontend
+// apex, so derive it from BASE rather than using FRONTEND_URL.
+const CLIENT_ORIGIN = new URL(BASE).origin;
 
 // In-memory stores. State only needs to live across the login->callback round
 // trip (same process, seconds). We discard the OAuth session right after the
@@ -45,7 +49,7 @@ export async function createClient(): Promise<NodeOAuthClient> {
     clientMetadata: {
       client_id: `${BASE}/client-metadata.json`,
       client_name: "Skycave",
-      client_uri: FRONTEND,
+      client_uri: CLIENT_ORIGIN,
       redirect_uris: [`${BASE}/callback`],
       // Stick to the broad `atproto` scope — granular scopes aren't finalized.
       scope: "atproto",
