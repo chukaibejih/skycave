@@ -27,7 +27,7 @@ class User(Base):
     games_played: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     games_won: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     total_score: Mapped[int] = mapped_column(
-        BigInteger, default=0, server_default="0"
+        BigInteger, default=0, server_default="0", index=True  # leaderboard sort
     )
 
     created_at: Mapped[datetime] = mapped_column(

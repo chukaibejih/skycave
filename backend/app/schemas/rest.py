@@ -165,6 +165,24 @@ class AdminGamesResponse(BaseModel):
     games: list[AdminGameRow]
 
 
+# --- Leaderboard (public) ---
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    did: str
+    handle: str
+    display_name: str | None
+    avatar_url: str | None
+    games_played: int
+    games_won: int
+    total_score: int
+    win_rate: float
+
+
+class LeaderboardResponse(BaseModel):
+    entries: list[LeaderboardEntry]
+
+
 # --- Feedback ---
 
 class FeedbackRequest(BaseModel):

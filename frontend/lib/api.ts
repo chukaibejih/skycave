@@ -105,6 +105,21 @@ export const joinRoom = (roomId: string) =>
 export const getInvite = (roomId: string) =>
   request<{ text: string; intent_url: string }>(`/share/invite/${roomId}`);
 
+// ── Leaderboard ──
+export interface LeaderboardEntry {
+  rank: number;
+  did: string;
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  games_played: number;
+  games_won: number;
+  total_score: number;
+  win_rate: number;
+}
+export const getLeaderboard = (limit = 25) =>
+  request<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`);
+
 // ── Feedback ──
 export const submitFeedback = (message: string, page?: string) =>
   request<{ ok: boolean }>("/feedback", {
