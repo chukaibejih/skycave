@@ -2,6 +2,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "./Button";
+import { BlueskyLogo } from "./BlueskyLogo";
 import { guestLogin } from "@/lib/api";
 import { startBlueskyLogin } from "@/lib/bluesky";
 import { useAuth } from "@/lib/store";
@@ -109,7 +110,7 @@ export function AuthModal({
               className="mb-3 w-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 font-[var(--font-mono)] text-sm outline-none focus:border-[var(--color-primary)]"
             />
             <Button variant="secondary" full onClick={onBluesky} disabled={busy}>
-              <span aria-hidden>🦋</span> Continue with Bluesky
+              <BlueskyLogo className="h-5 w-5 text-[#1185FE]" /> Continue with Bluesky
             </Button>
 
             {error && (
