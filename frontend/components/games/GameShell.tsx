@@ -1,14 +1,19 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { ScoreHeader } from "./ScoreHeader";
 import { FeedbackFlash } from "./Feedback";
-import { ColorClash } from "./ColorClash";
-import { FlagRush } from "./FlagRush";
-import { GeoGuess } from "./GeoGuess";
-import { OutlineQuiz } from "./OutlineQuiz";
-import { WordDuel } from "./WordDuel";
-import { ReactionGrid } from "./ReactionGrid";
 import { useAuth, useRoom } from "@/lib/store";
+
+// Each game is code-split so entering a room only downloads the one being
+// played (the globe stays behind GeoGuess's own dynamic import too). Client-only
+// (ssr:false must be an inline literal per next/dynamic's SWC transform).
+const ColorClash = dynamic(() => import("./ColorClash").then((m) => m.ColorClash), { ssr: false });
+const FlagRush = dynamic(() => import("./FlagRush").then((m) => m.FlagRush), { ssr: false });
+const GeoGuess = dynamic(() => import("./GeoGuess").then((m) => m.GeoGuess), { ssr: false });
+const OutlineQuiz = dynamic(() => import("./OutlineQuiz").then((m) => m.OutlineQuiz), { ssr: false });
+const WordDuel = dynamic(() => import("./WordDuel").then((m) => m.WordDuel), { ssr: false });
+const ReactionGrid = dynamic(() => import("./ReactionGrid").then((m) => m.ReactionGrid), { ssr: false });
 
 export function GameShell() {
   const {

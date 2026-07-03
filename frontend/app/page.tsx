@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -41,8 +41,9 @@ export default function Home() {
     }
   };
 
-  // Tapping any game opens the mode chooser (no hidden mode state).
-  const launch = (game: GameInfo) => setChooser(game);
+  // Tapping any game opens the mode chooser (no hidden mode state). Stable
+  // reference so the memoized orbit/cards don't re-render on modal open/close.
+  const launch = useCallback((game: GameInfo) => setChooser(game), []);
 
   const choose = async (game: GameInfo, m: "versus" | "solo") => {
     setChooser(null);
@@ -301,7 +302,7 @@ const PARK_EASE = "transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)";
 // pill counter-spins so its label stays upright. Tapping a pill parks it at 3
 // o'clock and lights up the center as "PLAY"; tapping center plays it.
 // Positions are derived from the game count, so adding a game just works.
-function HubPortal({
+const HubPortal = memo(function HubPortal({
   games,
   onPlay,
 }: {
@@ -453,4 +454,4 @@ function HubPortal({
       </motion.button>
     </div>
   );
-}
+});

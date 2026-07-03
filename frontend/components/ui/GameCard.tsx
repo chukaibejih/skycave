@@ -1,4 +1,5 @@
 "use client";
+import { memo } from "react";
 import { motion } from "framer-motion";
 import type { GameInfo } from "@/lib/types";
 
@@ -82,7 +83,7 @@ function Glyph({ type, color }: { type: string; color: string }) {
   }
 }
 
-export function GameCard({
+export const GameCard = memo(function GameCard({
   game,
   onPlay,
 }: {
@@ -149,4 +150,4 @@ export function GameCard({
       </div>
     </motion.button>
   );
-}
+});

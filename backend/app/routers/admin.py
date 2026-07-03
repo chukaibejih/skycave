@@ -48,22 +48,28 @@ async def admin_login(body: AdminLoginRequest) -> AdminTokenResponse:
 
 
 async def _count_rooms() -> tuple[int, int]:
-    """Scan Redis for live rooms; return (total, in_progress)."""
+    """Scan Redis for live rooms; return (total, in_progress).
+
+    Collects keys via SCAN, then fetches values in batched MGETs instead of one
+    GET per key (turns N round-trips into ~N/500).
+    """
     r = get_redis()
-    total = 0
-    in_progress = 0
-    async for key in r.scan_iter(match="room:*", count=200):
-        total += 1
-        raw = await r.get(key)
-        if raw:
-            try:
-                if json.loads(raw).get("status") == "in_progress":
-                    in_progress += 1
-            except (ValueError, TypeError):
-                pass
-        if total >= 2000:  # safety cap
+    keys: list[str] = []
+    async for key in r.scan_iter(match="room:*", count=500):
+        keys.append(key)
+        if len(keys) >= 2000:  # safety cap
             break
-    return total, in_progress
+
+    in_progress = 0
+    for i in range(0, len(keys), 500):
+        for raw in await r.mget(keys[i : i + 500]):
+            if raw:
+                try:
+                    if json.loads(raw).get("status") == "in_progress":
+                        in_progress += 1
+                except (ValueError, TypeError):
+                    pass
+    return len(keys), in_progress
 
 
 @router.get("/overview", response_model=AdminOverview)

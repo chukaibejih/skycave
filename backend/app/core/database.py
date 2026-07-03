@@ -17,7 +17,10 @@ class Base(DeclarativeBase):
 engine = create_async_engine(
     settings.database_url,
     echo=settings.env == "development",
-    pool_pre_ping=True,
+    pool_pre_ping=True,   # verify a conn before use (managed PG drops idle ones)
+    pool_size=10,
+    max_overflow=10,      # up to 20 concurrent conns
+    pool_recycle=1800,    # recycle every 30 min to avoid stale connections
 )
 
 AsyncSessionLocal = async_sessionmaker(
