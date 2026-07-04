@@ -5,8 +5,11 @@ import { useState } from "react";
 import { Button } from "./Button";
 import { submitFeedback } from "@/lib/api";
 
-// Floating "Feedback" button, available on every page except the back office.
-// Writes to the server; admins read it under /admin → Feedback.
+// Floating "Feedback" button. Available on the hub, leaderboard and results,
+// but hidden on the back office and during game sessions (room/play) so it
+// never overlaps gameplay. Writes to the server; admins read it under /admin.
+const HIDDEN_ON = ["/admin", "/room", "/play"];
+
 export function FeedbackButton() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -14,7 +17,7 @@ export function FeedbackButton() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
-  if (pathname?.startsWith("/admin")) return null;
+  if (HIDDEN_ON.some((p) => pathname?.startsWith(p))) return null;
 
   const close = () => {
     if (busy) return;

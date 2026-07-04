@@ -27,11 +27,12 @@ function shortDate(): string {
  * Build the solo Bluesky post. Reads naturally in a feed and carries the play
  * link so anyone can tap in to beat the score (the invite mechanic itself).
  *
- *   Color Clash · Jun 29
+ *   Color Clash on Skycave · Jun 29
  *
  *   34 correct · 60 seconds
  *   personal best
  *
+ *   beat my score:
  *   skycave.space/play/color-clash
  */
 export function soloShareText(opts: {
@@ -40,9 +41,9 @@ export function soloShareText(opts: {
   metric: string;
   isBest: boolean;
 }): string {
-  const lines = [`${opts.gameName} · ${shortDate()}`, "", opts.metric];
+  const lines = [`${opts.gameName} on Skycave · ${shortDate()}`, "", opts.metric];
   if (opts.isBest) lines.push("personal best");
-  lines.push("", playUrl(opts.gameType));
+  lines.push("", "beat my score:", playUrl(opts.gameType));
   return lines.join("\n");
 }
 

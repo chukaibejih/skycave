@@ -27,8 +27,12 @@ def compose_intent(text: str) -> str:
 
 
 def invite_text(game_name: str, room_id: str) -> str:
-    # Bluesky tone: lowercase, terse, reads like a person not a notification.
-    return f"anyone want to run it? playing {game_name} rn\n\n{invite_url(room_id)}"
+    # Give the reader context: what it is + that they can just tap in. Casual
+    # tone so it still reads like a person, not a notification.
+    return (
+        f"come play me in {game_name} on Skycave. tap the link to jump straight "
+        f"in, no account needed:\n\n{invite_url(room_id)}"
+    )
 
 
 def scorecard_text(
@@ -41,12 +45,12 @@ def scorecard_text(
     when: date | None = None,
 ) -> str:
     when = when or date.today()
-    # e.g. "GeoGuess 1v1 · Jun 27"
-    header = f"{game_name} · {when.strftime('%b %-d')}"
+    # e.g. "GeoGuess 1v1 on Skycave · Jun 27"
+    header = f"{game_name} on Skycave · {when.strftime('%b %-d')}"
     # Align the two score lines on a simple column.
     width = max(len(p1_handle), len(p2_handle)) + 3
     body = (
         f"{p1_handle.ljust(width)}{p1_score}\n"
         f"{p2_handle.ljust(width)}{p2_score}"
     )
-    return f"{header}\n\n{body}\n\n{results_url(room_id)}"
+    return f"{header}\n\n{body}\n\nyour turn:\n{results_url(room_id)}"
