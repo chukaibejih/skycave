@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
@@ -23,22 +23,20 @@ export default function LeaderboardPage() {
   const [cache, setCache] = useState<
     Partial<Record<LeaderboardPeriod, LeaderboardEntry[]>>
   >({});
-  const loading = useRef<Set<string>>(new Set());
   const entries = cache[period] ?? null;
 
   useEffect(() => {
-    if (cache[period] || loading.current.has(period)) return;
-    loading.current.add(period);
-    let cancelled = false;
+    if (cache[period]) return; // already loaded this period
+    let active = true;
     getLeaderboard(period, 25)
-      .then((r) => !cancelled && setCache((c) => ({ ...c, [period]: r.entries })))
+      .then((r) => {
+        if (active) setCache((c) => ({ ...c, [period]: r.entries }));
+      })
       .catch(() => {
-        if (cancelled) return;
-        loading.current.delete(period);
-        setCache((c) => ({ ...c, [period]: [] }));
+        if (active) setCache((c) => ({ ...c, [period]: [] }));
       });
     return () => {
-      cancelled = true;
+      active = false;
     };
   }, [period, cache]);
 
