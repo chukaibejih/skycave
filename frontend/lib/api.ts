@@ -117,8 +117,11 @@ export interface LeaderboardEntry {
   total_score: number;
   win_rate: number;
 }
-export const getLeaderboard = (limit = 25) =>
-  request<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`);
+export type LeaderboardPeriod = "all" | "week";
+export const getLeaderboard = (period: LeaderboardPeriod = "all", limit = 25) =>
+  request<{ entries: LeaderboardEntry[] }>(
+    `/leaderboard?period=${period}&limit=${limit}`
+  );
 
 // ── Feedback ──
 export const submitFeedback = (message: string, page?: string) =>

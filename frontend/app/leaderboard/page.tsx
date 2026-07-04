@@ -1,21 +1,46 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
-import { getLeaderboard, type LeaderboardEntry } from "@/lib/api";
+import {
+  getLeaderboard,
+  type LeaderboardEntry,
+  type LeaderboardPeriod,
+} from "@/lib/api";
 
 const bskyProfile = (handle: string) => `https://bsky.app/profile/${handle}`;
 
+const TABS: { key: LeaderboardPeriod; label: string }[] = [
+  { key: "week", label: "This week" },
+  { key: "all", label: "All time" },
+];
+
 export default function LeaderboardPage() {
   const router = useRouter();
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
+  const [period, setPeriod] = useState<LeaderboardPeriod>("week");
+  // Cache each period so toggling back and forth doesn't refetch/flicker.
+  const [cache, setCache] = useState<
+    Partial<Record<LeaderboardPeriod, LeaderboardEntry[]>>
+  >({});
+  const loading = useRef<Set<string>>(new Set());
+  const entries = cache[period] ?? null;
 
   useEffect(() => {
-    getLeaderboard(25)
-      .then((r) => setEntries(r.entries))
-      .catch(() => setEntries([]));
-  }, []);
+    if (cache[period] || loading.current.has(period)) return;
+    loading.current.add(period);
+    let cancelled = false;
+    getLeaderboard(period, 25)
+      .then((r) => !cancelled && setCache((c) => ({ ...c, [period]: r.entries })))
+      .catch(() => {
+        if (cancelled) return;
+        loading.current.delete(period);
+        setCache((c) => ({ ...c, [period]: [] }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [period, cache]);
 
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -51,6 +76,24 @@ export default function LeaderboardPage() {
         <div className="w-12" />
       </header>
 
+      {/* Period tabs */}
+      <div className="mb-5 flex justify-center gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setPeriod(t.key)}
+            className="rounded-full border px-4 py-2 text-sm transition-colors"
+            style={{
+              borderColor: period === t.key ? "var(--color-primary)" : "var(--color-border)",
+              color: period === t.key ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+              background: period === t.key ? "color-mix(in srgb, var(--color-primary) 16%, transparent)" : "transparent",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {entries === null ? (
         <p className="py-16 text-center text-sm text-[var(--color-text-secondary)]">
           loading…
@@ -58,7 +101,7 @@ export default function LeaderboardPage() {
       ) : entries.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-16 text-center">
           <div className="font-[var(--font-display)] text-xl font-semibold">
-            No one on the board yet.
+            {period === "week" ? "No games yet this week." : "No one on the board yet."}
           </div>
           <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--color-text-secondary)]">
             Log in with Bluesky and play a game to claim the top spot. Guests
@@ -126,7 +169,9 @@ export default function LeaderboardPage() {
       )}
 
       <p className="mt-4 text-center font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
-        ranked by cumulative 1v1 score
+        {period === "week"
+          ? "1v1 score from the last 7 days"
+          : "ranked by cumulative 1v1 score"}
       </p>
     </main>
   );
