@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -16,6 +16,8 @@ class PersonalBest(Base):
     """
 
     __tablename__ = "personal_bests"
+    # Solo leaderboard sort: top best_scores within a game.
+    __table_args__ = (Index("ix_pb_game_score", "game_type", "best_score"),)
 
     player_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     game_type: Mapped[str] = mapped_column(String(64), primary_key=True)

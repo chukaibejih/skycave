@@ -164,6 +164,7 @@ async def games(
             AdminGameRow(
                 id=g.id,
                 game_type=g.game_type,
+                mode=g.mode,
                 player1_handle=g.player1_handle,
                 player1_score=g.player1_score,
                 player2_handle=g.player2_handle,

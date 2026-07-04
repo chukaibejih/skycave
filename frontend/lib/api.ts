@@ -118,9 +118,16 @@ export interface LeaderboardEntry {
   win_rate: number;
 }
 export type LeaderboardPeriod = "all" | "week";
-export const getLeaderboard = (period: LeaderboardPeriod = "all", limit = 25) =>
+export type LeaderboardMode = "versus" | "solo";
+export const getLeaderboard = (opts: {
+  game: string;
+  mode: LeaderboardMode;
+  period?: LeaderboardPeriod;
+  limit?: number;
+}) =>
   request<{ entries: LeaderboardEntry[] }>(
-    `/leaderboard?period=${period}&limit=${limit}`
+    `/leaderboard?game=${opts.game}&mode=${opts.mode}` +
+      `&period=${opts.period ?? "all"}&limit=${opts.limit ?? 25}`
   );
 
 // ── Feedback ──

@@ -41,6 +41,15 @@ async def init_db() -> None:
     """
     # Import models so they register on Base.metadata before create_all.
     from app import models  # noqa: F401
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # create_all won't add columns to a pre-existing table. Idempotently
+        # backfill columns added after a table first shipped (Postgres-only).
+        await conn.execute(
+            text(
+                "ALTER TABLE game_sessions "
+                "ADD COLUMN IF NOT EXISTS mode VARCHAR(16) NOT NULL DEFAULT 'versus'"
+            )
+        )

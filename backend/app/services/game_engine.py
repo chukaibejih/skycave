@@ -590,13 +590,13 @@ async def end_game(room_id: str) -> None:
 
     await manager.broadcast(room_id, events.message(events.GAME_END, payload))
 
-    # Versus games are persisted as a GameSession (history + stats). Solo plays
-    # are tracked via _persist_solo (personal best) above, not as 1v1 sessions.
-    if not is_solo:
-        try:
-            await _persist_game(room, winner_id)
-        except Exception:  # noqa: BLE001 - persistence must never break the game
-            logger.exception("failed to persist game session for room %s", room_id)
+    # Every finished game is persisted as a GameSession so the back office counts
+    # all play. Solo also updates the player's personal best (via _persist_solo
+    # above) for the solo leaderboard; that's separate from history/stats here.
+    try:
+        await _persist_game(room, winner_id, "solo" if is_solo else "versus")
+    except Exception:  # noqa: BLE001 - persistence must never break the game
+        logger.exception("failed to persist game session for room %s", room_id)
 
 
 def _decide_winner(scores: dict[str, int]) -> str | None:
@@ -608,7 +608,9 @@ def _decide_winner(scores: dict[str, int]) -> str | None:
     return ranked[0][0]
 
 
-async def _persist_game(room: dict[str, Any], winner_id: str | None) -> None:
+async def _persist_game(
+    room: dict[str, Any], winner_id: str | None, mode: str = "versus"
+) -> None:
     from sqlalchemy import select
 
     from app.core.database import AsyncSessionLocal
@@ -618,22 +620,27 @@ async def _persist_game(room: dict[str, Any], winner_id: str | None) -> None:
     gs = room["game"]
     scores = gs["scores"]
     p1 = players[0]
-    p2 = players[1] if len(players) > 1 else None
+    p2 = players[1] if len(players) > 1 and mode != "solo" else None
 
-    # Build round-by-round breakdown for the score card.
-    rounds = [
-        {
-            "round": h["round"],
-            "p1": h["points"].get(p1["id"], 0),
-            "p2": h["points"].get(p2["id"], 0) if p2 else 0,
-        }
-        for h in gs["history"]
-    ]
+    # Round-by-round breakdown for the (1v1) score card; solo has no card.
+    rounds = (
+        []
+        if mode == "solo"
+        else [
+            {
+                "round": h["round"],
+                "p1": h["points"].get(p1["id"], 0),
+                "p2": h["points"].get(p2["id"], 0) if p2 else 0,
+            }
+            for h in gs["history"]
+        ]
+    )
 
     async with AsyncSessionLocal() as db:
         session = GameSession(
             room_id=room["id"],
             game_type=room["game_type"],
+            mode=mode,
             player1_id=p1["id"],
             player1_handle=p1["handle"],
             player2_id=p2["id"] if p2 else None,

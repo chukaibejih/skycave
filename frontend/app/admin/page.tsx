@@ -285,8 +285,10 @@ function GamesView({ games }: { games: GameRow[] | null }) {
   return (
     <Table head={["When", "Game", "Result", "Winner"]}>
       {games.map((g) => {
-        const winner =
-          g.player1_score === g.player2_score
+        const solo = g.mode === "solo";
+        const winner = solo
+          ? "solo run"
+          : g.player1_score === g.player2_score
             ? "draw"
             : g.player1_score > g.player2_score
               ? g.player1_handle
@@ -296,13 +298,26 @@ function GamesView({ games }: { games: GameRow[] | null }) {
             <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
               {new Date(g.created_at).toLocaleString()}
             </Td>
-            <Td>{gname(g.game_type)}</Td>
+            <Td>
+              {gname(g.game_type)}
+              {solo && (
+                <span className="ml-2 rounded-full bg-[var(--color-elevated)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  solo
+                </span>
+              )}
+            </Td>
             <Td className="font-[var(--font-mono)] whitespace-nowrap">
               <span className="text-[var(--color-primary)]">{g.player1_handle}</span>{" "}
-              {g.player1_score}-{g.player2_score}{" "}
-              <span className="text-[var(--color-warm)]">{g.player2_handle ?? "-"}</span>
+              {solo ? (
+                g.player1_score.toLocaleString()
+              ) : (
+                <>
+                  {g.player1_score}-{g.player2_score}{" "}
+                  <span className="text-[var(--color-warm)]">{g.player2_handle ?? "-"}</span>
+                </>
+              )}
             </Td>
-            <Td className={winner === "draw" ? "text-[var(--color-text-secondary)]" : "text-[var(--color-success)]"}>
+            <Td className={winner === "draw" || solo ? "text-[var(--color-text-secondary)]" : "text-[var(--color-success)]"}>
               {winner}
             </Td>
           </tr>

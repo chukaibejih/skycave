@@ -152,6 +152,7 @@ class AdminUsersResponse(BaseModel):
 class AdminGameRow(BaseModel):
     id: int
     game_type: str
+    mode: str
     player1_handle: str
     player1_score: int
     player2_handle: str | None

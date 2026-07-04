@@ -20,6 +20,12 @@ class GameSession(Base):
     room_id: Mapped[str] = mapped_column(String(16), index=True)
     game_type: Mapped[str] = mapped_column(String(64), index=True)
 
+    # "versus" (1v1) or "solo". Solo rows have no player2/winner; recorded so the
+    # back office counts every game, but excluded from the 1v1 leaderboard.
+    mode: Mapped[str] = mapped_column(
+        String(16), default="versus", server_default="versus", index=True
+    )
+
     player1_id: Mapped[str] = mapped_column(String(255), index=True)
     player1_handle: Mapped[str] = mapped_column(String(255))
     player2_id: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)

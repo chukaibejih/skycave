@@ -42,6 +42,9 @@ _wildcard = "*" in _origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if _wildcard else _origins,
+    # Allow cloudflared quick tunnels (phone/laptop testing) without hardcoding
+    # the URL, which changes on every tunnel restart. Never matches prod origins.
+    allow_origin_regex=None if _wildcard else r"https://[a-z0-9-]+\.trycloudflare\.com",
     allow_credentials=not _wildcard,
     allow_methods=["*"],
     allow_headers=["*"],

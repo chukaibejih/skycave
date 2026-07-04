@@ -63,6 +63,7 @@ export interface UserRow {
 export interface GameRow {
   id: number;
   game_type: string;
+  mode: string;
   player1_handle: string;
   player1_score: number;
   player2_handle: string | null;
