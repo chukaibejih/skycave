@@ -60,6 +60,7 @@ interface RoomState {
   opponentSubmitted: boolean;
   soloWords: string[]; // accepted words this solo Word Duel session
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
+  roomExpired: boolean; // waiting room auto-closed (no opponent joined)
 
   connect: (roomId: string) => void;
   disconnect: () => void;
@@ -85,6 +86,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   opponentSubmitted: false,
   soloWords: [],
   justJoined: false,
+  roomExpired: false,
 
   connect: (roomId) => {
     // Tear down any prior socket (e.g. navigating between rooms).
@@ -93,11 +95,11 @@ export const useRoom = create<RoomState>((set, get) => ({
     if (!token) return;
 
     const socket = new SkycaveSocket(roomId, token);
-    set({ socket, room: null, game: null, gameEnd: null, soloWords: [] });
+    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], roomExpired: false });
 
     socket.onStatus((status) => set({ status }));
 
-    // Full snapshot on (re)connect — rehydrate everything for state recovery.
+    // Full snapshot on (re)connect: rehydrate everything for state recovery.
 	    socket.on(WS.ROOM_STATE, (room: Room) => {
       const lastResult = room.game?.last_result as RoundResult | null | undefined;
       const myRoundState = room.game?.my_round_state;
@@ -108,6 +110,7 @@ export const useRoom = create<RoomState>((set, get) => ({
         roundResult: lastResult ?? null,
         locked: !!myRoundState?.locked,
         submitted: !!myRoundState?.submitted,
+        roomExpired: room.status === "expired",
         roundEndsAt: room.game?.round_ends_at ?? null,
 	        // If we reconnected mid-finished game, surface the end screen.
         gameEnd:
@@ -131,6 +134,17 @@ export const useRoom = create<RoomState>((set, get) => ({
           justJoined: wasWaiting && data.players.length >= 2,
         });
       }
+    });
+
+    // Server closed the waiting room (no opponent joined in time). Flip the flag
+    // so the host's lobby transitions to the "nobody joined" state immediately,
+    // without waiting for the visual countdown to reach zero.
+    socket.on(WS.ROOM_EXPIRED, () => {
+      const room = get().room;
+      set({
+        roomExpired: true,
+        room: room ? { ...room, status: "expired" } : room,
+      });
     });
 
     socket.on(WS.PLAYER_DISCONNECTED, (data: { player_id: string }) => {

@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { shakeVariants } from "./Feedback";
 import type { Feedback, RoundResult } from "@/lib/store";
@@ -31,6 +32,12 @@ export function OutlineQuiz({
   const active = phase === "active";
   const answer = result?.answer as { code?: string; name?: string } | undefined;
   const maskUrl = `url(/outlines/${roundData.code}.svg)`;
+
+  // Solo: flash the tapped option green (correct) or red (wrong), then the next
+  // prompt replaces it. Correctness is client-derivable (roundData.code is the
+  // answer). Reset whenever a new prompt arrives.
+  const [picked, setPicked] = useState<{ code: string; correct: boolean } | null>(null);
+  useEffect(() => setPicked(null), [roundData]);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 px-5">
@@ -67,18 +74,35 @@ export function OutlineQuiz({
       <div className="grid w-full max-w-md grid-cols-2 gap-3">
         {roundData.options.map((opt) => {
           const isCorrect = !active && answer?.code === opt.code;
+          const flash = solo && picked?.code === opt.code ? picked : null;
           return (
             <motion.button
               key={opt.code}
               whileTap={{ scale: 0.96 }}
               disabled={!active || locked}
-              onClick={() => onAction({ code: opt.code })}
-              className="min-h-[52px] rounded-[var(--radius-card)] border bg-[var(--color-surface)] px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60"
-              style={{
-                borderColor: isCorrect
-                  ? "var(--color-success)"
-                  : "var(--color-border)",
+              onClick={() => {
+                if (solo) {
+                  if (picked) return; // one answer per prompt
+                  setPicked({ code: opt.code, correct: opt.code === roundData.code });
+                }
+                onAction({ code: opt.code });
               }}
+              className="min-h-[52px] rounded-[var(--radius-card)] border bg-[var(--color-surface)] px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60"
+              style={
+                flash
+                  ? {
+                      borderWidth: 2,
+                      borderColor: flash.correct ? "#4FFFB0" : "#FF6B6B",
+                      backgroundColor: flash.correct ? "#4FFFB015" : "#FF6B6B15",
+                      transition: "none", // immediate, no fade in
+                      opacity: 1,
+                    }
+                  : {
+                      borderColor: isCorrect
+                        ? "var(--color-success)"
+                        : "var(--color-border)",
+                    }
+              }
             >
               {opt.name}
             </motion.button>

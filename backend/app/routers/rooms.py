@@ -15,7 +15,7 @@ from app.schemas.rest import (
     PlayerSlot,
     RoomResponse,
 )
-from app.services import room_manager as rooms
+from app.services import room_expiry, room_manager as rooms
 from app.services.sharing import invite_url
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -52,6 +52,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
         host_handle=room["host_handle"],
         players=[PlayerSlot(**p) for p in room["players"]],
         invite_url=invite_url(room["id"]),
+        expires_at=room.get("expires_at"),
         game=summary,
     )
 
@@ -77,6 +78,11 @@ async def create_room(
 
     await rooms.create_room(room_id, body.game_type, identity.model_dump(), mode=mode)
 
+    # Versus rooms silently start a 15 minute expiry window in the background;
+    # if no opponent joins, the room auto-closes. Solo rooms never wait.
+    if mode == "versus":
+        await room_expiry.arm(room_id)
+
     # Persist the durable anchor (for invite-link OG preview + history).
     db.add(
         Room(
@@ -98,6 +104,9 @@ async def get_room(room_id: str) -> RoomResponse:
     room = await rooms.get_room(room_id)
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
+    # Lazily close a room whose join window has elapsed, so a fresh load resolves
+    # to a clean "expired" state instead of a stale "waiting" one.
+    room = await room_expiry.ensure_fresh(room)
     game = get_game(room["game_type"])
     return _to_response(room, game.name if game else room["game_type"])
 
@@ -109,6 +118,10 @@ async def join_room(room_id: str, identity: CurrentIdentity) -> JoinRoomResponse
         raise HTTPException(status_code=404, detail="Room not found")
     if status == "full":
         raise HTTPException(status_code=409, detail="Room is full")
+
+    # An opponent arrived: close the expiry window so the room can't auto-expire.
+    if status == "joined":
+        await room_expiry.disarm(room_id)
 
     game = get_game(room["game_type"])
     you = rooms.find_player(room, identity.id)

@@ -87,6 +87,8 @@ class RoomResponse(BaseModel):
     host_handle: str
     players: list[PlayerSlot]
     invite_url: str
+    # Unix seconds when a waiting versus room auto-closes; null once claimed/solo.
+    expires_at: int | None = None
     game: GameSummary | None = None
 
 

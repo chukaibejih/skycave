@@ -14,7 +14,7 @@ import logging
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.core.deps import identity_from_token
-from app.services import game_engine, room_manager as rooms
+from app.services import game_engine, room_expiry, room_manager as rooms
 from app.websocket import events
 from app.websocket.manager import manager
 
@@ -31,6 +31,7 @@ def _public_room(room: dict, player_id: str) -> dict:
         "host_id": room["host_id"],
         "host_handle": room["host_handle"],
         "players": room["players"],
+        "expires_at": room.get("expires_at"),
         "game": None,
     }
     game = room.get("game")
@@ -70,6 +71,9 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, token: str | None) -> 
     if room is None:
         await ws.close(code=4404)  # room not found
         return
+    # A room whose join window elapsed while nobody was connected: reflect the
+    # expired status in the snapshot below so a late connector sees it too.
+    room = await room_expiry.ensure_fresh(room)
 
     # Must already be a member (joined via REST POST /rooms or /rooms/{id}/join).
     if rooms.find_player(room, identity.id) is None:

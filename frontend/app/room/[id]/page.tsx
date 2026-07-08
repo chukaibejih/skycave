@@ -1,15 +1,18 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { RoomPortal } from "@/components/lobby/RoomPortal";
 import { PlayerCard } from "@/components/lobby/PlayerCard";
 import { ShareButton } from "@/components/lobby/ShareButton";
+import { ChallengeFlow } from "@/components/lobby/ChallengeFlow";
+import { RoomCountdown } from "@/components/lobby/RoomCountdown";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
 import { preloadGlobe } from "@/components/games/GlobePicker";
-import { getInvite, getRoom, joinRoom } from "@/lib/api";
+import { createRoom, getInvite, getRoom, joinRoom } from "@/lib/api";
+import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth, useRoom } from "@/lib/store";
 
 export default function RoomPage() {
@@ -21,17 +24,21 @@ export default function RoomPage() {
     status,
     game,
     gameEnd,
+    roomExpired,
     connect,
     disconnect,
     sendReady,
   } = useRoom();
 
   const [notFound, setNotFound] = useState(false);
+  const [landedExpired, setLandedExpired] = useState(false); // arrived after it closed
+  const [timedOut, setTimedOut] = useState(false); // countdown reached zero locally
   const [inviteText, setInviteText] = useState("");
   const [iAmReady, setIAmReady] = useState(false);
+  const [challengeOpen, setChallengeOpen] = useState(false);
   // Guards the join+connect to run exactly once per mount. Critically it does
   // NOT depend on `room`, so the socket's `room: null` reset can't re-trigger
-  // it — that race was causing a rapid connect/disconnect loop on the joiner
+  // it. That race was causing a rapid connect/disconnect loop on the joiner
   // (worse over high-latency mobile, where ROOM_STATE lands after the re-run).
   const startedRef = useRef(false);
 
@@ -51,7 +58,13 @@ export default function RoomPage() {
     startedRef.current = true;
     (async () => {
       try {
-        await getRoom(id); // existence check (404 -> notFound)
+        const existing = await getRoom(id); // existence check (404 -> notFound)
+        // Landed on a link whose window already closed: show the closed page
+        // instead of joining a dead room.
+        if (existing.status === "expired") {
+          setLandedExpired(true);
+          return;
+        }
         await joinRoom(id);
         getInvite(id).then((r) => setInviteText(r.text)).catch(() => {});
         connect(id);
@@ -80,6 +93,25 @@ export default function RoomPage() {
       return () => clearTimeout(t);
     }
   }, [gameEnd, room, id, router]);
+
+  // Stable so RoomCountdown does not re-subscribe every second.
+  const onCountdownExpire = useCallback(() => setTimedOut(true), []);
+
+  // Fresh landing on a link whose window already closed: a clean, intentional
+  // closed page rather than a 404 or a dead lobby.
+  if (landedExpired) {
+    return (
+      <Centered>
+        <h1 className="font-[var(--font-display)] text-2xl font-semibold">
+          this room is closed.
+        </h1>
+        <p className="max-w-sm text-[var(--color-text-secondary)]">
+          the invite expired or the game already ended.
+        </p>
+        <Button onClick={() => router.push("/")}>start your own game</Button>
+      </Centered>
+    );
+  }
 
   if (notFound) {
     return (
@@ -116,6 +148,36 @@ export default function RoomPage() {
     );
   }
 
+  // Host was waiting and the room closed (ROOM_EXPIRED arrived, or the countdown
+  // hit zero). Let them choose what to do next, no auto-redirect.
+  if (roomExpired || timedOut) {
+    return (
+      <Centered>
+        <h1 className="font-[var(--font-display)] text-2xl font-semibold">
+          your room closed. nobody joined.
+        </h1>
+        <div className="flex w-full max-w-xs flex-col gap-3">
+          <Button
+            full
+            onClick={async () => {
+              try {
+                const fresh = await createRoom(room?.game_type ?? "");
+                router.push(`/room/${fresh.id}`);
+              } catch {
+                router.push("/");
+              }
+            }}
+          >
+            create a new room
+          </Button>
+          <Button variant="secondary" full onClick={() => router.push("/")}>
+            go home
+          </Button>
+        </div>
+      </Centered>
+    );
+  }
+
   // Lobby. Until this room's state has loaded, show no stale players.
   const players = ready ? room!.players : [];
   const opponent = players.find((p) => p.id !== identity?.id) ?? null;
@@ -123,82 +185,93 @@ export default function RoomPage() {
   const bothHere = players.length >= 2;
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col px-5 pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),20px)]">
       <ConnectionBadge status={status} />
 
-      <header className="flex items-center justify-between py-5">
+      <header className="flex items-center gap-2 py-4">
         <button
           onClick={() => router.push("/")}
-          className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 text-sm text-[var(--color-text-secondary)] active:text-[var(--color-text-primary)]"
+          aria-label="Back to hub"
+          className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 py-1.5 text-sm text-[var(--color-text-secondary)] active:text-[var(--color-text-primary)]"
         >
           hub
         </button>
-        <div className="text-center">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
-            room code
-          </div>
-          <div className="font-[var(--font-mono)] text-2xl font-semibold tracking-[0.2em]">
-            {id}
-          </div>
+        <div className="flex-1 text-center font-[var(--font-mono)] text-lg font-semibold tracking-[0.14em]">
+          {id}
         </div>
-        <div className="w-10" />
+        <div className="flex min-w-[64px] shrink-0 justify-end">
+          {!bothHere && room?.expires_at != null && (
+            <RoomCountdown expiresAt={room.expires_at} onExpire={onCountdownExpire} />
+          )}
+        </div>
       </header>
 
-      <div className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="flex flex-col items-center justify-center text-center">
-          <div className="mb-5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
-            {bothHere ? "opponent locked" : "waiting room"}
-          </div>
-          <RoomPortal filled={bothHere} size={280} />
-          <h1 className="mt-8 max-w-md font-[var(--font-display)] text-3xl font-semibold leading-tight sm:text-4xl">
-            {bothHere ? "Ready the match." : "Your portal is open."}
-          </h1>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--color-text-secondary)]">
-            {bothHere
-              ? "Both players are in. Tap ready when you want the first round to start."
-              : "Share the room link and the second player will appear here instantly."}
-          </p>
-        </section>
+      {/* Ambient portal — a small sign of life above the slots, not the hero. */}
+      <div className="flex justify-center pb-5 pt-1">
+        <RoomPortal filled={bothHere} size={92} compact />
+      </div>
 
-        <section className="mx-auto w-full max-w-md">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-[var(--font-display)] text-xl font-semibold">
-              Players
-            </h2>
-            <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-              {players.length}/2 online
-            </span>
-          </div>
-          <div className="space-y-3">
-          <PlayerCard player={me} accent="primary" label="you" />
-          <PlayerCard player={opponent} accent="warm" label="opponent" />
-          </div>
-          <div className="mt-6 space-y-3">
-            {!bothHere && inviteText && (
-              <>
-                <ShareButton text={inviteText} full />
-                <p className="text-center text-xs text-[var(--color-text-secondary)]">
-                  Post the invite on Bluesky. No account is required for the
-                  other player.
-                </p>
-              </>
-            )}
+      {/* The real content of this screen: who is in the room. */}
+      <div className="space-y-3">
+        <PlayerCard player={me} accent="primary" label="you" />
+        <PlayerCard player={opponent} accent="primary" label="opponent" />
+      </div>
 
-            {bothHere && (
-              <Button
-                full
-                disabled={iAmReady}
-                onClick={() => {
-                  setIAmReady(true);
-                  sendReady();
+      {/* Actions, in priority order, all reachable without scrolling. */}
+      <div className="mt-5 space-y-3">
+        {!bothHere && (
+          <>
+            {inviteText && <ShareButton text={inviteText} full />}
+
+            {!challengeOpen && (
+              <button
+                onClick={() => setChallengeOpen(true)}
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--color-primary) 55%, transparent)",
+                  color: "var(--color-text-primary)",
                 }}
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[12px] border-2 text-base font-semibold transition-[filter] active:brightness-95"
               >
-                {iAmReady ? "waiting for opponent..." : "Ready"}
-              </Button>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M14.5 3.5 21 10l-9.5 9.5a2.1 2.1 0 0 1-3 0L3 14a2.1 2.1 0 0 1 0-3z" />
+                  <path d="M7 7h.01" />
+                </svg>
+                Challenge someone
+              </button>
             )}
-          </div>
-        </section>
-        </div>
+
+            <ChallengeFlow
+              roomCode={id}
+              gameName={room?.game_name ?? room?.game_type ?? "this game"}
+              open={challengeOpen}
+              onOpenChange={setChallengeOpen}
+            />
+
+            {!challengeOpen && inviteText && (
+              <button
+                onClick={() => shareToBluesky(inviteText)}
+                className="w-full pt-0.5 text-center text-xs text-[var(--color-text-secondary)] underline underline-offset-2 active:text-[var(--color-text-primary)]"
+              >
+                Reshare the invite
+              </button>
+            )}
+          </>
+        )}
+
+        {bothHere && (
+          <Button
+            full
+            disabled={iAmReady}
+            onClick={() => {
+              setIAmReady(true);
+              sendReady();
+            }}
+          >
+            {iAmReady ? "waiting for opponent..." : "Ready"}
+          </Button>
+        )}
+      </div>
     </main>
   );
 }

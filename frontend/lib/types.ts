@@ -13,7 +13,7 @@ export interface PlayerSlot extends Identity {
   ready: boolean;
 }
 
-export type RoomStatus = "waiting" | "in_progress" | "finished";
+export type RoomStatus = "waiting" | "in_progress" | "finished" | "expired";
 
 export type RoomMode = "versus" | "solo";
 
@@ -61,6 +61,7 @@ export interface Room {
   players: PlayerSlot[];
   game?: GameState | null;
   invite_url?: string;
+  expires_at?: number | null; // unix seconds; waiting versus room auto-close time
 }
 
 // ── WebSocket event names (mirror app/websocket/events.py) ──
@@ -74,6 +75,7 @@ export const WS = {
   GAME_END: "GAME_END",
   PLAYER_DISCONNECTED: "PLAYER_DISCONNECTED",
   ROOM_STATE: "ROOM_STATE",
+  ROOM_EXPIRED: "ROOM_EXPIRED",
   ERROR: "ERROR",
   // client -> server
   READY: "READY",

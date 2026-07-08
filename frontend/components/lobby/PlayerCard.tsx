@@ -15,9 +15,13 @@ export function PlayerCard({ player, accent = "primary", label }: Props) {
 
   if (!player) {
     return (
-      <div className="flex min-h-[96px] flex-1 items-center justify-center rounded-[20px] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/35 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+      <motion.div
+        animate={{ opacity: [0.55, 1, 0.55] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        className="flex min-h-[96px] flex-1 items-center justify-center rounded-[20px] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/35 px-4 py-3 text-sm text-[var(--color-text-secondary)]"
+      >
         waiting for opponent...
-      </div>
+      </motion.div>
     );
   }
 

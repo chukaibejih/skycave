@@ -8,6 +8,8 @@ interface Props {
   /** Fires after the GO collapse completes — start the game here. */
   onGo?: () => void;
   size?: number;
+  /** Ring-only ambient mode: no center "waiting…"/"GO" label. */
+  compact?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface Props {
  *
  * Everything else in the app stays quiet; this is where it sings.
  */
-export function RoomPortal({ filled, onGo, size = 220 }: Props) {
+export function RoomPortal({ filled, onGo, size = 220, compact = false }: Props) {
   const [phase, setPhase] = useState<"waiting" | "go">("waiting");
 
   useEffect(() => {
@@ -108,9 +110,9 @@ export function RoomPortal({ filled, onGo, size = 220 }: Props) {
         />
       </svg>
 
-      {/* Center content: waiting dots → GO */}
+      {/* Center content: waiting dots → GO (hidden in ambient/compact mode) */}
       <AnimatePresence mode="wait">
-        {phase === "waiting" ? (
+        {compact ? null : phase === "waiting" ? (
           <motion.div
             key="waiting"
             className="font-[var(--font-body)] text-sm text-[var(--color-text-secondary)]"
