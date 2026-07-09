@@ -58,6 +58,13 @@ def _public_room(room: dict, player_id: str) -> dict:
                 "submitted": prior is not None,
             },
         }
+    # Turn-based board (Tile Takeover) — carry it so a reconnect rehydrates.
+    if game is not None and game.get("turn_state"):
+        from app.games.registry import get_game
+
+        g = get_game(room["game_type"])
+        if g is not None:
+            safe["board"] = g.turn_public(game["turn_state"])
     return safe
 
 

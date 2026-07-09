@@ -15,6 +15,7 @@ ROUND_RESULT = "ROUND_RESULT"
 GAME_END = "GAME_END"
 PLAYER_DISCONNECTED = "PLAYER_DISCONNECTED"
 ROOM_STATE = "ROOM_STATE"                # full snapshot, sent on (re)connect for recovery
+GAME_STATE = "GAME_STATE"                # turn-based board update (Tile Takeover)
 ROOM_EXPIRED = "ROOM_EXPIRED"            # waiting room closed (no opponent joined in time)
 ERROR = "ERROR"
 

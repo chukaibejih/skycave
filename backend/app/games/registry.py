@@ -5,9 +5,12 @@ from app.games.base import BaseGame
 from app.games.color_clash import ColorClash
 from app.games.flag_rush import FlagRush
 from app.games.geoguesss import GeoGuess
+from app.games.mad_math import MadMath
 from app.games.outline_quiz import OutlineQuiz
 from app.games.reaction_grid import ReactionGrid
+from app.games.tile_takeover import TileTakeover
 from app.games.word_duel import WordDuel
+from app.games.word_hunt import WordHunt
 
 _GAMES: dict[str, BaseGame] = {
     g.type: g
@@ -18,6 +21,9 @@ _GAMES: dict[str, BaseGame] = {
         OutlineQuiz(),
         WordDuel(),
         ReactionGrid(),
+        MadMath(),
+        WordHunt(),
+        TileTakeover(),
     )
 }
 

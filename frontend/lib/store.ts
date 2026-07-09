@@ -59,6 +59,7 @@ interface RoomState {
   roundEndsAt: number | null;
   opponentSubmitted: boolean;
   soloWords: string[]; // accepted words this solo Word Duel session
+  boardState: import("./types").BoardState | null; // turn-based board (Tile Takeover)
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
   roomExpired: boolean; // waiting room auto-closed (no opponent joined)
 
@@ -85,6 +86,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   roundEndsAt: null,
   opponentSubmitted: false,
   soloWords: [],
+  boardState: null,
   justJoined: false,
   roomExpired: false,
 
@@ -95,9 +97,18 @@ export const useRoom = create<RoomState>((set, get) => ({
     if (!token) return;
 
     const socket = new SkycaveSocket(roomId, token);
-    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], roomExpired: false });
+    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, roomExpired: false });
 
     socket.onStatus((status) => set({ status }));
+
+    // Turn-based board update (Tile Takeover). Also flips the game to active on
+    // first arrival, since turn-based games have no ROUND_START.
+    socket.on(WS.GAME_STATE, (board: import("./types").BoardState) => {
+      set((s) => ({
+        boardState: board,
+        game: s.game ? { ...s.game, phase: "active" } : s.game,
+      }));
+    });
 
     // Full snapshot on (re)connect: rehydrate everything for state recovery.
 	    socket.on(WS.ROOM_STATE, (room: Room) => {
@@ -111,6 +122,7 @@ export const useRoom = create<RoomState>((set, get) => ({
         locked: !!myRoundState?.locked,
         submitted: !!myRoundState?.submitted,
         roomExpired: room.status === "expired",
+        boardState: (room as unknown as { board?: import("./types").BoardState }).board ?? get().boardState,
         roundEndsAt: room.game?.round_ends_at ?? null,
 	        // If we reconnected mid-finished game, surface the end screen.
         gameEnd:

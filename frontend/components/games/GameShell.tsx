@@ -14,6 +14,9 @@ const GeoGuess = dynamic(() => import("./GeoGuess").then((m) => m.GeoGuess), { s
 const OutlineQuiz = dynamic(() => import("./OutlineQuiz").then((m) => m.OutlineQuiz), { ssr: false });
 const WordDuel = dynamic(() => import("./WordDuel").then((m) => m.WordDuel), { ssr: false });
 const ReactionGrid = dynamic(() => import("./ReactionGrid").then((m) => m.ReactionGrid), { ssr: false });
+const MadMath = dynamic(() => import("./MadMath").then((m) => m.MadMath), { ssr: false });
+const WordHunt = dynamic(() => import("./WordHunt").then((m) => m.WordHunt), { ssr: false });
+const TileTakeover = dynamic(() => import("./TileTakeover").then((m) => m.TileTakeover), { ssr: false });
 
 export function GameShell() {
   const {
@@ -25,11 +28,25 @@ export function GameShell() {
     locked,
     submitted,
     roundEndsAt,
+    boardState,
     sendAction,
   } = useRoom();
   const meId = useAuth((s) => s.identity?.id);
 
   if (!room || !game) return null;
+
+  // Turn-based games (Tile Takeover) drive their own full-screen board, not the
+  // round-based ScoreHeader flow.
+  if (game.mode === "turn_based") {
+    return (
+      <TileTakeover
+        board={boardState}
+        meId={meId}
+        players={room.players}
+        onAction={sendAction}
+      />
+    );
+  }
 
   const phase = game.phase;
   const durationSec = Number((roundData as any)?.round_time ?? 0);
@@ -89,6 +106,8 @@ export function GameShell() {
           {game.game_type === "outline_quiz" && <OutlineQuiz {...gameProps} />}
           {game.game_type === "word_duel" && <WordDuel {...gameProps} />}
           {game.game_type === "reaction_grid" && <ReactionGrid {...gameProps} />}
+          {game.game_type === "mad_math" && <MadMath {...gameProps} />}
+          {game.game_type === "word_hunt" && <WordHunt {...gameProps} />}
         </>
       )}
     </div>

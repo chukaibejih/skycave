@@ -20,7 +20,7 @@ import logging
 import time
 from typing import Any
 
-from app.games.base import RACE
+from app.games.base import RACE, TURN_BASED
 from app.games.registry import get_game
 from app.services import room_manager as rooms
 from app.websocket import events
@@ -108,6 +108,13 @@ async def start_game(room_id: str) -> None:
             "last_result": None,
             "solo_state": None,     # per-session private state (words used, level)
         }
+        if game.mode == TURN_BASED:
+            # One evolving board, no rounds. Solo adds a synthetic "ai" opponent.
+            pids = [p["id"] for p in room["players"]]
+            if is_solo:
+                pids = pids + ["ai"]
+            game_state["turn_state"] = game.init_turn_state(pids)
+            game_state["turn_ai"] = "ai" if is_solo else None
         room["status"] = "in_progress"
         room["game"] = game_state
         await rooms.save_room(room)
@@ -130,7 +137,9 @@ async def start_game(room_id: str) -> None:
     # solo has no portal, so start it snappily. Solo timed/words/ladder games use
     # the continuous session driver; everything else runs the fixed-round flow.
     start_delay = 0.4 if is_solo else 1.2
-    if solo_kind in ("timed", "words", "ladder"):
+    if game.mode == TURN_BASED:
+        _schedule(room_id, start_delay, lambda: _turn_begin(room_id))
+    elif solo_kind in ("timed", "words", "ladder"):
         _schedule(room_id, start_delay, lambda: _solo_begin(room_id))
     else:
         _schedule(room_id, start_delay, lambda: start_round(room_id, 1))
@@ -226,6 +235,8 @@ async def handle_action(
             "ladder",
         ):
             end_after = await _solo_handle(room, game, player_id, action)
+        elif game.mode == TURN_BASED:
+            end_after = await _turn_action(room, game, player_id, action)
         elif game.mode == RACE:
             # A player locked out (prior wrong discrete pick) can't act again.
             prior = gs["round_actions"].get(player_id)
@@ -293,6 +304,77 @@ async def handle_action(
                 await _finish_round_locked(room, winner_id=None)
 
     # Solo ladder miss ends the run; done outside the lock (end_game re-locks).
+    if end_after:
+        await end_game(room_id)
+
+
+# --------------------------------------------------------------------------- #
+# Turn-based driver (Tile Takeover)
+# --------------------------------------------------------------------------- #
+
+async def _turn_begin(room_id: str) -> None:
+    """Open a turn-based game: go active and broadcast the initial board."""
+    async with rooms.room_lock(room_id):
+        room = await rooms.get_room(room_id)
+        if room is None or room.get("game") is None:
+            return
+        game = get_game(room["game_type"])
+        if game is None:
+            return
+        gs = room["game"]
+        gs["phase"] = "active"
+        await rooms.save_room(room)
+        state = gs["turn_state"]
+    await manager.broadcast(
+        room_id, events.message(events.GAME_STATE, game.turn_public(state))
+    )
+
+
+async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict) -> bool:
+    """Apply one turn-based move (lock held). Returns True iff the game is over."""
+    room_id = room["id"]
+    gs = room["game"]
+    new = game.apply_turn(gs["turn_state"], player_id, action)
+    if new is None:
+        return False  # not their turn / illegal move — ignore
+    gs["turn_state"] = new
+    await rooms.save_room(room)
+    await manager.broadcast(
+        room_id, events.message(events.GAME_STATE, game.turn_public(new))
+    )
+    if game.turn_over(new):
+        return True
+    # Solo: the AI replies after a short beat so the player sees their move land.
+    if gs.get("turn_ai") and new["turn"] == gs["turn_ai"]:
+        _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
+    return False
+
+
+async def _turn_ai_move(room_id: str) -> None:
+    """Play the solo AI's move and broadcast the board; end the game if it fills."""
+    end_after = False
+    async with rooms.room_lock(room_id):
+        room = await rooms.get_room(room_id)
+        if room is None or room.get("game") is None:
+            return
+        game = get_game(room["game_type"])
+        if game is None:
+            return
+        gs = room["game"]
+        ai = gs.get("turn_ai")
+        state = gs.get("turn_state")
+        if gs["phase"] != "active" or ai is None or state is None or state["turn"] != ai:
+            return
+        move = game.ai_move(state, ai)
+        new = game.apply_turn(state, ai, move) if move else None
+        if new is None:
+            return  # AI has no legal move (shouldn't happen)
+        gs["turn_state"] = new
+        await rooms.save_room(room)
+        await manager.broadcast(
+            room_id, events.message(events.GAME_STATE, game.turn_public(new))
+        )
+        end_after = game.turn_over(new)
     if end_after:
         await end_game(room_id)
 
@@ -561,6 +643,10 @@ async def end_game(room_id: str) -> None:
         gs = room["game"]
         if gs.get("phase") == "finished":
             return  # idempotent: a miss + a stray timeout must not double-end
+        # Turn-based games score by the final board tally, not accumulated rounds.
+        _tb_game = get_game(room["game_type"])
+        if _tb_game and _tb_game.mode == TURN_BASED and gs.get("turn_state"):
+            gs["scores"] = _tb_game.turn_scores(gs["turn_state"])
         scores = gs["scores"]
         is_solo = room.get("mode") == "solo"
         room["status"] = "finished"

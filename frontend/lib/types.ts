@@ -30,7 +30,7 @@ export interface GameInfo {
   name: string;
   tagline: string;
   total_rounds: number;
-  mode: "race" | "simultaneous";
+  mode: "race" | "simultaneous" | "turn_based";
   min_players: number;
   max_players: number;
 }
@@ -38,7 +38,7 @@ export interface GameInfo {
 export interface GameState {
   game_type: string;
   total_rounds: number;
-  mode: "race" | "simultaneous";
+  mode: "race" | "simultaneous" | "turn_based";
   round: number;
   phase: "starting" | "active" | "round_over" | "finished";
   scores: Record<string, number>;
@@ -64,6 +64,19 @@ export interface Room {
   expires_at?: number | null; // unix seconds; waiting versus room auto-close time
 }
 
+// Turn-based board (Tile Takeover). Sent via GAME_STATE / ROOM_STATE.
+export interface BoardState {
+  cols: number;
+  rows: number;
+  ncolors: number;
+  tiles: number[];
+  owner: (string | null)[];
+  order: string[];
+  turn: string;
+  pcolor: Record<string, number>;
+  scores: Record<string, number>;
+}
+
 // ── WebSocket event names (mirror app/websocket/events.py) ──
 export const WS = {
   // server -> client
@@ -75,6 +88,7 @@ export const WS = {
   GAME_END: "GAME_END",
   PLAYER_DISCONNECTED: "PLAYER_DISCONNECTED",
   ROOM_STATE: "ROOM_STATE",
+  GAME_STATE: "GAME_STATE",
   ROOM_EXPIRED: "ROOM_EXPIRED",
   ERROR: "ERROR",
   // client -> server

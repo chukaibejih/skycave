@@ -23,6 +23,7 @@ from typing import Any
 
 RACE = "race"
 SIMULTANEOUS = "simultaneous"
+TURN_BASED = "turn_based"
 
 
 class BaseGame:
@@ -95,6 +96,41 @@ class BaseGame:
         player who timed out — score them 0).
         """
         raise NotImplementedError
+
+    # ---- turn-based mode ----
+    # Turn-based games (Tile Takeover) don't use rounds: there's one evolving
+    # board and players alternate moves until it's full. State lives entirely in
+    # `turn_state` on the game doc; there is no hidden secret. Solo plays the
+    # same flow against a server-side AI (see `ai_move`).
+    def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
+        """Fresh board. `player_ids[0]` moves first (order is [you, opponent])."""
+        raise NotImplementedError
+
+    def apply_turn(
+        self, state: dict[str, Any], player_id: str, action: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Apply a move; return the new state (with `turn` advanced) or None if
+        the move is illegal / not this player's turn."""
+        raise NotImplementedError
+
+    def turn_public(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Client-facing board (turn-based games hide nothing)."""
+        return state
+
+    def turn_over(self, state: dict[str, Any]) -> bool:
+        return False
+
+    def turn_scores(self, state: dict[str, Any]) -> dict[str, int]:
+        """Final per-player tally (e.g. tiles owned)."""
+        return {}
+
+    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+        """Solo only: choose a move for the AI opponent, or None if it can't."""
+        return None
+
+    def turn_metric(self, score: int, state: dict[str, Any]) -> str:
+        """Solo results/share line for a turn-based game."""
+        return f"{score} tiles"
 
     # ---- shared helpers ----
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
