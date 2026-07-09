@@ -67,7 +67,7 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
   const myTurn = board.turn === me;
   const oppName =
     opp === "ai"
-      ? "AI"
+      ? "Caver"
       : players.find((p) => p.id === opp)?.display_name ?? "opponent";
 
   const pick = (color: number) => {
