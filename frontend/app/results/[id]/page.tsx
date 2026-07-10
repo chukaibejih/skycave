@@ -6,6 +6,7 @@ import { ScoreCard } from "@/components/ui/ScoreCard";
 import { ShareButton } from "@/components/lobby/ShareButton";
 import { Button } from "@/components/ui/Button";
 import { createRoom, getRoom, getScorecard } from "@/lib/api";
+import { startBlueskyLogin } from "@/lib/bluesky";
 import { downloadScoreCard } from "@/lib/scorecard-image";
 import { resolveSoloBest, soloShareText, gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -15,6 +16,13 @@ export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const meId = useAuth((s) => s.identity?.id);
+  const isGuest = useAuth((s) => !!s.identity?.is_guest);
+  const hydrate = useAuth((s) => s.hydrate);
+  // Resolve identity on a direct/refresh load so the guest nudge (and the
+  // "you win" perspective) know who is viewing.
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
   const [room, setRoom] = useState<Room | null>(null);
   const [shareText, setShareText] = useState("");
   const [soloBest, setSoloBest] = useState<{
@@ -113,6 +121,7 @@ export default function ResultsPage() {
               </button>
             </div>
           </div>
+          <GuestNudge show={isGuest} />
         </section>
 
         <motion.div
@@ -224,6 +233,7 @@ export default function ResultsPage() {
             </button>
           </div>
         </div>
+        <GuestNudge show={isGuest} />
       </section>
 
       <motion.div
@@ -256,5 +266,23 @@ function Centered({ children }: { children: React.ReactNode }) {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-6 text-center">
       {children}
     </main>
+  );
+}
+
+// Quiet, contextual nudge for guests — shown after a game, never as a modal.
+function GuestNudge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="mt-6 max-w-md font-[var(--font-body)] text-xs leading-5" style={{ color: "#8888AA" }}>
+      Playing as a guest.{" "}
+      <button
+        onClick={() => startBlueskyLogin()}
+        style={{ color: "#6C63FF" }}
+        className="font-semibold underline underline-offset-2"
+      >
+        Connect Bluesky
+      </button>{" "}
+      to appear on the leaderboard and track your stats.
+    </p>
   );
 }

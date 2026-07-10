@@ -1,6 +1,6 @@
 // Global state: auth identity + live room/game state driven by the socket.
 import { create } from "zustand";
-import { fetchMe, getToken } from "./api";
+import { fetchMe, getToken, logout as apiLogout } from "./api";
 import { SkycaveSocket, type ConnectionStatus } from "./websocket";
 import { WS, type Identity, type Room, type GameState } from "./types";
 
@@ -10,9 +10,10 @@ interface AuthState {
   loaded: boolean;
   setIdentity: (i: Identity | null) => void;
   hydrate: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   identity: null,
   loaded: false,
   setIdentity: (identity) => set({ identity }),
@@ -23,6 +24,12 @@ export const useAuth = create<AuthState>((set) => ({
     }
     const identity = await fetchMe();
     set({ identity, loaded: true });
+  },
+  // Clear local state (guest + Bluesky) and revoke the Bluesky session server-side.
+  logout: async () => {
+    const isGuest = get().identity?.is_guest ?? true;
+    await apiLogout(isGuest);
+    set({ identity: null });
   },
 }));
 

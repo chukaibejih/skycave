@@ -80,6 +80,25 @@ export async function fetchMe(): Promise<Identity | null> {
   }
 }
 
+/**
+ * Log out. Clears the local Skycave token (works for guests too). For Bluesky
+ * users it also asks the OAuth sidecar to revoke the AT Protocol session and
+ * clear the httpOnly session cookie. Best-effort: the local clear always runs.
+ */
+export async function logout(isGuest: boolean): Promise<void> {
+  if (!isGuest) {
+    try {
+      await fetch(`${API}/oauth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      /* best-effort; the local token clear below is what logs the app out */
+    }
+  }
+  clearToken();
+}
+
 // ── Games ──
 export const listGames = () => request<GameInfo[]>("/games");
 

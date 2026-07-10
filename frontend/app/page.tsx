@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,11 +10,11 @@ import { Avatar } from "@/components/ui/Avatar";
 import { createRoom, listGames } from "@/lib/api";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
-import type { GameInfo } from "@/lib/types";
+import type { GameInfo, Identity } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
-  const { identity, loaded, hydrate } = useAuth();
+  const { identity, loaded, hydrate, logout } = useAuth();
   const [games, setGames] = useState<GameInfo[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
   // Game whose mode is being chosen, and the pending {game, mode} awaiting auth.
@@ -68,17 +68,7 @@ export default function Home() {
           </div>
         </div>
         {loaded && identity ? (
-          <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 py-1 pl-4 pr-1">
-            <span className="hidden max-w-[150px] truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">
-              {identity.is_guest ? identity.display_name : `@${identity.handle}`}
-            </span>
-            <Avatar
-              id={identity.id}
-              name={identity.display_name}
-              avatarUrl={identity.avatar_url}
-              size={36}
-            />
-          </div>
+          <AccountMenu identity={identity} onLogout={logout} />
         ) : (
           <button
             onClick={() => setAuthOpen(true)}
@@ -220,6 +210,92 @@ export default function Home() {
         }}
       />
     </main>
+  );
+}
+
+// Identity chip that opens a small menu with Log out. Same control for guests
+// and Bluesky users; the logout flow underneath handles the difference.
+function AccountMenu({
+  identity,
+  onLogout,
+}: {
+  identity: Identity;
+  onLogout: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  const label = identity.is_guest ? identity.display_name : `@${identity.handle}`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 py-1 pl-4 pr-1 active:border-[var(--color-primary)]"
+      >
+        <span className="hidden max-w-[150px] truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">
+          {label}
+        </span>
+        <Avatar
+          id={identity.id}
+          name={identity.display_name}
+          avatarUrl={identity.avatar_url}
+          size={36}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.14 }}
+            className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-[16px] border border-[var(--color-border)] bg-[var(--color-elevated)] shadow-xl"
+          >
+            <div className="border-b border-[var(--color-border)] px-4 py-3">
+              <div className="truncate text-sm font-semibold">
+                {identity.display_name}
+              </div>
+              <div className="truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+                {identity.is_guest ? "playing as guest" : `@${identity.handle}`}
+              </div>
+            </div>
+            <button
+              role="menuitem"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await onLogout();
+                setOpen(false);
+                setBusy(false);
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-[var(--color-warm)] active:bg-[var(--color-surface)] disabled:opacity-50"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="m16 17 5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              {busy ? "Logging out..." : "Log out"}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
