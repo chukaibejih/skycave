@@ -39,8 +39,11 @@ export function SignalFlow({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const paused = useRef(false);
+  const paused = useRef(false); // frozen while a finger is down (freeze-on-touch + scrub)
   const offset = useRef(0);
+  const drag = useRef<{ x: number; off: number; lastX: number; lastT: number } | null>(null);
+  const vel = useRef(0); // px/sec fling velocity, decays after release
+  const moved = useRef(false); // did this gesture scrub? if so, suppress the node tap
   const [dims, setDims] = useState({ w: 0, h: 200 });
 
   const n = games.length;
@@ -66,7 +69,15 @@ export function SignalFlow({
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (!paused.current) offset.current += SPEED * dt;
+      if (!paused.current) {
+        offset.current += SPEED * dt; // base auto-drift
+        if (Math.abs(vel.current) > 2) {
+          offset.current += vel.current * dt; // fling momentum from a release
+          vel.current *= Math.pow(0.02, dt); // time-based friction
+        } else {
+          vel.current = 0;
+        }
+      }
       const el = wrapRef.current;
       if (el) {
         const W = el.clientWidth;
@@ -108,17 +119,41 @@ export function SignalFlow({
     return d;
   })();
 
-  const freeze = () => (paused.current = true);
-  const thaw = () => (paused.current = false);
+  // Grab the wire to scrub it yourself. A tap (no real movement) still freezes
+  // and falls through to the node's launch; a drag scrubs and flings on release.
+  const onDown = (e: React.PointerEvent) => {
+    paused.current = true;
+    vel.current = 0;
+    moved.current = false;
+    drag.current = { x: e.clientX, off: offset.current, lastX: e.clientX, lastT: performance.now() };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 4) moved.current = true;
+    offset.current = d.off + dx;
+    const now = performance.now();
+    const dt = Math.max(0.001, (now - d.lastT) / 1000);
+    vel.current = Math.max(-2600, Math.min(2600, (e.clientX - d.lastX) / dt));
+    d.lastX = e.clientX;
+    d.lastT = now;
+  };
+  const onUp = () => {
+    drag.current = null;
+    paused.current = false; // resume auto-drift; any fling decays in the tick
+  };
 
   return (
     <div
       ref={wrapRef}
-      onPointerDown={freeze}
-      onPointerUp={thaw}
-      onPointerLeave={thaw}
-      onPointerCancel={thaw}
-      className="relative h-[190px] w-full overflow-hidden sm:h-[220px]"
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerLeave={onUp}
+      onPointerCancel={onUp}
+      style={{ touchAction: "pan-y" }}
+      className="relative h-[190px] w-full cursor-grab overflow-hidden active:cursor-grabbing sm:h-[220px]"
     >
       {/* The signal line */}
       <svg
@@ -144,7 +179,10 @@ export function SignalFlow({
             ref={(el) => {
               nodeRefs.current[i] = el;
             }}
-            onClick={() => onPlay(g)}
+            onClick={() => {
+              if (moved.current) return; // this was a scrub, not a tap
+              onPlay(g);
+            }}
             style={{
               borderColor: `color-mix(in srgb, ${accent} 60%, transparent)`,
               boxShadow: `0 0 18px color-mix(in srgb, ${accent} 30%, transparent), 0 4px 16px rgba(0,0,0,0.45)`,

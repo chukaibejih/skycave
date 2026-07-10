@@ -10,6 +10,9 @@ const ACCENT: Record<string, string> = {
   outline_quiz: "var(--color-cyan)",
   word_duel: "var(--color-gold)",
   reaction_grid: "var(--color-primary)",
+  mad_math: "var(--color-gold)",
+  word_hunt: "var(--color-cyan)",
+  tile_takeover: "var(--color-success)",
 };
 
 const META: Record<string, { code: string; stat: string }> = {
@@ -19,6 +22,9 @@ const META: Record<string, { code: string; stat: string }> = {
   outline_quiz: { code: "OUT", stat: "shapes" },
   word_duel: { code: "WRD", stat: "vocab" },
   reaction_grid: { code: "RXN", stat: "memory" },
+  mad_math: { code: "MTH", stat: "mental" },
+  word_hunt: { code: "HNT", stat: "grid" },
+  tile_takeover: { code: "TKO", stat: "board" },
 };
 
 // Lightweight inline glyph per game (no icon dependency).
@@ -72,6 +78,32 @@ function Glyph({ type, color }: { type: string; color: string }) {
           )}
         </svg>
       );
+    case "mad_math":
+      // operator cluster: a plus and a multiply
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" {...common} strokeLinecap="round">
+          <path d="M5 8h6M8 5v6" />
+          <path d="M14 14l5 5M19 14l-5 5" />
+        </svg>
+      );
+    case "word_hunt":
+      // a grid with a traced hunt path
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2.5" />
+          <path d="M8 9l3 3 2-2 3 4" fill="none" />
+        </svg>
+      );
+    case "tile_takeover":
+      // a 2x2 board, two tiles claimed
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none">
+          <rect x="4" y="4" width="7" height="7" rx="1.4" fill={color} fillOpacity="0.4" />
+          <rect x="13" y="4" width="7" height="7" rx="1.4" />
+          <rect x="4" y="13" width="7" height="7" rx="1.4" />
+          <rect x="13" y="13" width="7" height="7" rx="1.4" fill={color} fillOpacity="0.4" />
+        </svg>
+      );
     default:
       // flag_rush
       return (
@@ -99,7 +131,7 @@ export const GameCard = memo(function GameCard({
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onPlay(game)}
-      className="group relative flex min-h-[220px] overflow-hidden rounded-[20px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors active:border-[color:var(--accent)]"
+      className="group relative flex min-h-[152px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 text-left transition-colors active:border-[color:var(--accent)] sm:min-h-[168px] sm:p-4"
       style={{ ["--accent" as string]: accent }}
     >
       <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-active:opacity-100">
@@ -113,35 +145,35 @@ export const GameCard = memo(function GameCard({
       <div className="relative flex w-full flex-col">
         <div className="flex items-start justify-between">
           <div
-            className="flex h-14 w-14 items-center justify-center rounded-2xl border"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border"
             style={{
               background: `${accent}18`,
               borderColor: `${accent}4d`,
-              boxShadow: `0 0 26px ${accent}26`,
+              boxShadow: `0 0 22px ${accent}22`,
             }}
           >
             <Glyph type={game.type} color={accent} />
           </div>
-          <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+          <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
             {meta.code}
           </span>
         </div>
 
-        <div className="mt-8 flex-1">
-          <h3 className="font-[var(--font-display)] text-xl font-semibold leading-tight">
+        <div className="mt-3.5 flex-1">
+          <h3 className="font-[var(--font-display)] text-[15px] font-semibold leading-tight sm:text-lg">
             {game.name}
           </h3>
-          <p className="mt-2 text-sm leading-snug text-[var(--color-text-secondary)]">
+          <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--color-text-secondary)] sm:text-[13px]">
             {game.tagline}
           </p>
         </div>
 
-        <div className="mt-7 flex w-full items-center justify-between gap-3">
-          <span className="font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
-            {game.total_rounds} rounds / {meta.stat}
+        <div className="mt-3 flex w-full items-center justify-between gap-2">
+          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+            {game.total_rounds}r / {meta.stat}
           </span>
           <span
-            className="inline-flex h-10 min-w-20 items-center justify-center rounded-full px-4 text-sm font-semibold"
+            className="inline-flex h-8 items-center justify-center rounded-full px-4 text-[13px] font-semibold"
             style={{ background: accent, color: "#05060a" }}
           >
             Play

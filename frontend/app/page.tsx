@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { GameCard } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
+import { CaveDoor } from "@/components/hub/CaveDoor";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { createRoom, listGames } from "@/lib/api";
@@ -158,6 +159,10 @@ export default function Home() {
         </motion.div>
       </section>
 
+      <section className="pb-10">
+        <CaveDoor />
+      </section>
+
       <section className="pb-12">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
@@ -173,7 +178,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {games.map((g) => (
           <GameCard key={g.type} game={g} onPlay={launch} />
         ))}

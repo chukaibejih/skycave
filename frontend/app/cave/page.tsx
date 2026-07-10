@@ -112,9 +112,12 @@ function Intro() {
   return (
     <div>
       <h1 className="font-[var(--font-display)] text-3xl font-bold" style={{ color: INK }}>The Cave</h1>
+      <p className="mt-2 font-[var(--font-display)] text-base font-semibold" style={{ color: "#e8dcc0" }}>
+        You know who did it. They don&apos;t.
+      </p>
       <p className="mt-2 max-w-xl text-sm leading-6" style={{ color: MUTED }}>
-        A two-person mystery. You each hold half the clues and can only see your own. Talk it through in the shared
-        notepad, agree on an answer, and confirm together.
+        Build a mystery, split the clues between two strangers, and watch them piece it together. Or claim a case and
+        solve one with a partner. Half the clues each. Only yours to see.
       </p>
     </div>
   );
