@@ -40,6 +40,18 @@ async def add_evidence(case_id: str, body: EvidenceIn, identity: BlueskyIdentity
     return {"id": e.id}
 
 
+@router.patch("/cases/{case_id}/evidence/{eid}")
+async def edit_evidence(case_id: str, eid: str, body: EvidenceIn, identity: BlueskyIdentity, db: AsyncSession = Depends(get_db)):
+    await cave.update_evidence(db, case_id, eid, identity.id, body.model_dump(exclude_unset=True))
+    return {"ok": True}
+
+
+@router.delete("/cases/{case_id}/evidence/{eid}")
+async def remove_evidence(case_id: str, eid: str, identity: BlueskyIdentity, db: AsyncSession = Depends(get_db)):
+    await cave.delete_evidence(db, case_id, eid, identity.id)
+    return {"ok": True}
+
+
 @router.post("/cases/{case_id}/publish")
 async def publish(case_id: str, identity: BlueskyIdentity, db: AsyncSession = Depends(get_db)):
     c = await cave.publish_case(db, case_id, identity.id)

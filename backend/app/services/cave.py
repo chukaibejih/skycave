@@ -95,6 +95,28 @@ async def add_evidence(db, case_id, architect_did, ev: dict) -> CaveEvidence:
     return card
 
 
+async def _owned_card(db, case_id, eid, architect_did) -> CaveEvidence:
+    await _owned_draft(db, case_id, architect_did)
+    card = await db.get(CaveEvidence, eid)
+    if card is None or card.case_id != case_id:
+        raise HTTPException(404, "Evidence not found")
+    return card
+
+
+async def update_evidence(db, case_id, eid, architect_did, data: dict) -> None:
+    card = await _owned_card(db, case_id, eid, architect_did)
+    for field in ("type", "content", "assignment", "is_red_herring", "order"):
+        if data.get(field) is not None:
+            setattr(card, field, data[field])
+    await db.commit()
+
+
+async def delete_evidence(db, case_id, eid, architect_did) -> None:
+    card = await _owned_card(db, case_id, eid, architect_did)
+    await db.delete(card)
+    await db.commit()
+
+
 async def publish_checklist(db, case: CaveCase) -> list[str]:
     """Return a list of specific, human-readable blockers (empty = ready)."""
     ev = (
