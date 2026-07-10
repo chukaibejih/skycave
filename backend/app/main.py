@@ -12,6 +12,7 @@ from app.core.redis_client import close_redis, get_redis
 from app.routers import (
     admin,
     auth,
+    cave,
     feedback,
     games,
     leaderboard,
@@ -58,6 +59,7 @@ app.include_router(share.router)
 app.include_router(admin.router)
 app.include_router(feedback.router)
 app.include_router(leaderboard.router)
+app.include_router(cave.router)
 
 
 @app.get("/health", tags=["meta"])

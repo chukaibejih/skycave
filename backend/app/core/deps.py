@@ -64,6 +64,19 @@ async def require_admin(
     return True
 
 
+async def get_bluesky_identity(
+    identity: Annotated[Identity, Depends(get_current_identity)],
+) -> Identity:
+    """Require a connected Bluesky account (no guests). Used by The Cave."""
+    if identity.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The Cave requires a Bluesky account",
+        )
+    return identity
+
+
 CurrentIdentity = Annotated[Identity, Depends(get_current_identity)]
 OptionalIdentity = Annotated[Identity | None, Depends(get_optional_identity)]
+BlueskyIdentity = Annotated[Identity, Depends(get_bluesky_identity)]
 AdminAuth = Annotated[bool, Depends(require_admin)]
