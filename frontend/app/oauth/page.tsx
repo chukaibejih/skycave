@@ -17,7 +17,11 @@ function OAuthInner() {
       const identity = await completeBluesky();
       if (identity) {
         setIdentity(identity);
-        router.replace("/");
+        // Return to a deep link the user started login from (e.g. a Cave case),
+        // otherwise home.
+        const back = sessionStorage.getItem("cave_return");
+        sessionStorage.removeItem("cave_return");
+        router.replace(back || "/");
       } else {
         setError("Couldn't complete Bluesky login.");
       }

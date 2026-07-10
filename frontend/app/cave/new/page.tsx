@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CaveShell, Hint } from "@/components/cave/CaveShell";
 import { shareToBluesky } from "@/lib/bluesky";
@@ -24,6 +24,14 @@ const MUTED = "#8888AA";
 const SITE = "skycave.space";
 
 export default function BuildPage() {
+  return (
+    <Suspense fallback={<CaveShell back="/cave"><p className="py-20 text-center text-sm" style={{ color: MUTED }}>opening the builder...</p></CaveShell>}>
+      <Builder />
+    </Suspense>
+  );
+}
+
+function Builder() {
   const router = useRouter();
   const params = useSearchParams();
   const { identity, loaded, hydrate } = useAuth();
