@@ -26,8 +26,10 @@ from app.schemas.rest import (
     AdminGamesResponse,
     AdminLoginRequest,
     AdminOverview,
+    AdminTimeseries,
     AdminTokenResponse,
     AdminUsersResponse,
+    DayBucket,
     GameTypeCount,
     UserStats,
 )
@@ -106,6 +108,70 @@ async def overview(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminOve
         rooms_in_progress=in_progress,
         by_game=by_game,
     )
+
+
+@router.get("/timeseries", response_model=AdminTimeseries)
+async def timeseries(
+    _: AdminAuth,
+    db: AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=7, le=90),
+) -> AdminTimeseries:
+    """Daily activity for the last `days`: games (by mode), new users, feedback.
+
+    Buckets are continuous (missing days filled with 0) and dated in UTC so the
+    front end can render a gap-free time series.
+    """
+    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    game_rows = (
+        await db.execute(
+            select(
+                func.date(GameSession.created_at).label("d"),
+                GameSession.mode,
+                func.count(),
+            )
+            .where(GameSession.created_at >= start)
+            .group_by("d", GameSession.mode)
+        )
+    ).all()
+    user_rows = (
+        await db.execute(
+            select(func.date(User.created_at).label("d"), func.count())
+            .where(User.created_at >= start)
+            .group_by("d")
+        )
+    ).all()
+    fb_rows = (
+        await db.execute(
+            select(func.date(Feedback.created_at).label("d"), func.count())
+            .where(Feedback.created_at >= start)
+            .group_by("d")
+        )
+    ).all()
+
+    games: dict[str, dict[str, int]] = {}
+    for d, mode, c in game_rows:
+        bucket = games.setdefault(d.isoformat(), {"versus": 0, "solo": 0})
+        bucket["solo" if mode == "solo" else "versus"] += int(c)
+    users = {d.isoformat(): int(c) for d, c in user_rows}
+    feedback = {d.isoformat(): int(c) for d, c in fb_rows}
+
+    buckets = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).date().isoformat()
+        g = games.get(day, {})
+        buckets.append(
+            DayBucket(
+                date=day,
+                versus=g.get("versus", 0),
+                solo=g.get("solo", 0),
+                users=users.get(day, 0),
+                feedback=feedback.get(day, 0),
+            )
+        )
+    return AdminTimeseries(days=days, buckets=buckets)
 
 
 @router.get("/users", response_model=AdminUsersResponse)

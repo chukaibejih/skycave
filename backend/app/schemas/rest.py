@@ -146,6 +146,19 @@ class AdminOverview(BaseModel):
     by_game: list[GameTypeCount]
 
 
+class DayBucket(BaseModel):
+    date: str  # YYYY-MM-DD (UTC)
+    versus: int
+    solo: int
+    users: int
+    feedback: int
+
+
+class AdminTimeseries(BaseModel):
+    days: int
+    buckets: list[DayBucket]
+
+
 class AdminUsersResponse(BaseModel):
     total: int
     users: list["UserStats"]

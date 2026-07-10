@@ -81,7 +81,21 @@ export interface FeedbackRow {
   created_at: string;
 }
 
+export interface DayBucket {
+  date: string;
+  versus: number;
+  solo: number;
+  users: number;
+  feedback: number;
+}
+export interface Timeseries {
+  days: number;
+  buckets: DayBucket[];
+}
+
 export const getOverview = () => adminGet<Overview>("/admin/overview");
+export const getTimeseries = (days = 30) =>
+  adminGet<Timeseries>(`/admin/timeseries?days=${days}`);
 export const getUsers = (limit = 100) =>
   adminGet<{ total: number; users: UserRow[] }>(`/admin/users?limit=${limit}`);
 export const getGames = (limit = 100) =>

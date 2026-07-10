@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   AdminAuthError,
@@ -9,12 +9,15 @@ import {
   getFeedback,
   getGames,
   getOverview,
+  getTimeseries,
   getUsers,
   type FeedbackRow,
   type GameRow,
   type Overview,
+  type Timeseries,
   type UserRow,
 } from "@/lib/admin";
+import { BarList, Legend, TimeChart } from "@/components/admin/AdminCharts";
 
 const GAME_NAME: Record<string, string> = {
   geoguess: "GeoGuess 1v1",
@@ -23,6 +26,9 @@ const GAME_NAME: Record<string, string> = {
   outline_quiz: "Outline Quiz",
   word_duel: "Word Duel",
   reaction_grid: "Reaction Grid",
+  mad_math: "Mad Math",
+  word_hunt: "Word Hunt",
+  tile_takeover: "Tile Takeover",
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 
@@ -213,6 +219,8 @@ function FeedbackView({ feedback }: { feedback: FeedbackRow[] | null }) {
   );
 }
 
+const RANGES = [7, 30, 90];
+
 function OverviewView({ o }: { o: Overview }) {
   const cards = [
     { label: "Bluesky users", value: o.users },
@@ -221,40 +229,102 @@ function OverviewView({ o }: { o: Overview }) {
     { label: "Live rooms", value: o.active_rooms },
     { label: "In progress", value: o.rooms_in_progress },
   ];
-  const maxCount = Math.max(1, ...o.by_game.map((g) => g.count));
+
+  const [days, setDays] = useState(30);
+  const [ts, setTs] = useState<Timeseries | null>(null);
+  useEffect(() => {
+    let active = true;
+    setTs(null);
+    getTimeseries(days)
+      .then((t) => active && setTs(t))
+      .catch(() => active && setTs(null));
+    return () => {
+      active = false;
+    };
+  }, [days]);
+
+  const labels = ts?.buckets.map((b) => b.date) ?? [];
+  const gamesSeries = [
+    { name: "1v1", color: "#8b7cff", values: ts?.buckets.map((b) => b.versus) ?? [] },
+    { name: "solo", color: "#ff725e", values: ts?.buckets.map((b) => b.solo) ?? [] },
+  ];
+  const usersSeries = [
+    { name: "new members", color: "#67e8f9", values: ts?.buckets.map((b) => b.users) ?? [] },
+  ];
+  const byType = o.by_game
+    .map((g) => ({ label: gname(g.game_type), value: g.count }))
+    .sort((a, b) => b.value - a.value);
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((c) => (
           <div key={c.label} className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="font-[var(--font-display)] text-3xl font-bold">{c.value}</div>
+            <div className="font-[var(--font-display)] text-3xl font-bold">{c.value.toLocaleString()}</div>
             <div className="mt-1 text-xs text-[var(--color-text-secondary)]">{c.label}</div>
           </div>
         ))}
       </div>
 
-      <h2 className="mb-3 mt-8 font-[var(--font-display)] text-lg font-semibold">
-        Games played by type
-      </h2>
-      <div className="space-y-2">
-        {o.by_game.length === 0 && (
-          <p className="text-sm text-[var(--color-text-secondary)]">No games yet.</p>
-        )}
-        {o.by_game.map((g) => (
-          <div key={g.game_type} className="flex items-center gap-3">
-            <div className="w-32 shrink-0 text-sm">{gname(g.game_type)}</div>
-            <div className="h-6 flex-1 overflow-hidden rounded-full bg-[var(--color-surface)]">
-              <div
-                className="h-full rounded-full bg-[var(--color-primary)]"
-                style={{ width: `${(g.count / maxCount) * 100}%` }}
-              />
-            </div>
-            <div className="w-10 text-right font-[var(--font-mono)] text-sm">{g.count}</div>
-          </div>
-        ))}
+      <div className="mt-8 flex items-center justify-between">
+        <h2 className="font-[var(--font-display)] text-lg font-semibold">Activity</h2>
+        <div className="flex gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+          {RANGES.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+              style={{
+                background: days === d ? "var(--color-primary)" : "transparent",
+                color: days === d ? "#05060a" : "var(--color-text-secondary)",
+              }}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <ChartCard title="Games per day" legend={<Legend series={gamesSeries} />}>
+          {ts ? <TimeChart labels={labels} series={gamesSeries} unit="games" /> : <ChartSkeleton />}
+        </ChartCard>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChartCard title="New members per day">
+            {ts ? <TimeChart labels={labels} series={usersSeries} unit="members" /> : <ChartSkeleton />}
+          </ChartCard>
+          <ChartCard title="Games by type">
+            <BarList items={byType} />
+          </ChartCard>
+        </div>
       </div>
     </motion.div>
   );
+}
+
+function ChartCard({
+  title,
+  legend,
+  children,
+}: {
+  title: string;
+  legend?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)]/60 p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h3 className="font-[var(--font-display)] text-[1rem] font-semibold">{title}</h3>
+        {legend}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return <div className="h-[200px] animate-pulse rounded-[12px] bg-[var(--color-surface)]" />;
 }
 
 function UsersView({ users }: { users: UserRow[] | null }) {
