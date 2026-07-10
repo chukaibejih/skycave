@@ -71,7 +71,10 @@ async def browse(
 
 
 @router.get("/cases/{case_id}")
-async def case_preview(case_id: str, identity: BlueskyIdentity, db: AsyncSession = Depends(get_db)):
+async def case_preview(case_id: str, db: AsyncSession = Depends(get_db)):
+    # Public teaser: the shareable case link must open for a logged-out visitor
+    # (they sign in to claim a spot). Reveals only title/premise/difficulty, never
+    # the split evidence or the answer.
     return await cave.get_case_public(db, case_id)
 
 

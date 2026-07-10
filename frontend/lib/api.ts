@@ -72,6 +72,21 @@ export async function completeBluesky(): Promise<Identity | null> {
   return data.identity;
 }
 
+/**
+ * LOCAL DEV ONLY. Mint a real (non-guest) identity from a Bluesky handle without
+ * the OAuth dance, so the Cave can be exercised before the sidecar is deployed.
+ * Backend returns 404 unless env == development; the UI only surfaces this when
+ * NEXT_PUBLIC_DEV_LOGIN === "true".
+ */
+export async function devLogin(handle: string): Promise<Identity> {
+  const data = await request<{ token: string; identity: Identity }>(
+    "/auth/dev/login",
+    { method: "POST", body: JSON.stringify({ handle }) }
+  );
+  setToken(data.token);
+  return data.identity;
+}
+
 export async function fetchMe(): Promise<Identity | null> {
   try {
     return await request<Identity>("/auth/me");

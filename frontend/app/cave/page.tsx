@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CaveShell, Hint } from "@/components/cave/CaveShell";
-import { startBlueskyLogin } from "@/lib/bluesky";
+import { CaveSignIn } from "@/components/cave/SignIn";
 import { useAuth } from "@/lib/store";
 import { browseCases, myCases, myRooms, type CaseCard, type ArchitectCase, type SolverRoom } from "@/lib/cave";
 
@@ -31,18 +31,8 @@ export default function CaveHome() {
     return (
       <CaveShell back="/">
         <Intro />
-        <div className="mt-8 rounded-[16px] border p-6" style={{ borderColor: "var(--color-border)", background: "#12100d" }}>
-          <p className="text-sm" style={{ color: INK }}>The Cave is played with your Bluesky identity. Solving is a two-person job.</p>
-          <button
-            onClick={() => {
-              sessionStorage.setItem("cave_return", "/cave");
-              startBlueskyLogin();
-            }}
-            className="mt-4 h-11 w-full rounded-[10px] text-sm font-semibold"
-            style={{ background: "var(--color-primary)", color: "#05060a" }}
-          >
-            Connect Bluesky to enter
-          </button>
+        <div className="mt-8">
+          <CaveSignIn returnTo="/cave" />
         </div>
       </CaveShell>
     );

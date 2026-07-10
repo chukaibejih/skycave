@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CaveShell, Hint } from "@/components/cave/CaveShell";
-import { startBlueskyLogin } from "@/lib/bluesky";
+import { CaveSignIn } from "@/components/cave/SignIn";
 import { useAuth } from "@/lib/store";
 import { claimRoom, getCasePreview, CaveError, type CaseCard } from "@/lib/cave";
 
@@ -27,11 +27,6 @@ export default function CasePreviewPage() {
   }, [id]);
 
   const claim = async () => {
-    if (!authed) {
-      sessionStorage.setItem("cave_return", `/cave/${id}`);
-      startBlueskyLogin();
-      return;
-    }
     setClaiming(true);
     setErr(null);
     try {
@@ -76,16 +71,26 @@ export default function CasePreviewPage() {
         shared notepad, then confirm one answer as a team.
       </div>
 
-      <button
-        onClick={claim}
-        disabled={claiming}
-        className="mt-5 h-12 w-full rounded-[12px] text-sm font-semibold disabled:opacity-50"
-        style={{ background: "var(--color-primary)", color: "#05060a" }}
-      >
-        {claiming ? "claiming your spot..." : authed ? "Take a solver spot" : "Connect Bluesky to solve"}
-      </button>
-      <Hint>Claiming pairs you into a room. If a spot is already open, you become the second solver and the case begins.</Hint>
-      {err && <p className="mt-3 text-sm" style={{ color: "#ff725e" }}>{err}</p>}
+      {!loaded ? (
+        <div className="mt-5 h-12" />
+      ) : authed ? (
+        <>
+          <button
+            onClick={claim}
+            disabled={claiming}
+            className="mt-5 h-12 w-full rounded-[12px] text-sm font-semibold disabled:opacity-50"
+            style={{ background: "var(--color-primary)", color: "#05060a" }}
+          >
+            {claiming ? "claiming your spot..." : "Take a solver spot"}
+          </button>
+          <Hint>Claiming pairs you into a room. If a spot is already open, you become the second solver and the case begins.</Hint>
+          {err && <p className="mt-3 text-sm" style={{ color: "#ff725e" }}>{err}</p>}
+        </>
+      ) : (
+        <div className="mt-5">
+          <CaveSignIn returnTo={`/cave/${id}`} />
+        </div>
+      )}
 
       <div className="mt-6 text-center text-[12px]" style={{ color: MUTED }}>{c.attempts} attempts · {c.solves} solved</div>
     </CaveShell>

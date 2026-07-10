@@ -6,6 +6,7 @@ import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth } from "@/lib/store";
 import {
   addNote,
+  CaveError,
   confirmVerdict,
   getReveal,
   getRoom,
@@ -36,12 +37,24 @@ export default function CaseRoomPage() {
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const cursor = useRef(0);
+  const gotReveal = useRef(false); // ref, not state: read inside the poll interval without a stale closure
+
+  const loadReveal = () => {
+    if (gotReveal.current) return;
+    gotReveal.current = true;
+    getReveal(roomId)
+      .then(setReveal)
+      .catch(() => {
+        gotReveal.current = false; // let a later poll retry if it wasn't ready yet
+      });
+  };
 
   // Poll: merge new notepad entries (delta by cursor), refresh room state. Pause
   // when the tab is hidden, resume on focus.
   useEffect(() => {
     if (!loaded || !identity) return;
     let alive = true;
+    let id: ReturnType<typeof setInterval> | null = null;
     const pull = async () => {
       if (document.hidden) return;
       try {
@@ -52,15 +65,16 @@ export default function CaseRoomPage() {
           setNotes((prev) => [...prev, ...r.notepad]);
           cursor.current = r.cursor;
         }
-        if ((r.status === "solved" || r.status === "failed") && !reveal) {
-          getReveal(roomId).then((rv) => alive && setReveal(rv)).catch(() => {});
+        if (r.status === "solved" || r.status === "failed") {
+          loadReveal();
+          if (id) clearInterval(id); // game over: nothing left to poll for
         }
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Could not load the room");
       }
     };
     pull();
-    const id = setInterval(pull, POLL_MS);
+    id = setInterval(pull, POLL_MS);
     const onVis = () => !document.hidden && pull();
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -195,9 +209,20 @@ export default function CaseRoomPage() {
           room={room}
           bothWrote={bothWrote}
           onConfirm={async (answer) => {
-            const res = await confirmVerdict(roomId, answer);
-            await refreshNow();
-            if (res.resolved) getReveal(roomId).then(setReveal).catch(() => {});
+            try {
+              const res = await confirmVerdict(roomId, answer);
+              await refreshNow();
+              if (res.resolved) loadReveal();
+            } catch (e) {
+              // 409 = the case already resolved (partner sealed it, or a double
+              // tap). Not an error to the player: just sync to the outcome.
+              if (e instanceof CaveError && e.status === 409) {
+                await refreshNow();
+                loadReveal();
+              } else {
+                throw e;
+              }
+            }
           }}
         />
       )}
@@ -364,16 +389,25 @@ function VerdictPanel({
 }) {
   const [answer, setAnswer] = useState(room.verdict.answer ?? "");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (room.verdict.answer && room.verdict.answer !== answer) setAnswer(room.verdict.answer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.verdict.answer]);
 
+  // You have already sealed this exact answer; nothing to do until it changes or
+  // your partner confirms. Prevents the double-tap that hits a resolved room.
+  const alreadySealed =
+    room.verdict.your_confirmed && answer.trim() === (room.verdict.answer ?? "").trim();
+
   const submit = async () => {
-    if (!answer.trim() || busy) return;
+    if (!answer.trim() || busy || alreadySealed) return;
     setBusy(true);
+    setErr(null);
     try {
       await onConfirm(answer.trim());
+    } catch {
+      setErr("Could not submit your verdict. Try again.");
     } finally {
       setBusy(false);
     }
@@ -397,13 +431,14 @@ function VerdictPanel({
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={submit}
-              disabled={busy || !answer.trim()}
+              disabled={busy || !answer.trim() || alreadySealed}
               className="h-11 flex-1 rounded-[10px] text-sm font-semibold disabled:opacity-40"
               style={{ background: "var(--color-primary)", color: "#05060a" }}
             >
-              {room.verdict.your_confirmed ? "Confirmed" : "Confirm verdict"}
+              {busy ? "..." : alreadySealed ? "Confirmed" : "Confirm verdict"}
             </button>
           </div>
+          {err && <p className="mt-2 text-[13px]" style={{ color: "#ff725e" }}>{err}</p>}
           <div className="mt-3 flex items-center gap-4 text-xs" style={{ color: MUTED }}>
             <span style={{ color: room.verdict.a_confirmed ? "#56f0aa" : MUTED }}>Solver A {room.verdict.a_confirmed ? "confirmed" : "pending"}</span>
             <span style={{ color: room.verdict.b_confirmed ? "#56f0aa" : MUTED }}>Solver B {room.verdict.b_confirmed ? "confirmed" : "pending"}</span>

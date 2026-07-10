@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.ids import new_guest_id
@@ -51,6 +52,38 @@ async def guest_login(body: GuestRequest) -> TokenResponse:
 @router.get("/me", response_model=Identity)
 async def me(identity: CurrentIdentity) -> Identity:
     return identity
+
+
+class DevLoginRequest(BaseModel):
+    handle: str
+
+
+@router.post("/dev/login", response_model=TokenResponse)
+async def dev_login(body: DevLoginRequest) -> TokenResponse:
+    """LOCAL DEV ONLY. Mint a real (non-guest) identity from a Bluesky handle,
+    skipping the OAuth/DPoP dance so the Cave can be exercised before the sidecar
+    is deployed. The profile (DID, handle, avatar) is the genuine public one; only
+    the login proof is bypassed. Returns 404 unless env == "development".
+    """
+    if settings.env != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+    actor = body.handle.strip().lstrip("@")
+    if not actor:
+        raise HTTPException(status_code=422, detail="Handle required")
+    profile = await bluesky_auth.fetch_profile(actor)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Handle not found on Bluesky")
+    token = await bluesky_auth.upsert_and_tokenize(profile)
+    return TokenResponse(
+        token=token,
+        identity=Identity(
+            id=profile["did"],
+            is_guest=False,
+            handle=profile["handle"],
+            display_name=profile["display_name"],
+            avatar_url=profile["avatar_url"],
+        ),
+    )
 
 
 @router.post("/bluesky/complete", response_model=TokenResponse)
