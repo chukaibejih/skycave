@@ -15,8 +15,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CaveCase, CaveEvidence, CaveNotepad, CaveRoom, CaveSuspicion
 from app.schemas.rest import Identity
+from app.websocket.manager import manager
 
 MIN_EVIDENCE = 4
+
+
+# ── Live sync (WebSocket) ──────────────────────────────────────────────────
+# The room state is authoritative in Postgres and every client can poll the
+# delta cursor. These pokes just tell live sockets to pull *now* instead of
+# waiting for the next poll, so the notepad feels instant. Best-effort: a missed
+# poke is covered by the fallback poll. Sockets are keyed by solver role (A/B),
+# so the connected set doubles as presence.
+def cave_channel(room_id: str) -> str:
+    return f"cave:{room_id}"
+
+
+async def poke(room_id: str, *, exclude_role: str | None = None, kind: str = "sync") -> None:
+    await manager.broadcast(cave_channel(room_id), {"type": "poke", "kind": kind}, exclude=exclude_role)
+
+
+async def broadcast_presence(room_id: str) -> None:
+    roles = sorted(manager.connected_ids(cave_channel(room_id)))
+    await manager.broadcast(cave_channel(room_id), {"type": "presence", "roles": roles})
+
+
+async def room_member_role(db, room_id: str, did: str) -> str | None:
+    """Non-raising membership check for the WebSocket handshake."""
+    room = await db.get(CaveRoom, room_id)
+    return None if room is None else _role_of(room, did)
 
 
 def normalize_answer(s: str | None) -> str:
@@ -321,6 +347,7 @@ async def add_note(db, room_id: str, viewer: Identity, content: str) -> CaveNote
     db.add(note)
     await db.commit()
     await db.refresh(note)
+    await poke(room.id, exclude_role=role, kind="note")
     return note
 
 
@@ -343,6 +370,7 @@ async def set_suspicion(db, room_id: str, viewer_did: str, option_key: str, stat
         existing.status = status
         existing.updated_by_role = role
     await db.commit()
+    await poke(room.id, exclude_role=role, kind="suspicion")
 
 
 async def confirm_verdict(db, room_id: str, viewer: Identity, answer: str) -> dict:
@@ -384,6 +412,8 @@ async def confirm_verdict(db, room_id: str, viewer: Identity, answer: str) -> di
         resolved = True
 
     await db.commit()
+    # Poke both sides: the partner needs the confirmation/resolution immediately.
+    await poke(room.id, kind="verdict")
     return {
         "status": room.status,
         "a_confirmed": room.a_confirmed,

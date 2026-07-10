@@ -5,15 +5,47 @@ See the_cave_plan.md. No em dashes.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.deps import BlueskyIdentity
+from app.core.database import AsyncSessionLocal, get_db
+from app.core.deps import BlueskyIdentity, identity_from_token
 from app.schemas.cave import CaseDraftIn, ConfirmIn, EvidenceIn, NotepadIn, SuspicionIn
 from app.services import cave
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/cave", tags=["cave"])
+
+
+@router.websocket("/rooms/{room_id}/ws")
+async def room_ws(ws: WebSocket, room_id: str, token: str | None = Query(default=None)):
+    """Live sync for a case room. Authenticated by the same JWT as the REST API
+    (passed as ?token=). Sockets are keyed by solver role so the connected set is
+    presence. We push `poke` (pull now) and `presence` events; the client never
+    needs to send anything. All room reads still go through the role-filtered REST
+    endpoint, so no secret ever crosses this socket.
+    """
+    identity = identity_from_token(token)
+    if identity is None or identity.is_guest:
+        await ws.close(code=4401)
+        return
+    async with AsyncSessionLocal() as db:
+        role = await cave.room_member_role(db, room_id, identity.id)
+    if role is None:
+        await ws.close(code=4403)
+        return
+
+    chan = cave.cave_channel(room_id)
+    await manager.connect(chan, role, ws)
+    await cave.broadcast_presence(room_id)
+    try:
+        while True:
+            await ws.receive_text()  # keepalive only; client messages are ignored
+    except WebSocketDisconnect:
+        pass
+    finally:
+        manager.disconnect(chan, role, ws)
+        await cave.broadcast_presence(room_id)
 
 
 # ── Builder (architect) ──

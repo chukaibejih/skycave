@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CaveShell, Hint } from "@/components/cave/CaveShell";
+import { getToken } from "@/lib/api";
 import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth } from "@/lib/store";
 import {
@@ -20,7 +21,8 @@ const INK = "var(--color-text-primary)";
 const MUTED = "#8888AA";
 const PAPER = "#1a1a14"; // aged paper for evidence
 const SITE = "skycave.space";
-const POLL_MS = 12000;
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+const POLL_MS = 30000; // fallback only; the WebSocket carries real-time updates
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -36,63 +38,93 @@ export default function CaseRoomPage() {
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [presence, setPresence] = useState<string[]>([]); // solver roles currently connected via WS
+  const [wsUp, setWsUp] = useState(false);
   const cursor = useRef(0);
-  const gotReveal = useRef(false); // ref, not state: read inside the poll interval without a stale closure
+  const gotReveal = useRef(false);
+  const resolvedRef = useRef(false);
 
-  const loadReveal = () => {
+  const loadReveal = useCallback(() => {
     if (gotReveal.current) return;
     gotReveal.current = true;
     getReveal(roomId)
       .then(setReveal)
       .catch(() => {
-        gotReveal.current = false; // let a later poll retry if it wasn't ready yet
+        gotReveal.current = false; // let a later sync retry if it wasn't ready yet
       });
-  };
+  }, [roomId]);
 
-  // Poll: merge new notepad entries (delta by cursor), refresh room state. Pause
-  // when the tab is hidden, resume on focus.
-  useEffect(() => {
-    if (!loaded || !identity) return;
-    let alive = true;
-    let id: ReturnType<typeof setInterval> | null = null;
-    const pull = async () => {
-      if (document.hidden) return;
-      try {
-        const r = await getRoom(roomId, cursor.current);
-        if (!alive) return;
-        setRoom(r);
-        if (r.notepad.length) {
-          setNotes((prev) => [...prev, ...r.notepad]);
-          cursor.current = r.cursor;
-        }
-        if (r.status === "solved" || r.status === "failed") {
-          loadReveal();
-          if (id) clearInterval(id); // game over: nothing left to poll for
-        }
-      } catch (e) {
-        if (alive) setErr(e instanceof Error ? e.message : "Could not load the room");
-      }
-    };
-    pull();
-    id = setInterval(pull, POLL_MS);
-    const onVis = () => !document.hidden && pull();
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      alive = false;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, identity, roomId]);
-
-  const refreshNow = async () => {
+  // One delta pull: merge new notepad entries by cursor, refresh room state, and
+  // load the reveal once resolved. Called by both the WS poke and the fallback poll.
+  const syncNow = useCallback(async () => {
     const r = await getRoom(roomId, cursor.current);
     setRoom(r);
     if (r.notepad.length) {
       setNotes((prev) => [...prev, ...r.notepad]);
       cursor.current = r.cursor;
     }
-  };
+    if (r.status === "solved" || r.status === "failed") {
+      resolvedRef.current = true;
+      loadReveal();
+    }
+    return r;
+  }, [roomId, loadReveal]);
+  const refreshNow = syncNow;
+
+  // Fallback poll: a safety net under the WebSocket. Slow (30s) because the socket
+  // carries real-time updates; this only covers a dropped poke or a dead socket.
+  // Pauses when the tab is hidden and stops once the case resolves.
+  useEffect(() => {
+    if (!loaded || !identity) return;
+    let id: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
+      if (document.hidden || resolvedRef.current) return;
+      syncNow().catch((e) => setErr(e instanceof Error ? e.message : "Could not load the room"));
+    };
+    tick();
+    id = setInterval(tick, POLL_MS);
+    const onVis = () => !document.hidden && tick();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (id) clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [loaded, identity, syncNow]);
+
+  // Live socket: instant notepad/suspicion/verdict sync + partner presence.
+  // Reconnects with a fixed backoff; stops once the case resolves.
+  useEffect(() => {
+    if (!loaded || !identity) return;
+    const token = getToken();
+    if (!token) return;
+    let ws: WebSocket | null = null;
+    let stop = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const connect = () => {
+      if (stop) return;
+      ws = new WebSocket(`${WS_BASE}/cave/rooms/${roomId}/ws?token=${encodeURIComponent(token)}`);
+      ws.onopen = () => setWsUp(true);
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "poke") syncNow().catch(() => {});
+          else if (msg.type === "presence") setPresence(Array.isArray(msg.roles) ? msg.roles : []);
+        } catch {
+          /* ignore malformed frame */
+        }
+      };
+      ws.onclose = () => {
+        setWsUp(false);
+        if (!stop && !resolvedRef.current) retry = setTimeout(connect, 2500);
+      };
+    };
+    connect();
+    return () => {
+      stop = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
+  }, [loaded, identity, roomId, syncNow]);
 
   if (loaded && (!identity || identity.is_guest)) {
     return (
@@ -116,6 +148,10 @@ export default function CaseRoomPage() {
   const bothWrote =
     notes.some((n) => n.role === "A") && notes.some((n) => n.role === "B");
   const resolved = room.status === "solved" || room.status === "failed";
+  // Live presence when the socket is up (partner's role in the connected set),
+  // otherwise fall back to the claim-based flag from room state.
+  const partnerRole = room.your_role === "A" ? "B" : "A";
+  const partnerOnline = wsUp ? presence.includes(partnerRole) : room.partner.present;
 
   return (
     <CaveShell back="/cave">
@@ -163,12 +199,13 @@ export default function CaseRoomPage() {
 
       {/* Partner status */}
       <section className="mt-5 flex items-center gap-3 rounded-[12px] border px-4 py-3" style={{ borderColor: "var(--color-border)", background: "#100e0b" }}>
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: room.partner.present ? "var(--color-success)" : MUTED }} />
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: partnerOnline ? "var(--color-success)" : MUTED }} />
         <div className="text-sm" style={{ color: INK }}>
           {room.partner.handle ? (
             <>
-              Partner <span style={{ color: MUTED }}>@{room.partner.handle}</span> holds{" "}
-              <span style={{ color: INK }}>{room.partner.private_count}</span> private{" "}
+              Partner <span style={{ color: MUTED }}>@{room.partner.handle}</span>{" "}
+              <span style={{ color: partnerOnline ? "var(--color-success)" : MUTED }}>{partnerOnline ? "is here" : "is away"}</span>
+              {" · "}holds <span style={{ color: INK }}>{room.partner.private_count}</span> private{" "}
               {room.partner.private_count === 1 ? "card" : "cards"} you cannot see.
             </>
           ) : (
