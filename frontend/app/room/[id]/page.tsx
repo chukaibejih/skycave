@@ -10,6 +10,7 @@ import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
+import { GameOver } from "@/components/games/GameOver";
 import { preloadGlobe } from "@/components/games/GlobePicker";
 import { createRoom, getInvite, getRoom, joinRoom } from "@/lib/api";
 import { shareToBluesky } from "@/lib/bluesky";
@@ -86,9 +87,11 @@ export default function RoomPage() {
   // Gating on room.id prevents flashing the old game and mis-routing to results.
   const ready = !!room && room.id === id;
 
-  // When *this* game ends, head to results.
+  // Solo has no opponent to rematch, so it heads straight to the results / score
+  // card screen. Versus stays in the room and shows the seamless rematch screen
+  // (below), keeping both players and the live socket together.
   useEffect(() => {
-    if (gameEnd && room?.id === id) {
+    if (gameEnd && room?.id === id && room?.mode === "solo") {
       const t = setTimeout(() => router.push(`/results/${id}`), 600);
       return () => clearTimeout(t);
     }
@@ -135,6 +138,17 @@ export default function RoomPage() {
           /* effect above will join + connect */
         }}
       />
+    );
+  }
+
+  // Versus game finished: stay in the room and offer a seamless rematch on the
+  // same room. Solo redirected to results above, so this is versus only.
+  if (ready && gameEnd && room!.status === "finished" && room!.mode !== "solo") {
+    return (
+      <>
+        <ConnectionBadge status={status} />
+        <GameOver roomId={id} />
+      </>
     );
   }
 

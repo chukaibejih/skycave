@@ -62,6 +62,7 @@ export interface Room {
   game?: GameState | null;
   invite_url?: string;
   expires_at?: number | null; // unix seconds; waiting versus room auto-close time
+  series?: Record<string, number>; // wins per player id across rematches in this room
 }
 
 // Turn-based board (Tile Takeover). Sent via GAME_STATE / ROOM_STATE.

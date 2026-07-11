@@ -182,6 +182,12 @@ export default function ResultsPage() {
   }
 
   const rematch = async () => {
+    // Versus: rejoin the SAME room so both players continue together (its finished
+    // screen offers the seamless rematch). Solo: spin up a fresh room to replay.
+    if (room.mode !== "solo") {
+      router.push(`/room/${id}`);
+      return;
+    }
     const fresh = await createRoom(room.game_type);
     router.push(`/room/${fresh.id}`);
   };

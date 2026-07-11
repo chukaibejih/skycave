@@ -659,10 +659,13 @@ async def end_game(room_id: str) -> None:
         if is_solo and room["players"]:
             solo_summary = await _persist_solo(room)
             gs["solo_summary"] = solo_summary
+        # Running series tally across rematches in this room (versus only). A draw
+        # advances nobody. Persisted on the room so a rejoin/reconnect sees it.
+        winner_id = None if is_solo else _decide_winner(scores)
+        if winner_id:
+            series = room.setdefault("series", {})
+            series[winner_id] = series.get(winner_id, 0) + 1
         await rooms.save_room(room)
-
-    # Solo has no opponent, so no winner — it's a score, not a verdict.
-    winner_id = None if is_solo else _decide_winner(scores)
 
     payload: dict[str, Any] = {
         "scores": scores,
@@ -670,6 +673,7 @@ async def end_game(room_id: str) -> None:
         "history": gs["history"],
         "players": room["players"],
         "mode": room.get("mode", "versus"),
+        "series": room.get("series", {}),
     }
     if solo_summary is not None:
         payload["solo_summary"] = solo_summary

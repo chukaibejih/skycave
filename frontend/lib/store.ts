@@ -48,6 +48,7 @@ export interface GameEnd {
   winner_id: string | null;
   history: { round: number; points: Record<string, number> }[];
   players: Room["players"];
+  series?: Record<string, number>; // wins per player id across rematches in this room
 }
 
 export type Feedback = "correct" | "wrong" | null;
@@ -69,6 +70,8 @@ interface RoomState {
   boardState: import("./types").BoardState | null; // turn-based board (Tile Takeover)
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
   roomExpired: boolean; // waiting room auto-closed (no opponent joined)
+  series: Record<string, number>; // wins per player id across rematches in this room
+  rematchRequestedBy: string[]; // player ids who tapped rematch on the finished screen
 
   connect: (roomId: string) => void;
   disconnect: () => void;
@@ -96,6 +99,8 @@ export const useRoom = create<RoomState>((set, get) => ({
   boardState: null,
   justJoined: false,
   roomExpired: false,
+  series: {},
+  rematchRequestedBy: [],
 
   connect: (roomId) => {
     // Tear down any prior socket (e.g. navigating between rooms).
@@ -104,7 +109,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     if (!token) return;
 
     const socket = new SkycaveSocket(roomId, token);
-    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, roomExpired: false });
+    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, roomExpired: false, series: {}, rematchRequestedBy: [] });
 
     socket.onStatus((status) => set({ status }));
 
@@ -131,6 +136,13 @@ export const useRoom = create<RoomState>((set, get) => ({
         roomExpired: room.status === "expired",
         boardState: (room as unknown as { board?: import("./types").BoardState }).board ?? get().boardState,
         roundEndsAt: room.game?.round_ends_at ?? null,
+        series: room.series ?? get().series,
+        // On a finished room, ready flags mean "wants a rematch" (see backend
+        // _handle_rematch). Rehydrate that so a reconnect shows the right prompt.
+        rematchRequestedBy:
+          room.status === "finished"
+            ? room.players.filter((p) => p.ready).map((p) => p.id)
+            : [],
 	        // If we reconnected mid-finished game, surface the end screen.
         gameEnd:
           room.status === "finished" && room.game
@@ -139,6 +151,7 @@ export const useRoom = create<RoomState>((set, get) => ({
                 winner_id: null,
                 history: room.game.history,
                 players: room.players,
+                series: room.series ?? {},
               }
             : get().gameEnd,
       });
@@ -179,10 +192,24 @@ export const useRoom = create<RoomState>((set, get) => ({
       });
     });
 
+    // A player opted into a rematch on the finished screen. Ready flags on the
+    // broadcast players tell us who; both ready -> the backend restarts the same
+    // room and a GAME_START follows.
+    socket.on(WS.REMATCH_REQUEST, (data: { player_id: string; players?: Room["players"] }) => {
+      set((s) => {
+        const players = data.players ?? s.room?.players ?? [];
+        return {
+          room: s.room && data.players ? { ...s.room, players: data.players } : s.room,
+          rematchRequestedBy: players.filter((p) => p.ready).map((p) => p.id),
+        };
+      });
+    });
+
 	    socket.on(WS.GAME_START, (data: any) => {
 	      set({
 	        gameEnd: null,
 	        roundResult: null,
+        rematchRequestedBy: [],
         submitted: false,
         roundEndsAt: null,
 	        game: {
@@ -275,6 +302,8 @@ export const useRoom = create<RoomState>((set, get) => ({
 	        gameEnd: data,
 	        game: s.game ? { ...s.game, phase: "finished", scores: data.scores } : s.game,
 	        room: s.room ? { ...s.room, status: "finished" } : s.room,
+        series: data.series ?? s.series,
+        rematchRequestedBy: [], // fresh finished screen; nobody has opted in yet
         roundEndsAt: null,
 	      }));
     });

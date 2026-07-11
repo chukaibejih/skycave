@@ -32,6 +32,7 @@ def _public_room(room: dict, player_id: str) -> dict:
         "host_handle": room["host_handle"],
         "players": room["players"],
         "expires_at": room.get("expires_at"),
+        "series": room.get("series", {}),
         "game": None,
     }
     game = room.get("game")
