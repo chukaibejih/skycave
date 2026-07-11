@@ -62,6 +62,12 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
 
   const me = meId && board.order.includes(meId) ? meId : board.order[0];
   const opp = board.order.find((id) => id !== me) ?? board.order[1];
+  // Starting corners (server: order[0] bottom-left, order[1] top-right). Used to
+  // mark each player's home tile so you can see where you began.
+  const homeCell = (pid: string) =>
+    board.order[0] === pid ? (board.rows - 1) * board.cols : board.cols - 1;
+  const myHome = homeCell(me);
+  const oppHome = homeCell(opp);
   const myColor = board.pcolor[me];
   const oppColor = board.pcolor[opp];
   const myTurn = board.turn === me;
@@ -91,32 +97,62 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
         className="grid w-full max-w-[336px] gap-[3px]"
         style={{ gridTemplateColumns: `repeat(${board.cols}, 1fr)` }}
       >
-        {board.tiles.map((c, i) => (
-          <div
-            key={i}
-            className="relative aspect-square rounded-[4px]"
-            style={{ background: PALETTE[c] }}
-          >
-            <AnimatePresence>
-              {captured.has(i) && (
-                <motion.div
-                  key={gen}
-                  initial={{ opacity: 0.85, scale: 0.45 }}
-                  animate={{ opacity: 0, scale: 1 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="pointer-events-none absolute inset-0 rounded-[4px]"
-                  style={{ background: "rgba(255,255,255,0.6)" }}
+        {board.tiles.map((c, i) => {
+          const owner = board.owner[i];
+          const mine = owner === me;
+          const theirs = owner === opp;
+          const isMyHome = i === myHome;
+          const isOppHome = i === oppHome;
+          return (
+            <div
+              key={i}
+              className="relative aspect-square rounded-[4px]"
+              style={{
+                background: PALETTE[c],
+                // Ownership outline: your tiles ringed in bright ink, the
+                // opponent's in dark, neutral tiles plain. Makes each side's
+                // territory (and the front line between them) visible at a glance.
+                boxShadow: mine
+                  ? "inset 0 0 0 2px rgba(245,247,255,0.92)"
+                  : theirs
+                  ? "inset 0 0 0 2px rgba(12,14,20,0.55)"
+                  : "none",
+              }}
+            >
+              {/* Home pip: where each player started. Yours glows; theirs is muted. */}
+              {(isMyHome || isOppHome) && (
+                <span
+                  className="pointer-events-none absolute left-1/2 top-1/2 rounded-full"
+                  style={{
+                    width: isMyHome ? "46%" : "36%",
+                    height: isMyHome ? "46%" : "36%",
+                    transform: "translate(-50%, -50%)",
+                    background: isMyHome ? "rgba(245,247,255,0.95)" : "rgba(12,14,20,0.6)",
+                    boxShadow: isMyHome ? "0 0 6px rgba(245,247,255,0.65)" : "none",
+                  }}
                 />
               )}
-            </AnimatePresence>
-          </div>
-        ))}
+              <AnimatePresence>
+                {captured.has(i) && (
+                  <motion.div
+                    key={gen}
+                    initial={{ opacity: 0.85, scale: 0.45 }}
+                    animate={{ opacity: 0, scale: 1 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="pointer-events-none absolute inset-0 rounded-[4px]"
+                    style={{ background: "rgba(255,255,255,0.6)" }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </div>
 
       {/* Hint + color picker */}
       <div className="mt-auto w-full pt-6">
         <p className="mb-3 text-center text-xs text-[var(--color-text-secondary)]">
-          tap a color to flood your side · most tiles wins ·{" "}
+          your corner has the glowing dot · flood out from it · most tiles wins ·{" "}
           <button onClick={() => setShowIntro(true)} className="underline underline-offset-2">
             how to play
           </button>
@@ -164,8 +200,9 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
               <h2 className="font-[var(--font-display)] text-xl font-bold">How to play</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--color-text-secondary)]">
                 <li>
-                  <span className="text-[var(--color-text-primary)]">You own one corner, the other player owns the opposite one.</span>
+                  <span className="text-[var(--color-text-primary)]">You start in the corner with the glowing white dot; your opponent has the opposite corner.</span>
                 </li>
+                <li>Your tiles are outlined in white, theirs in dark, so you can always see who owns what.</li>
                 <li>Tap a color below. Your whole area turns that color and grabs every touching tile of it.</li>
                 <li>You can't pick your current color or your opponent's (those two are dimmed).</li>
                 <li>When the board fills up, whoever owns the most tiles wins.</li>
