@@ -217,3 +217,34 @@ export function BarList({
     </div>
   );
 }
+
+// A 100%-stacked horizontal bar with a labeled legend below (share of a whole).
+export function SplitBar({
+  segments,
+}: {
+  segments: { label: string; value: number; color: string }[];
+}) {
+  const total = Math.max(1, segments.reduce((s, x) => s + x.value, 0));
+  const pct = (v: number) => Math.round((v / total) * 100);
+  return (
+    <div>
+      <div className="flex h-7 w-full overflow-hidden rounded-full" style={{ background: SURFACE }}>
+        {segments.map((s) =>
+          s.value > 0 ? (
+            <div key={s.label} title={`${s.label}: ${s.value}`} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
+          ) : null
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+        {segments.map((s) => (
+          <div key={s.label} className="flex items-center gap-1.5 text-sm">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+            <span className="text-[var(--color-text-secondary)]">{s.label}</span>
+            <span className="font-[var(--font-mono)]">{s.value.toLocaleString()}</span>
+            <span className="text-[var(--color-text-secondary)]">· {pct(s.value)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

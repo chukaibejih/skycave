@@ -8,16 +8,18 @@ import {
   getAdminToken,
   getFeedback,
   getGames,
+  getInsights,
   getOverview,
   getTimeseries,
   getUsers,
   type FeedbackRow,
   type GameRow,
+  type Insights,
   type Overview,
   type Timeseries,
   type UserRow,
 } from "@/lib/admin";
-import { BarList, Legend, TimeChart } from "@/components/admin/AdminCharts";
+import { BarList, Legend, SplitBar, TimeChart } from "@/components/admin/AdminCharts";
 
 const GAME_NAME: Record<string, string> = {
   geoguess: "GeoGuess 1v1",
@@ -243,6 +245,17 @@ function OverviewView({ o }: { o: Overview }) {
     };
   }, [days]);
 
+  const [ins, setIns] = useState<Insights | null>(null);
+  useEffect(() => {
+    let active = true;
+    getInsights()
+      .then((i) => active && setIns(i))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const labels = ts?.buckets.map((b) => b.date) ?? [];
   const gamesSeries = [
     { name: "1v1", color: "#8b7cff", values: ts?.buckets.map((b) => b.versus) ?? [] },
@@ -298,6 +311,67 @@ function OverviewView({ o }: { o: Overview }) {
             <BarList items={byType} />
           </ChartCard>
         </div>
+      </div>
+
+      <h2 className="mt-10 font-[var(--font-display)] text-lg font-semibold">Insights</h2>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Who's playing">
+          {ins ? (
+            <>
+              <SplitBar
+                segments={[
+                  { label: "guests", value: ins.plays.guest, color: "#ff725e" },
+                  { label: "Bluesky", value: ins.plays.bluesky, color: "#8b7cff" },
+                ]}
+              />
+              <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                Share of every play by account type. Connecting Bluesky is what turns a guest into a player who can be brought back.
+              </p>
+            </>
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+
+        <ChartCard title="1v1 invite funnel">
+          {ins ? (
+            <>
+              <SplitBar
+                segments={[
+                  { label: "found an opponent", value: ins.funnel.filled, color: "#56f0aa" },
+                  { label: "expired · no-show", value: ins.funnel.expired, color: "#ff725e" },
+                ]}
+              />
+              <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                Of 1v1 rooms opened from a shared link, how many actually filled. A high no-show share means the invite loop is leaking.
+              </p>
+            </>
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Feedback by screen">
+          {ins ? (
+            <BarList items={ins.feedback_by_page.map((p) => ({ label: p.label, value: p.count }))} color="#67e8f9" />
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Feedback by device">
+          {ins ? (
+            <SplitBar
+              segments={[
+                { label: "mobile", value: ins.feedback_by_device.mobile, color: "#67e8f9" },
+                { label: "desktop", value: ins.feedback_by_device.desktop, color: "#8b7cff" },
+                { label: "unknown", value: ins.feedback_by_device.unknown, color: "#3a4258" },
+              ]}
+            />
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
       </div>
     </motion.div>
   );

@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -18,19 +18,24 @@ from app.core.database import get_db
 from app.core.deps import AdminAuth
 from app.core.redis_client import get_redis
 from app.core.security import create_admin_token
-from app.models import Feedback, GameSession, User
+from app.models import Feedback, GameSession, Room, User
 from app.schemas.rest import (
     AdminFeedbackResponse,
     AdminFeedbackRow,
     AdminGameRow,
     AdminGamesResponse,
+    AdminInsights,
     AdminLoginRequest,
     AdminOverview,
     AdminTimeseries,
     AdminTokenResponse,
     AdminUsersResponse,
     DayBucket,
+    DeviceSplit,
+    FunnelStat,
     GameTypeCount,
+    LabelCount,
+    SplitCount,
     UserStats,
 )
 
@@ -172,6 +177,65 @@ async def timeseries(
             )
         )
     return AdminTimeseries(days=days, buckets=buckets)
+
+
+@router.get("/insights", response_model=AdminInsights)
+async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminInsights:
+    """Deeper cuts over data we already store: guest-vs-Bluesky play share, the
+    1v1 invite funnel, and where/how feedback comes in."""
+    G = "guest:%"  # every guest id is prefixed "guest:"; a DID is a Bluesky account
+
+    # --- Guest vs Bluesky: share of all plays (count each occupied player slot) ---
+    p1_guest = await db.scalar(select(func.count()).where(GameSession.player1_id.like(G))) or 0
+    p1_all = await db.scalar(select(func.count()).select_from(GameSession)) or 0
+    p2_guest = await db.scalar(select(func.count()).where(GameSession.player2_id.like(G))) or 0
+    p2_all = await db.scalar(select(func.count()).where(GameSession.player2_id.isnot(None))) or 0
+    guest_plays = p1_guest + p2_guest
+    bluesky_plays = (p1_all - p1_guest) + (p2_all - p2_guest)
+
+    # --- 1v1 invite funnel: filled (played) vs expired (nobody joined in time) ---
+    # Only versus rooms arm an expiry timer, so status == "expired" always means a
+    # 1v1 room whose invite found no opponent. A finished 1v1 game is a versus
+    # GameSession.
+    filled = await db.scalar(select(func.count()).where(GameSession.mode == "versus")) or 0
+    expired = await db.scalar(select(func.count()).select_from(Room).where(Room.status == "expired")) or 0
+
+    # --- Feedback by page ---
+    page_rows = (
+        await db.execute(
+            select(Feedback.page, func.count())
+            .group_by(Feedback.page)
+            .order_by(desc(func.count()))
+            .limit(12)
+        )
+    ).all()
+    by_page = [LabelCount(label=(p or "(unknown)"), count=c) for p, c in page_rows]
+
+    # --- Feedback by device (parse the user agent) ---
+    total_fb = await db.scalar(select(func.count()).select_from(Feedback)) or 0
+    unknown = await db.scalar(select(func.count()).where(Feedback.user_agent.is_(None))) or 0
+    mobile = (
+        await db.scalar(
+            select(func.count()).where(
+                Feedback.user_agent.isnot(None),
+                or_(
+                    Feedback.user_agent.ilike("%Mobile%"),
+                    Feedback.user_agent.ilike("%Android%"),
+                    Feedback.user_agent.ilike("%iPhone%"),
+                    Feedback.user_agent.ilike("%iPad%"),
+                ),
+            )
+        )
+        or 0
+    )
+    desktop = max(0, total_fb - unknown - mobile)
+
+    return AdminInsights(
+        plays=SplitCount(guest=guest_plays, bluesky=bluesky_plays),
+        funnel=FunnelStat(filled=filled, expired=expired),
+        feedback_by_page=by_page,
+        feedback_by_device=DeviceSplit(mobile=mobile, desktop=desktop, unknown=unknown),
+    )
 
 
 @router.get("/users", response_model=AdminUsersResponse)

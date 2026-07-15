@@ -159,6 +159,34 @@ class AdminTimeseries(BaseModel):
     buckets: list[DayBucket]
 
 
+class SplitCount(BaseModel):
+    guest: int
+    bluesky: int
+
+
+class FunnelStat(BaseModel):
+    filled: int  # 1v1 rooms that found an opponent and played
+    expired: int  # 1v1 rooms that timed out with no opponent
+
+
+class LabelCount(BaseModel):
+    label: str
+    count: int
+
+
+class DeviceSplit(BaseModel):
+    mobile: int
+    desktop: int
+    unknown: int
+
+
+class AdminInsights(BaseModel):
+    plays: SplitCount  # guest vs Bluesky share of all plays
+    funnel: FunnelStat
+    feedback_by_page: list[LabelCount]
+    feedback_by_device: DeviceSplit
+
+
 class AdminUsersResponse(BaseModel):
     total: int
     users: list["UserStats"]

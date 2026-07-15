@@ -93,6 +93,14 @@ export interface Timeseries {
   buckets: DayBucket[];
 }
 
+export interface Insights {
+  plays: { guest: number; bluesky: number };
+  funnel: { filled: number; expired: number };
+  feedback_by_page: { label: string; count: number }[];
+  feedback_by_device: { mobile: number; desktop: number; unknown: number };
+}
+export const getInsights = () => adminGet<Insights>("/admin/insights");
+
 export const getOverview = () => adminGet<Overview>("/admin/overview");
 export const getTimeseries = (days = 30) =>
   adminGet<Timeseries>(`/admin/timeseries?days=${days}`);
