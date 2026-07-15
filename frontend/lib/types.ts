@@ -77,7 +77,7 @@ export interface BoardState {
   ncolors: number;
   tiles: number[];
   pcolor: Record<string, number>;
-  // Connect Four only (present on connect4 boards).
+  // Connect 4 only (present on connect4 boards).
   winner?: string | null;
   win_cells?: number[];
   // Dots and Boxes only (present on dots_boxes boards).

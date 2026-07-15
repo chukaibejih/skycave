@@ -1,7 +1,7 @@
 """Dots and Boxes — draw edges between dots; complete a box to claim it and move
 again. Most boxes when the grid fills wins.
 
-Turn-based (same engine as Tile Takeover / Connect Four). Completing a box keeps
+Turn-based (same engine as Tile Takeover / Connect 4). Completing a box keeps
 the turn, so both humans and the AI can chain captures (the engine re-invokes
 ai_move while the turn stays with it). Solo plays a heuristic Caver: take free
 boxes, otherwise play a safe edge, otherwise open the smallest sacrifice.

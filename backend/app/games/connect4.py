@@ -1,4 +1,4 @@
-"""Connect Four — drop discs down a 7x6 grid, line up four to win.
+"""Connect 4 — drop discs down a 7x6 grid, line up four to win.
 
 Turn-based (same engine as Tile Takeover): one evolving board, players alternate
 until someone connects four or the board fills. Zero data, deterministic rules.
@@ -139,7 +139,7 @@ def _minimax(owner, me, opp, turn, depth, alpha, beta):
 
 class Connect4(BaseGame):
     type = "connect4"
-    name = "Connect Four"
+    name = "Connect 4"
     tagline = "Drop discs. Line up four."
     total_rounds = 1
     mode = TURN_BASED
