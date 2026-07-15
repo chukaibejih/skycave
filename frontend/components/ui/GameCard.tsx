@@ -144,7 +144,7 @@ const NEW_SINCE: Record<string, string> = {
   connect4: "2026-07-12",
   dots_boxes: "2026-07-12",
 };
-function isNewGame(type: string): boolean {
+export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];
   return !!since && Date.now() < new Date(since).getTime() + NEW_DAYS * 86_400_000;
 }

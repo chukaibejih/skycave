@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { GameCard } from "@/components/ui/GameCard";
+import { GameCard, isNewGame } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
 import { CaveDoor } from "@/components/hub/CaveDoor";
 import { AuthModal } from "@/components/ui/AuthModal";
@@ -179,7 +179,9 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        {games.map((g) => (
+        {/* NEW games float to the top of the dock; a stable sort keeps the rest in
+            order. They drop back automatically once their NEW window expires. */}
+        {[...games].sort((a, b) => (isNewGame(b.type) ? 1 : 0) - (isNewGame(a.type) ? 1 : 0)).map((g) => (
           <GameCard key={g.type} game={g} onPlay={launch} />
         ))}
         {games.length === 0 && (
