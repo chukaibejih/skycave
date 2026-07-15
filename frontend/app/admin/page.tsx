@@ -372,6 +372,67 @@ function OverviewView({ o }: { o: Overview }) {
             <ChartSkeleton />
           )}
         </ChartCard>
+
+        <ChartCard title="Active members">
+          {ins ? (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                {([["DAU", ins.active.dau], ["WAU", ins.active.wau], ["MAU", ins.active.mau]] as const).map(([l, v]) => (
+                  <div key={l} className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-center">
+                    <div className="font-[var(--font-display)] text-2xl font-bold">{v.toLocaleString()}</div>
+                    <div className="mt-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">{l}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                Distinct Bluesky members who played (day / week / month). Stickiness DAU/MAU: {ins.active.mau ? Math.round((ins.active.dau / ins.active.mau) * 100) : 0}%.
+              </p>
+            </>
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+
+        <ChartCard title="New vs returning (last 7 days)">
+          {ins ? (
+            <>
+              <SplitBar
+                segments={[
+                  { label: "returning", value: ins.retention.returning, color: "#56f0aa" },
+                  { label: "new", value: ins.retention.new, color: "#67e8f9" },
+                ]}
+              />
+              <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                Members active this week, split by whether they had played before. Returning is the number that compounds.
+              </p>
+            </>
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="mt-4">
+        <ChartCard title="Top players">
+          {ins ? (
+            ins.top_players.length ? (
+              <div className="space-y-2">
+                {ins.top_players.map((p, i) => (
+                  <div key={p.handle} className="flex items-center gap-3 text-sm">
+                    <span className="w-5 text-right font-[var(--font-mono)] text-[var(--color-text-secondary)]">{i + 1}</span>
+                    <span className="flex-1 truncate">@{p.handle}</span>
+                    <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{p.games} games</span>
+                    <span className="w-12 text-right font-[var(--font-mono)]">{Math.round(p.win_rate * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-text-secondary)]">No ranked players yet.</p>
+            )
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
       </div>
     </motion.div>
   );

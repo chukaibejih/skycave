@@ -180,11 +180,34 @@ class DeviceSplit(BaseModel):
     unknown: int
 
 
+class ActiveUsers(BaseModel):
+    dau: int  # distinct Bluesky members who played in the last 1 / 7 / 30 days
+    wau: int
+    mau: int
+
+
+class RetentionSplit(BaseModel):
+    new: int  # active in the last 7 days, first ever game also in that window
+    returning: int  # active in the last 7 days and had played before
+
+
+class TopPlayer(BaseModel):
+    handle: str
+    games: int
+    wins: int
+    win_rate: float  # 0..1
+
+
 class AdminInsights(BaseModel):
     plays: SplitCount  # guest vs Bluesky share of all plays
     funnel: FunnelStat
     feedback_by_page: list[LabelCount]
     feedback_by_device: DeviceSplit
+    # Retention is Bluesky-only: guest ids are fresh each session, so a guest can
+    # never be "returning" and would inflate the counts.
+    active: ActiveUsers
+    retention: RetentionSplit
+    top_players: list[TopPlayer]
 
 
 class AdminUsersResponse(BaseModel):

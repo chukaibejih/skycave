@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -30,12 +30,15 @@ from app.schemas.rest import (
     AdminTimeseries,
     AdminTokenResponse,
     AdminUsersResponse,
+    ActiveUsers,
     DayBucket,
     DeviceSplit,
     FunnelStat,
     GameTypeCount,
     LabelCount,
+    RetentionSplit,
     SplitCount,
+    TopPlayer,
     UserStats,
 )
 
@@ -230,11 +233,65 @@ async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminIns
     )
     desktop = max(0, total_fb - unknown - mobile)
 
+    # --- Active Bluesky members (DAU/WAU/MAU) + new-vs-returning retention ---
+    # Every play slot, guests excluded (their id is fresh each session, so they
+    # can never be "returning").
+    now = datetime.now(timezone.utc)
+    plays_union = """
+        SELECT player1_id AS pid, created_at FROM game_sessions WHERE player1_id NOT LIKE 'guest:%'
+        UNION ALL
+        SELECT player2_id AS pid, created_at FROM game_sessions
+          WHERE player2_id IS NOT NULL AND player2_id NOT LIKE 'guest:%'
+    """
+
+    async def active_since(days: int) -> int:
+        q = text(f"SELECT count(DISTINCT pid) FROM ({plays_union}) s WHERE created_at >= :since")
+        return (await db.scalar(q, {"since": now - timedelta(days=days)})) or 0
+
+    dau, wau, mau = await active_since(1), await active_since(7), await active_since(30)
+
+    week_ago = now - timedelta(days=7)
+    ret = (
+        await db.execute(
+            text(
+                f"""
+        WITH p AS (
+            SELECT pid, MIN(created_at) AS first_seen, MAX(created_at) AS last_seen
+            FROM ({plays_union}) s GROUP BY pid
+        )
+        SELECT
+            COUNT(*) FILTER (WHERE last_seen >= :w AND first_seen >= :w) AS new_count,
+            COUNT(*) FILTER (WHERE last_seen >= :w AND first_seen < :w) AS returning_count
+        FROM p
+        """
+            ),
+            {"w": week_ago},
+        )
+    ).one()
+    new_p, returning_p = int(ret[0] or 0), int(ret[1] or 0)
+
+    # --- Top players (registered accounts, by games played) ---
+    top_rows = (
+        await db.execute(
+            select(User.handle, User.games_played, User.games_won)
+            .where(User.games_played > 0)
+            .order_by(desc(User.games_played))
+            .limit(8)
+        )
+    ).all()
+    top_players = [
+        TopPlayer(handle=h, games=gp, wins=gw, win_rate=(gw / gp if gp else 0.0))
+        for h, gp, gw in top_rows
+    ]
+
     return AdminInsights(
         plays=SplitCount(guest=guest_plays, bluesky=bluesky_plays),
         funnel=FunnelStat(filled=filled, expired=expired),
         feedback_by_page=by_page,
         feedback_by_device=DeviceSplit(mobile=mobile, desktop=desktop, unknown=unknown),
+        active=ActiveUsers(dau=dau, wau=wau, mau=mau),
+        retention=RetentionSplit(new=new_p, returning=returning_p),
+        top_players=top_players,
     )
 
 

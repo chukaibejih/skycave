@@ -98,6 +98,9 @@ export interface Insights {
   funnel: { filled: number; expired: number };
   feedback_by_page: { label: string; count: number }[];
   feedback_by_device: { mobile: number; desktop: number; unknown: number };
+  active: { dau: number; wau: number; mau: number };
+  retention: { new: number; returning: number };
+  top_players: { handle: string; games: number; wins: number; win_rate: number }[];
 }
 export const getInsights = () => adminGet<Insights>("/admin/insights");
 
