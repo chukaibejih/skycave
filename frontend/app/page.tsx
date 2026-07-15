@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +13,11 @@ import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
 import type { GameInfo, Identity } from "@/lib/types";
 
+// Paint before the first frame on the client (no "syncing" flash) but fall back to
+// a plain effect on the server, where layout effects do not run.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+const GAMES_CACHE = "skycave_games";
+
 export default function Home() {
   const router = useRouter();
   const { identity, loaded, hydrate, logout } = useAuth();
@@ -23,9 +28,30 @@ export default function Home() {
   const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" } | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // Instant dock + signal from the cached catalog (rendered before paint), so
+  // repeat visitors never see the "syncing" state.
+  useIsoLayoutEffect(() => {
+    try {
+      const cached = localStorage.getItem(GAMES_CACHE);
+      if (cached) setGames(JSON.parse(cached) as GameInfo[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Revalidate in the background; the catalog only changes on deploy.
   useEffect(() => {
     hydrate();
-    listGames().then(setGames).catch(() => setGames([]));
+    listGames()
+      .then((g) => {
+        setGames(g);
+        try {
+          localStorage.setItem(GAMES_CACHE, JSON.stringify(g));
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {});
   }, [hydrate]);
 
   const go = async (game: GameInfo, m: "versus" | "solo") => {

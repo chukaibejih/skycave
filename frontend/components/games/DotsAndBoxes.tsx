@@ -190,9 +190,10 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
             ))
           )}
 
-          {/* assist: gently blink the suggested line */}
+          {/* assist: gently blink the suggested line. pointer-events off so the
+              pulse never intercepts the tap meant for the edge beneath it. */}
           {hintLine && (
-            <line className="animate-pulse" x1={hintLine.x1} y1={hintLine.y1} x2={hintLine.x2} y2={hintLine.y2} stroke={YOU} strokeWidth={2.2} strokeLinecap="round" />
+            <line className="animate-pulse" x1={hintLine.x1} y1={hintLine.y1} x2={hintLine.x2} y2={hintLine.y2} stroke={YOU} strokeWidth={2.2} strokeLinecap="round" style={{ pointerEvents: "none" }} />
           )}
         </svg>
       </div>
