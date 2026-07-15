@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="34%" r="75%">
+      <stop offset="0" stop-color="#12152400"/>
+      <stop offset="0" stop-color="#121524"/>
+      <stop offset="1" stop-color="#05060a"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="40%" cy="36%" r="72%">
+      <stop offset="0" stop-color="#c3b9ff"/>
+      <stop offset="0.5" stop-color="#8b7cff"/>
+      <stop offset="1" stop-color="#5f4de0"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <!-- dark tile -->
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+
+  <!-- portal edge (cyan) -->
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#67e8f9" stroke-opacity="0.45" stroke-width="9"/>
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#67e8f9" stroke-opacity="0.9" stroke-width="9"
+          stroke-dasharray="150 620" stroke-linecap="round" transform="rotate(-40 256 256)"/>
+
+  <!-- ambient glow -->
+  <circle cx="256" cy="256" r="120" fill="#8b7cff" opacity="0.55" filter="url(#glow)"/>
+
+  <!-- the orb (the violet "." accent) -->
+  <circle cx="256" cy="256" r="112" fill="url(#orb)"/>
+  <ellipse cx="220" cy="208" rx="42" ry="28" fill="#ffffff" opacity="0.35"/>
+</svg>
