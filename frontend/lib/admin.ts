@@ -101,6 +101,16 @@ export interface Insights {
   active: { dau: number; wau: number; mau: number };
   retention: { new: number; returning: number };
   top_players: { handle: string; games: number; wins: number; win_rate: number }[];
+  game_balance: {
+    game_type: string;
+    games: number;
+    versus: number;
+    solo: number;
+    decisive: number;
+    first_player_win_rate: number;
+    draw_rate: number;
+    avg_score: number;
+  }[];
 }
 export const getInsights = () => adminGet<Insights>("/admin/insights");
 

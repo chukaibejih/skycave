@@ -198,6 +198,17 @@ class TopPlayer(BaseModel):
     win_rate: float  # 0..1
 
 
+class GameBalance(BaseModel):
+    game_type: str
+    games: int  # total sessions
+    versus: int  # 1v1 sessions
+    solo: int
+    decisive: int  # 1v1 sessions with a winner
+    first_player_win_rate: float  # of decisive 1v1, how often player 1 won (0..1)
+    draw_rate: float  # of 1v1, how often it tied (0..1)
+    avg_score: float  # average player-1 score (a game's typical scale)
+
+
 class AdminInsights(BaseModel):
     plays: SplitCount  # guest vs Bluesky share of all plays
     funnel: FunnelStat
@@ -208,6 +219,7 @@ class AdminInsights(BaseModel):
     active: ActiveUsers
     retention: RetentionSplit
     top_players: list[TopPlayer]
+    game_balance: list[GameBalance]
 
 
 class AdminUsersResponse(BaseModel):

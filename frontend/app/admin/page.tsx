@@ -412,7 +412,7 @@ function OverviewView({ o }: { o: Overview }) {
         </ChartCard>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard title="Top players">
           {ins ? (
             ins.top_players.length ? (
@@ -428,6 +428,44 @@ function OverviewView({ o }: { o: Overview }) {
               </div>
             ) : (
               <p className="text-sm text-[var(--color-text-secondary)]">No ranked players yet.</p>
+            )
+          ) : (
+            <ChartSkeleton />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Game balance">
+          {ins ? (
+            ins.game_balance.length ? (
+              <>
+                <div className="flex items-center gap-2 px-1 pb-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  <span className="flex-1">game</span>
+                  <span className="w-10 text-right">1v1</span>
+                  <span className="w-20 text-right">1st-player</span>
+                  <span className="w-12 text-right">draws</span>
+                </div>
+                {ins.game_balance.map((g) => {
+                  const enough = g.decisive >= 8;
+                  const imbalanced = enough && (g.first_player_win_rate < 0.4 || g.first_player_win_rate > 0.6);
+                  return (
+                    <div key={g.game_type} className="flex items-center gap-2 px-1 py-1 text-sm">
+                      <span className="flex-1 truncate">{gname(g.game_type)}</span>
+                      <span className="w-10 text-right font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{g.versus}</span>
+                      <span className="w-20 text-right font-[var(--font-mono)]" style={{ color: imbalanced ? "#ffd166" : undefined }} title={imbalanced ? "far from a fair 50%" : undefined}>
+                        {g.decisive ? `${Math.round(g.first_player_win_rate * 100)}%` : "·"}
+                      </span>
+                      <span className="w-12 text-right font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+                        {g.versus ? `${Math.round(g.draw_rate * 100)}%` : "·"}
+                      </span>
+                    </div>
+                  );
+                })}
+                <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                  1st-player is how often the host wins a decisive 1v1. Far from 50% (flagged) hints a first-move advantage or a bug. Needs a few games to mean anything.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-[var(--color-text-secondary)]">No games yet.</p>
             )
           ) : (
             <ChartSkeleton />

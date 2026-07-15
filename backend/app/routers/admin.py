@@ -34,6 +34,7 @@ from app.schemas.rest import (
     DayBucket,
     DeviceSplit,
     FunnelStat,
+    GameBalance,
     GameTypeCount,
     LabelCount,
     RetentionSplit,
@@ -284,6 +285,43 @@ async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminIns
         for h, gp, gw in top_rows
     ]
 
+    # --- Per-game balance & depth ---
+    # First-player win rate over decisive 1v1 games is the fairness signal: a value
+    # far from 50% means a first-mover advantage (or a bug). Solo (vs the AI) is
+    # excluded from the rate.
+    balance_rows = (
+        await db.execute(
+            text(
+                """
+        SELECT game_type,
+            count(*) AS games,
+            count(*) FILTER (WHERE mode='versus') AS versus,
+            count(*) FILTER (WHERE mode='solo') AS solo,
+            count(*) FILTER (WHERE mode='versus' AND winner_id IS NOT NULL) AS decisive,
+            count(*) FILTER (WHERE mode='versus' AND winner_id IS NOT NULL AND winner_id = player1_id) AS p1_wins,
+            count(*) FILTER (WHERE mode='versus' AND winner_id IS NULL) AS draws,
+            coalesce(avg(player1_score), 0)::float AS avg_score
+        FROM game_sessions
+        GROUP BY game_type
+        ORDER BY count(*) DESC
+        """
+            )
+        )
+    ).all()
+    game_balance = [
+        GameBalance(
+            game_type=gt,
+            games=games,
+            versus=versus,
+            solo=solo,
+            decisive=decisive,
+            first_player_win_rate=(p1w / decisive if decisive else 0.0),
+            draw_rate=(draws / versus if versus else 0.0),
+            avg_score=float(avg_score or 0),
+        )
+        for gt, games, versus, solo, decisive, p1w, draws, avg_score in balance_rows
+    ]
+
     return AdminInsights(
         plays=SplitCount(guest=guest_plays, bluesky=bluesky_plays),
         funnel=FunnelStat(filled=filled, expired=expired),
@@ -292,6 +330,7 @@ async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminIns
         active=ActiveUsers(dau=dau, wau=wau, mau=mau),
         retention=RetentionSplit(new=new_p, returning=returning_p),
         top_players=top_players,
+        game_balance=game_balance,
     )
 
 
