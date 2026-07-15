@@ -1,5 +1,7 @@
 "use client";
+import { useMemo } from "react";
 import type { BoardState, PlayerSlot } from "@/lib/types";
+import { AssistToggle, useAssist, useIdleHint } from "./assist";
 
 interface Props {
   board: BoardState | null;
@@ -12,6 +14,47 @@ const YOU = "#8b7cff"; // violet
 const OPP = "#ff725e"; // coral
 const S = 10; // dot spacing in viewBox units
 const P = 7; // padding
+
+// Gentle assist: take a free box if one is available, else a safe line that gives
+// nothing away, else the line that opens the fewest boxes. Returns a flat edge id.
+function dotsHint(h: (string | null)[], v: (string | null)[], cols: number, rows: number, numH: number): number | null {
+  const hIdx = (r: number, c: number) => r * cols + c;
+  const vIdx = (r: number, c: number) => r * (cols + 1) + c;
+  const sides = (hh: (string | null)[], vv: (string | null)[], r: number, c: number) =>
+    (hh[hIdx(r, c)] ? 1 : 0) + (hh[hIdx(r + 1, c)] ? 1 : 0) + (vv[vIdx(r, c)] ? 1 : 0) + (vv[vIdx(r, c + 1)] ? 1 : 0);
+  const legal: number[] = [];
+  for (let i = 0; i < h.length; i++) if (!h[i]) legal.push(i);
+  for (let i = 0; i < v.length; i++) if (!v[i]) legal.push(numH + i);
+  if (!legal.length) return null;
+  const sim = (id: number): [(string | null)[], (string | null)[]] => {
+    const hh = h.slice();
+    const vv = v.slice();
+    if (id < numH) hh[id] = "x";
+    else vv[id - numH] = "x";
+    return [hh, vv];
+  };
+  const countAt = (hh: (string | null)[], vv: (string | null)[], n: number) => {
+    let k = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (sides(hh, vv, r, c) === n) k++;
+    return k;
+  };
+  const four0 = countAt(h, v, 4);
+  for (const e of legal) {
+    const [hh, vv] = sim(e);
+    if (countAt(hh, vv, 4) > four0) return e; // completes a box
+  }
+  const three0 = countAt(h, v, 3);
+  const safe = legal.filter((e) => {
+    const [hh, vv] = sim(e);
+    return countAt(hh, vv, 3) <= three0; // gives no 3rd side away
+  });
+  if (safe.length) return safe[Math.floor(safe.length / 2)];
+  return legal.reduce((best, e) => {
+    const [hh, vv] = sim(e);
+    const [bh, bv] = sim(best);
+    return countAt(hh, vv, 3) < countAt(bh, bv, 3) ? e : best;
+  }, legal[0]);
+}
 
 export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
   if (!board) {
@@ -31,6 +74,7 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
   const me = meId && board.order.includes(meId) ? meId : board.order[0];
   const opp = board.order.find((id) => id !== me) ?? board.order[1];
   const oppName = opp === "ai" ? "Caver" : players.find((p) => p.id === opp)?.display_name ?? "opponent";
+  const isSolo = opp === "ai";
   const myTurn = board.turn === me;
   const over = boxOwner.every((o) => o !== null);
   const myScore = board.scores[me] ?? 0;
@@ -46,6 +90,29 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
     onAction({ edge: edgeId });
   };
 
+  const [assist, setAssist] = useAssist();
+  const canAssist = assist && isSolo; // hints only vs the Caver, never against a human
+  const drawn = h.filter(Boolean).length + v.filter(Boolean).length;
+  const hintEdge = useMemo(
+    () => (canAssist && myTurn && !over ? dotsHint(h, v, cols, rows, numH) : null),
+    [canAssist, myTurn, over, h, v, cols, rows, numH]
+  );
+  const showHint = useIdleHint(canAssist && myTurn && !over && hintEdge != null, drawn);
+  // Coords of the suggested edge, for the pulse overlay.
+  let hintLine: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  if (showHint && hintEdge != null) {
+    if (hintEdge < numH) {
+      const r = Math.floor(hintEdge / cols);
+      const c = hintEdge % cols;
+      hintLine = { x1: dx(c), y1: dy(r), x2: dx(c + 1), y2: dy(r) };
+    } else {
+      const idx = hintEdge - numH;
+      const r = Math.floor(idx / (cols + 1));
+      const c = idx % (cols + 1);
+      hintLine = { x1: dx(c), y1: dy(r), x2: dx(c), y2: dy(r + 1) };
+    }
+  }
+
   const W = cols * S + 2 * P;
   const H = rows * S + 2 * P;
 
@@ -59,7 +126,8 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
         <Chip color={OPP} label={oppName} score={oppScore} active={!myTurn && !over} align="right" />
       </header>
 
-      <div className="w-full max-w-[330px] rounded-[16px] border p-3" style={{ borderColor: "var(--color-border)", background: "#0f1017" }}>
+      <div className="flex w-full flex-1 flex-col items-center justify-center">
+      <div className="w-full max-w-[372px] rounded-[16px] border p-3.5" style={{ borderColor: "var(--color-border)", background: "#0f1017" }}>
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ touchAction: "manipulation" }}>
           {/* claimed boxes */}
           {boxOwner.map((o, i) => {
@@ -121,12 +189,23 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
               <circle key={`d${r}-${c}`} cx={dx(c)} cy={dy(r)} r={1.3} fill="#5a6178" />
             ))
           )}
+
+          {/* assist: gently blink the suggested line */}
+          {hintLine && (
+            <line className="animate-pulse" x1={hintLine.x1} y1={hintLine.y1} x2={hintLine.x2} y2={hintLine.y2} stroke={YOU} strokeWidth={2.2} strokeLinecap="round" />
+          )}
         </svg>
       </div>
 
-      <p className="mt-4 text-center text-xs text-[var(--color-text-secondary)]">
+      {isSolo && (
+        <div className="mt-5 flex justify-center">
+          <AssistToggle on={assist} onChange={setAssist} />
+        </div>
+      )}
+      <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
         tap a line between two dots · close the 4th side of a box to claim it and go again
       </p>
+      </div>
     </main>
   );
 }
