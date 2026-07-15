@@ -141,8 +141,8 @@ function Glyph({ type, color }: { type: string; color: string }) {
 // (adjust to your actual deploy day); the badge auto-hides after NEW_DAYS.
 const NEW_DAYS = 5;
 const NEW_SINCE: Record<string, string> = {
-  connect4: "2026-07-12",
-  dots_boxes: "2026-07-12",
+  connect4: "2026-07-15",
+  dots_boxes: "2026-07-15",
 };
 export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];
