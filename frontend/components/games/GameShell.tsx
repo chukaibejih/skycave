@@ -17,6 +17,8 @@ const ReactionGrid = dynamic(() => import("./ReactionGrid").then((m) => m.Reacti
 const MadMath = dynamic(() => import("./MadMath").then((m) => m.MadMath), { ssr: false });
 const WordHunt = dynamic(() => import("./WordHunt").then((m) => m.WordHunt), { ssr: false });
 const TileTakeover = dynamic(() => import("./TileTakeover").then((m) => m.TileTakeover), { ssr: false });
+const Connect4 = dynamic(() => import("./Connect4").then((m) => m.Connect4), { ssr: false });
+const DotsAndBoxes = dynamic(() => import("./DotsAndBoxes").then((m) => m.DotsAndBoxes), { ssr: false });
 
 export function GameShell() {
   const {
@@ -35,17 +37,13 @@ export function GameShell() {
 
   if (!room || !game) return null;
 
-  // Turn-based games (Tile Takeover) drive their own full-screen board, not the
-  // round-based ScoreHeader flow.
+  // Turn-based games drive their own full-screen board, not the round-based
+  // ScoreHeader flow. Pick the board component by game type.
   if (game.mode === "turn_based") {
-    return (
-      <TileTakeover
-        board={boardState}
-        meId={meId}
-        players={room.players}
-        onAction={sendAction}
-      />
-    );
+    const boardProps = { board: boardState, meId, players: room.players, onAction: sendAction };
+    if (game.game_type === "connect4") return <Connect4 {...boardProps} />;
+    if (game.game_type === "dots_boxes") return <DotsAndBoxes {...boardProps} />;
+    return <TileTakeover {...boardProps} />;
   }
 
   const phase = game.phase;

@@ -351,8 +351,14 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
 
 
 async def _turn_ai_move(room_id: str) -> None:
-    """Play the solo AI's move and broadcast the board; end the game if it fills."""
+    """Play the solo AI's move and broadcast the board; end the game if it fills.
+
+    If the move earns another turn (games like Dots and Boxes let you go again on
+    completing a box), schedule the AI's next move so it plays out its whole chain,
+    one visible step at a time.
+    """
     end_after = False
+    again = False
     async with rooms.room_lock(room_id):
         room = await rooms.get_room(room_id)
         if room is None or room.get("game") is None:
@@ -375,8 +381,11 @@ async def _turn_ai_move(room_id: str) -> None:
             room_id, events.message(events.GAME_STATE, game.turn_public(new))
         )
         end_after = game.turn_over(new)
+        again = not end_after and new["turn"] == ai  # AI earned a bonus move
     if end_after:
         await end_game(room_id)
+    elif again:
+        _schedule(room_id, 0.5, lambda: _turn_ai_move(room_id))
 
 
 # --------------------------------------------------------------------------- #

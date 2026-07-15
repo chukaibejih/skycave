@@ -13,6 +13,8 @@ const ACCENT: Record<string, string> = {
   mad_math: "var(--color-gold)",
   word_hunt: "var(--color-cyan)",
   tile_takeover: "var(--color-success)",
+  connect4: "var(--color-gold)",
+  dots_boxes: "var(--color-cyan)",
 };
 
 const META: Record<string, { code: string; stat: string }> = {
@@ -25,6 +27,8 @@ const META: Record<string, { code: string; stat: string }> = {
   mad_math: { code: "MTH", stat: "mental" },
   word_hunt: { code: "HNT", stat: "grid" },
   tile_takeover: { code: "TKO", stat: "board" },
+  connect4: { code: "C4", stat: "4 in a row" },
+  dots_boxes: { code: "D&B", stat: "boxes" },
 };
 
 // Lightweight inline glyph per game (no icon dependency).
@@ -94,6 +98,24 @@ function Glyph({ type, color }: { type: string; color: string }) {
           <path d="M8 9l3 3 2-2 3 4" fill="none" />
         </svg>
       );
+    case "dots_boxes":
+      // four dots with two closed sides
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round">
+          <path d="M7 7h10M7 7v10" />
+          {[7, 17].map((x) => [7, 17].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" fill={color} stroke="none" />))}
+        </svg>
+      );
+    case "connect4":
+      // a board with dropped discs
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none">
+          <rect x="4" y="4" width="16" height="16" rx="2.5" />
+          <circle cx="9" cy="15" r="1.9" fill={color} />
+          <circle cx="15" cy="15" r="1.9" fill={color} fillOpacity="0.35" />
+          <circle cx="9" cy="9.5" r="1.9" fill={color} fillOpacity="0.35" />
+        </svg>
+      );
     case "tile_takeover":
       // a 2x2 board, two tiles claimed
       return (
@@ -115,6 +137,18 @@ function Glyph({ type, color }: { type: string; color: string }) {
   }
 }
 
+// Flag a game NEW for its first few days on the hub. Set each game's go-live date
+// (adjust to your actual deploy day); the badge auto-hides after NEW_DAYS.
+const NEW_DAYS = 5;
+const NEW_SINCE: Record<string, string> = {
+  connect4: "2026-07-12",
+  dots_boxes: "2026-07-12",
+};
+function isNewGame(type: string): boolean {
+  const since = NEW_SINCE[type];
+  return !!since && Date.now() < new Date(since).getTime() + NEW_DAYS * 86_400_000;
+}
+
 export const GameCard = memo(function GameCard({
   game,
   onPlay,
@@ -124,6 +158,7 @@ export const GameCard = memo(function GameCard({
 }) {
   const accent = ACCENT[game.type] ?? "var(--color-primary)";
   const meta = META[game.type] ?? { code: "1V1", stat: "duel" };
+  const showNew = isNewGame(game.type);
   return (
     <motion.button
       initial={{ opacity: 0, y: 14 }}
@@ -154,9 +189,19 @@ export const GameCard = memo(function GameCard({
           >
             <Glyph type={game.type} color={accent} />
           </div>
-          <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-            {meta.code}
-          </span>
+          <div className="flex items-center gap-1.5">
+            {showNew && (
+              <span
+                className="rounded-full px-1.5 py-0.5 font-[var(--font-mono)] text-[9px] font-bold uppercase leading-none tracking-wide"
+                style={{ background: accent, color: "#05060a" }}
+              >
+                new
+              </span>
+            )}
+            <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+              {meta.code}
+            </span>
+          </div>
         </div>
 
         <div className="mt-3.5 flex-1">

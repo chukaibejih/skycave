@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from app.games.base import BaseGame
 from app.games.color_clash import ColorClash
+from app.games.connect4 import Connect4
+from app.games.dots_boxes import DotsAndBoxes
 from app.games.flag_rush import FlagRush
 from app.games.geoguesss import GeoGuess
 from app.games.mad_math import MadMath
@@ -24,6 +26,8 @@ _GAMES: dict[str, BaseGame] = {
         MadMath(),
         WordHunt(),
         TileTakeover(),
+        Connect4(),
+        DotsAndBoxes(),
     )
 }
 

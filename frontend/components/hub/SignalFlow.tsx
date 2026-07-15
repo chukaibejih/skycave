@@ -12,6 +12,8 @@ const ACCENT: Record<string, string> = {
   mad_math: "var(--color-gold)",
   word_hunt: "var(--color-cyan)",
   tile_takeover: "var(--color-success)",
+  connect4: "var(--color-gold)",
+  dots_boxes: "var(--color-cyan)",
 };
 const accentOf = (t: string) => ACCENT[t] ?? "var(--color-primary)";
 

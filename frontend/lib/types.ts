@@ -69,13 +69,22 @@ export interface Room {
 export interface BoardState {
   cols: number;
   rows: number;
-  ncolors: number;
-  tiles: number[];
   owner: (string | null)[];
   order: string[];
   turn: string;
-  pcolor: Record<string, number>;
   scores: Record<string, number>;
+  // Tile Takeover only (present on tile_takeover boards).
+  ncolors: number;
+  tiles: number[];
+  pcolor: Record<string, number>;
+  // Connect Four only (present on connect4 boards).
+  winner?: string | null;
+  win_cells?: number[];
+  // Dots and Boxes only (present on dots_boxes boards).
+  num_h?: number;
+  h?: (string | null)[];
+  v?: (string | null)[];
+  boxes?: (string | null)[];
 }
 
 // ── WebSocket event names (mirror app/websocket/events.py) ──
