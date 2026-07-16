@@ -24,15 +24,17 @@
       linear-gradient(180deg,#070914 0%,#05060a 52%,#030407 100%);
     background-attachment:fixed;
   }
-  .wrap{max-width:430px;margin:0 auto;padding:20px 16px 28px;}
-  .head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;}
+  .wrap{max-width:430px;margin:0 auto;padding:18px 16px 26px;}
+  .head{display:flex;align-items:baseline;justify-content:space-between;}
   h1{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em;}
   .tag{font-family:var(--mono);font-size:11px;color:var(--ts);}
-  .sub{font-size:13px;color:var(--ts);margin-bottom:12px;}
+  .sub{font-size:13px;color:var(--ts);margin:2px 0 12px;}
+  .sub b{color:var(--tp);font-weight:600;}
 
-  .hud{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
-  .match{font-family:var(--display);font-weight:700;font-size:26px;line-height:1;}
-  .match small{font-family:var(--mono);font-weight:400;font-size:11px;color:var(--ts);display:block;letter-spacing:.06em;text-transform:uppercase;margin-top:3px;}
+  .hud{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+  .stat{min-width:52px;}
+  .stat .v{font-family:var(--display);font-weight:700;font-size:24px;line-height:1;}
+  .stat .l{font-family:var(--mono);font-size:10px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-top:3px;}
   .stab{flex:1;}
   .stab .lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:5px;}
   .bar{height:8px;border-radius:9999px;background:#0c0f17;border:1px solid var(--border);overflow:hidden;}
@@ -41,32 +43,39 @@
   .stage{position:relative;border-radius:18px;border:1px solid var(--border);overflow:hidden;
     background:radial-gradient(120% 90% at 50% 15%, #1b2030 0%, #0b0e16 70%);touch-action:none;}
   canvas{display:block;width:100%;}
-  .flash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;
-    background:rgba(5,6,10,.72);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;text-align:center;padding:24px;}
-  .flash.on{opacity:1;pointer-events:auto;}
-  .flash b{font-family:var(--display);font-weight:700;font-size:20px;color:var(--warm);}
-  .flash span{font-size:13px;color:var(--ts);max-width:260px;}
 
-  .row{display:flex;gap:8px;margin-top:12px;}
-  button{font-family:var(--body);font-weight:600;font-size:13px;border-radius:10px;padding:10px 12px;cursor:pointer;border:1px solid var(--border);
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;
+    background:rgba(5,6,10,.82);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .25s;text-align:center;padding:22px;}
+  .overlay.on{opacity:1;pointer-events:auto;}
+  .overlay b.k{font-family:var(--display);font-weight:700;font-size:20px;}
+  .overlay .big{font-family:var(--display);font-weight:800;font-size:44px;line-height:1;}
+  .overlay .brk{display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--ts);}
+  .overlay .brk b{color:var(--tp);}
+  #cardCanvas{width:320px;border-radius:12px;border:1px solid var(--border);}
+  .flashsub{font-size:13px;color:var(--ts);max-width:260px;}
+  .warm{color:var(--warm);}
+
+  .row{display:flex;gap:8px;margin-top:12px;align-items:center;}
+  button{font-family:var(--body);font-weight:600;font-size:13px;border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid var(--border);
     background:var(--surface);color:var(--tp);transition:background .15s,border-color .15s;}
   button:hover{background:var(--elevated);}
   button.primary{background:var(--primary);border-color:var(--primary);color:#05060a;}
   button.on{border-color:var(--cyan);color:var(--cyan);}
-  .hint{margin-top:12px;font-size:12px;line-height:1.5;color:var(--ts);}
-  .hint b{color:var(--tp);font-weight:600;}
   .swatches{display:flex;gap:6px;margin-left:auto;}
   .sw{width:26px;height:26px;border-radius:8px;border:2px solid transparent;cursor:pointer;}
   .sw.on{border-color:var(--tp);}
+  .hint{margin-top:12px;font-size:12px;line-height:1.5;color:var(--ts);}
+  .hint b{color:var(--tp);font-weight:600;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="head"><h1>Kiln</h1><span class="tag">prototype · shaping feel</span></div>
-  <div class="sub">Shape the clay to match the ghost. Precision scores. Nerve keeps it standing.</div>
+  <div class="head"><h1>Kiln</h1><span class="tag">prototype · round loop</span></div>
+  <div class="sub">Today's pot · <b id="potname">Belly jar</b></div>
 
   <div class="hud">
-    <div class="match"><span id="matchv">0%</span><small>match</small></div>
+    <div class="stat"><div class="v" id="matchv">0%</div><div class="l">match</div></div>
+    <div class="stat"><div class="v" id="timev">45</div><div class="l">seconds</div></div>
     <div class="stab">
       <div class="lab"><span>stability</span><span id="stabv">100%</span></div>
       <div class="bar"><i id="stabbar"></i></div>
@@ -75,23 +84,40 @@
 
   <div class="stage" id="stage">
     <canvas id="c"></canvas>
-    <div class="flash" id="flash">
-      <b>It collapsed.</b>
-      <span>The wall got too thin, too fast. Slow, even pressure keeps a pot alive.</span>
-      <button class="primary" onclick="resetClay()">Throw again</button>
+
+    <div class="overlay" id="collapse">
+      <b class="k warm">It collapsed.</b>
+      <span class="flashsub">The wall got too thin, too fast. Slow, even pressure keeps a pot alive.</span>
+      <button class="primary" onclick="newRound(sameTarget)">Throw again</button>
+    </div>
+
+    <div class="overlay" id="result">
+      <b class="k">Fired.</b>
+      <div class="big" id="scorev">0</div>
+      <div class="brk">
+        <span>shape <b id="bkShape">0</b></span>
+        <span>glaze <b id="bkGlaze">0</b></span>
+        <span>nerve <b id="bkNerve">0</b></span>
+      </div>
+      <canvas id="cardCanvas" width="640" height="360"></canvas>
+      <div class="row" style="margin-top:4px;">
+        <button class="primary" onclick="newRound(nextTarget)">Next pot</button>
+        <button onclick="newRound(sameTarget)">Reshape</button>
+        <button onclick="alert('This would open the Bluesky composer with the card image attached.')">Share</button>
+      </div>
     </div>
   </div>
 
   <div class="row">
+    <button class="primary" id="fireBtn" onclick="fire()">Fire it</button>
     <button id="ghostBtn" class="on" onclick="toggleGhost()">Ghost: on</button>
-    <button onclick="resetClay()">Reset clay</button>
     <div class="swatches" id="swatches"></div>
   </div>
 
   <p class="hint">
-    <b>Drag on the clay</b> to push the wall out or pinch it in at that height.
-    Pull it <b>too thin or too fast</b> and it wobbles, drains stability, and collapses.
-    Pick a glaze color to <b>paint a band</b> as you drag near the surface.
+    <b>Drag on the clay</b> to shape it toward the ghost before the timer runs out.
+    Go <b>too thin or too fast</b> and it wobbles and collapses. Tap a glaze, then drag
+    near the surface to <b>paint a band</b>. Hit <b>Fire it</b> to score.
   </p>
 </div>
 
@@ -101,13 +127,12 @@ const ctx = canvas.getContext('2d');
 const stage = document.getElementById('stage');
 
 // ---- geometry ----
-const CSSW = () => stage.clientWidth;
 const CSSH = 470;
 let dpr = Math.min(window.devicePixelRatio || 1, 3);
 let W = 0, H = CSSH;
 function resize(){
   dpr = Math.min(window.devicePixelRatio || 1, 3);
-  W = CSSW();
+  W = stage.clientWidth;
   canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
   canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -115,150 +140,146 @@ function resize(){
 window.addEventListener('resize', resize);
 
 const ROWS = 64;
-const yTop = 46, yBot = 424;         // pot vertical extent on canvas
+const yTop = 46, yBot = 424;
 const potH = yBot - yTop;
-const MAXR = 132;                    // widest allowed radius
-const MINWALL = 5;                   // absolute min radius
-const THIN = 16;                     // below this = fragile
+const MAXR = 132, MINWALL = 5, THIN = 16;
+const ROUND_SECS = 45;
 const cx = () => W/2;
-
 const rowY = i => yTop + (i/(ROWS-1))*potH;
 const yToRow = y => Math.max(0, Math.min(ROWS-1, Math.round(((y-yTop)/potH)*(ROWS-1))));
 
-// target vase (normalized radius of MAXR), interpolated from keyframes
-const KEYS = [[0,.40],[.07,.27],[.16,.38],[.40,.94],[.58,.82],[.80,.34],[1,.30]];
-function targetR(i){
-  const t = i/(ROWS-1);
-  for(let k=0;k<KEYS.length-1;k++){
-    const [t0,r0]=KEYS[k],[t1,r1]=KEYS[k+1];
-    if(t>=t0 && t<=t1){ const f=(t-t0)/(t1-t0); const s=f*f*(3-2*f); return (r0+(r1-r0)*s)*MAXR; }
-  }
-  return KEYS[KEYS.length-1][1]*MAXR;
+// ---- targets ----
+const TARGETS = [
+  { name:'Belly jar', keys:[[0,.40],[.07,.27],[.16,.38],[.40,.94],[.58,.82],[.80,.34],[1,.30]], glaze:[[0,.09,'#8b7cff'],[.34,.60,'#67e8f9']] },
+  { name:'Bud vase',  keys:[[0,.33],[.10,.19],[.24,.25],[.46,.35],[.66,.31],[.86,.27],[1,.25]], glaze:[[0,.11,'#ffd166']] },
+  { name:'Amphora',   keys:[[0,.30],[.08,.22],[.20,.52],[.36,.80],[.50,.63],[.66,.83],[.82,.40],[1,.30]], glaze:[[0,.07,'#ff725e'],[.44,.66,'#56f0aa']] },
+];
+function interpKeys(keys,i){
+  const t=i/(ROWS-1);
+  for(let k=0;k<keys.length-1;k++){ const [t0,r0]=keys[k],[t1,r1]=keys[k+1];
+    if(t>=t0 && t<=t1){ const f=(t-t0)/(t1-t0), s=f*f*(3-2*f); return (r0+(r1-r0)*s)*MAXR; } }
+  return keys[keys.length-1][1]*MAXR;
 }
-let target = [], prof = [], glaze = [], vel = [];
-function resetClay(){
-  target = []; prof = []; glaze = []; vel = [];
+function bandColor(bands,i){ const t=i/(ROWS-1); for(const [a,b,c] of bands){ if(t>=a && t<=b) return c; } return null; }
+
+let target=[], tglaze=[], prof=[], glaze=[], vel=[];
+let curTarget=0;
+const sameTarget = -1, nextTarget = -2;
+function setTarget(idx){
+  curTarget = idx; const T = TARGETS[idx];
+  document.getElementById('potname').textContent = T.name;
+  target=[]; tglaze=[];
+  for(let i=0;i<ROWS;i++){ target[i]=interpKeys(T.keys,i); tglaze[i]=bandColor(T.glaze,i); }
+}
+function newRound(which){
+  if(which===sameTarget){ /* keep curTarget */ }
+  else if(which===nextTarget){ curTarget=(curTarget+1)%TARGETS.length; }
+  else { curTarget = which; }
+  setTarget(curTarget);
+  prof=[]; glaze=[]; vel=[];
   for(let i=0;i<ROWS;i++){
-    target[i] = targetR(i);
     const t=i/(ROWS-1);
-    // start: a rough lump, part-way toward the target so there is clay to work
-    const lump = (0.46 + 0.12*Math.sin(t*Math.PI))*MAXR;
-    prof[i] = lump*0.5 + target[i]*0.5 + (Math.sin(i*0.7)*6);
+    prof[i] = (0.44 + 0.10*Math.sin(t*Math.PI))*MAXR + Math.sin(i*0.7)*4;   // a fresh, neutral lump
     prof[i] = Math.max(MINWALL, Math.min(MAXR, prof[i]));
-    glaze[i] = null; vel[i] = 0;
+    glaze[i]=null; vel[i]=0;
   }
-  stability = 1; collapsed = false; document.getElementById('flash').classList.remove('on');
+  stability=1; collapsed=false; timeLeft=ROUND_SECS; phase='shaping';
+  document.getElementById('collapse').classList.remove('on');
+  document.getElementById('result').classList.remove('on');
+  document.getElementById('fireBtn').disabled=false;
 }
 
 // ---- state ----
-let stability = 1, collapsed = false, spin = 0, showGhost = true;
-let last = performance.now();
-let pointer = null, lastMove = 0, moveSpeed = 0;
+let stability=1, collapsed=false, spin=0, showGhost=true, slump=0, collapseSide=1;
+let phase='shaping', timeLeft=ROUND_SECS;
+let last=performance.now(), pointer=null, lastMove=0, moveSpeed=0;
 
 // glaze palette
-const GLAZES = ['#c0503b','#8b7cff','#67e8f9','#ffd166','#f5f7ff','#2e7d5b'];
-let glazeColor = null;
-const swWrap = document.getElementById('swatches');
-GLAZES.forEach((c,idx)=>{
-  const b=document.createElement('div'); b.className='sw'; b.style.background=c;
-  b.onclick=()=>{ glazeColor = glazeColor===c?null:c; [...swWrap.children].forEach(x=>x.classList.remove('on')); if(glazeColor===c) b.classList.add('on'); };
-  swWrap.appendChild(b);
-});
-
-function toggleGhost(){ showGhost=!showGhost; document.getElementById('ghostBtn').textContent='Ghost: '+(showGhost?'on':'off'); document.getElementById('ghostBtn').classList.toggle('on',showGhost); }
+const GLAZES=['#c0503b','#8b7cff','#67e8f9','#ffd166','#f5f7ff','#2e7d5b'];
+let glazeColor=null;
+const swWrap=document.getElementById('swatches');
+GLAZES.forEach(c=>{ const b=document.createElement('div'); b.className='sw'; b.style.background=c;
+  b.onclick=()=>{ glazeColor=glazeColor===c?null:c; [...swWrap.children].forEach(x=>x.classList.remove('on')); if(glazeColor===c) b.classList.add('on'); };
+  swWrap.appendChild(b); });
+function toggleGhost(){ showGhost=!showGhost; const b=document.getElementById('ghostBtn'); b.textContent='Ghost: '+(showGhost?'on':'off'); b.classList.toggle('on',showGhost); }
 
 // ---- input ----
-function evPos(e){
-  const r = canvas.getBoundingClientRect();
-  const p = (e.touches && e.touches[0]) || e;
-  return { x:(p.clientX-r.left), y:(p.clientY-r.top) };
-}
-function down(e){ if(collapsed) return; e.preventDefault(); pointer = evPos(e); lastMove = performance.now(); }
+function evPos(e){ const r=canvas.getBoundingClientRect(); const p=(e.touches&&e.touches[0])||e; return {x:p.clientX-r.left,y:p.clientY-r.top}; }
+function down(e){ if(phase!=='shaping'||collapsed) return; e.preventDefault(); pointer=evPos(e); lastMove=performance.now(); }
 function move(e){
-  if(!pointer || collapsed) return; e.preventDefault();
-  const p = evPos(e);
-  const now = performance.now();
-  const dt = Math.max(1, now-lastMove);
-  const dist = Math.hypot(p.x-pointer.x, p.y-pointer.y);
-  moveSpeed = 0.7*moveSpeed + 0.3*(dist/dt*16);   // px per ~frame, smoothed
-  shapeAt(p.x, p.y, dist);
-  pointer = p; lastMove = now;
+  if(!pointer||phase!=='shaping'||collapsed) return; e.preventDefault();
+  const p=evPos(e), now=performance.now(), dt=Math.max(1,now-lastMove);
+  const dist=Math.hypot(p.x-pointer.x,p.y-pointer.y);
+  moveSpeed=0.7*moveSpeed+0.3*(dist/dt*16);
+  shapeAt(p.x,p.y,dist); pointer=p; lastMove=now;
 }
-function up(){ pointer = null; }
+function up(){ pointer=null; }
 canvas.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
 canvas.addEventListener('touchstart',down,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
 
-const BRUSH = 6;               // rows of influence each side
-function shapeAt(px, py, dist){
-  const i0 = yToRow(py);
-  const desired = Math.max(MINWALL, Math.min(MAXR, Math.abs(px - cx())));
-  const strength = Math.min(0.6, 0.22 + dist*0.02);
+const BRUSH=6;
+function shapeAt(px,py,dist){
+  const i0=yToRow(py); const desired=Math.max(MINWALL,Math.min(MAXR,Math.abs(px-cx())));
+  const strength=Math.min(0.6,0.22+dist*0.02);
   for(let j=Math.max(0,i0-BRUSH); j<=Math.min(ROWS-1,i0+BRUSH); j++){
-    const w = Math.exp(-Math.pow((j-i0)/(BRUSH*0.6), 2));
-    const before = prof[j];
-    prof[j] += (desired - prof[j]) * w * strength;
-    prof[j] = Math.max(MINWALL, Math.min(MAXR, prof[j]));
-    vel[j] = 0.6*vel[j] + Math.abs(prof[j]-before);
-    if(glazeColor && Math.abs(Math.abs(px-cx())-prof[j]) < 26) glaze[j] = glazeColor;
+    const w=Math.exp(-Math.pow((j-i0)/(BRUSH*0.6),2)); const before=prof[j];
+    prof[j]+=(desired-prof[j])*w*strength; prof[j]=Math.max(MINWALL,Math.min(MAXR,prof[j]));
+    vel[j]=0.6*vel[j]+Math.abs(prof[j]-before);
+    if(glazeColor && Math.abs(Math.abs(px-cx())-prof[j])<26) glaze[j]=glazeColor;
   }
 }
 
 // ---- scoring ----
-function matchPct(){
-  let s=0; for(let i=0;i<ROWS;i++) s += Math.abs(prof[i]-target[i]);
-  const mean = s/ROWS;
-  return Math.max(0, Math.min(1, 1 - mean/(0.34*MAXR)));
+function hx(c){ c=c.replace('#',''); return [parseInt(c.slice(0,2),16),parseInt(c.slice(2,4),16),parseInt(c.slice(4,6),16)]; }
+function colorDist(a,b){ const A=hx(a),B=hx(b); return Math.hypot(A[0]-B[0],A[1]-B[1],A[2]-B[2]); }
+function shapeMatch(){ let s=0; for(let i=0;i<ROWS;i++) s+=Math.abs(prof[i]-target[i]); return Math.max(0,Math.min(1,1-(s/ROWS)/(0.34*MAXR))); }
+function glazeMatch(){
+  let sum=0,cnt=0;
+  for(let i=0;i<ROWS;i++){ const tg=tglaze[i];
+    if(tg){ cnt++; sum += glaze[i] ? Math.max(0,1-colorDist(glaze[i],tg)/150) : 0; } }
+  return cnt? sum/cnt : 1;
 }
 
-// ---- physics: nerve ----
-function step(dt){
-  if(collapsed) return;
-  let thin=0, agitation=0;
-  for(let i=0;i<ROWS;i++){ if(prof[i]<THIN) thin += (THIN-prof[i])/THIN; agitation += vel[i]; vel[i]*=0.9; }
-  const speedDrain = Math.max(0, moveSpeed-6) * 0.010;
-  const thinDrain  = thin * 0.010;
-  const regen = (pointer? 0.004 : 0.010);        // recovers when you ease off
-  stability = Math.max(0, Math.min(1, stability - (speedDrain+thinDrain)*dt*0.06 + regen*dt*0.06));
-  moveSpeed *= 0.92;
-  if(stability<=0) collapse();
+// ---- round control ----
+function fire(){
+  if(phase!=='shaping') return;
+  phase='fired'; pointer=null; document.getElementById('fireBtn').disabled=true;
+  const sh=shapeMatch(), gl=glazeMatch(), nv=stability;
+  const shPts=Math.round(sh*600), glPts=Math.round(gl*300), nvPts=Math.round(nv*100);
+  const total=shPts+glPts+nvPts;
+  document.getElementById('scorev').textContent=total;
+  document.getElementById('bkShape').textContent=shPts;
+  document.getElementById('bkGlaze').textContent=glPts;
+  document.getElementById('bkNerve').textContent=nvPts;
+  drawCard(total);
+  document.getElementById('result').classList.add('on');
 }
-let slump=0, collapseSide=1;
-function collapse(){ collapsed=true; slump=0; collapseSide = Math.random()<0.5?-1:1; document.getElementById('flash').classList.add('on'); }
 
-// ---- render ----
-const PI2 = Math.PI*2;
-
-// one-time matte clay grain (faint warm tint) — reused every frame, drifts to spin
-const noiseCan = document.createElement('canvas'); noiseCan.width=160; noiseCan.height=160;
+// ---- render helpers ----
+const PI2=Math.PI*2;
+const noiseCan=document.createElement('canvas'); noiseCan.width=160; noiseCan.height=160;
 (()=>{ const nx=noiseCan.getContext('2d'); const im=nx.createImageData(160,160);
-  for(let p=0;p<im.data.length;p+=4){ const v=128+(Math.random()*2-1)*38;
-    im.data[p]=v+10; im.data[p+1]=v; im.data[p+2]=v-8; im.data[p+3]=255; }
+  for(let p=0;p<im.data.length;p+=4){ const v=128+(Math.random()*2-1)*38; im.data[p]=v+10; im.data[p+1]=v; im.data[p+2]=v-8; im.data[p+3]=255; }
   nx.putImageData(im,0,0); })();
-const noisePat = ctx.createPattern(noiseCan,'repeat');
+const noisePat=ctx.createPattern(noiseCan,'repeat');
 
-// collapse lean/fold: top rows swing sideways as it buckles
 function bend(i){ if(!collapsed) return 0; const t=i/(ROWS-1); return collapseSide*slump*Math.pow(1-t,1.6)*MAXR*0.85; }
 function colX(i){ return cx()+bend(i); }
-
 function dispR(i){
-  const fragile = (1-stability) * (prof[i]<THIN? 1.7:0.5);
-  let r = prof[i];
-  if(collapsed){ r = prof[i]*Math.max(0.15,1-slump*0.8); r += Math.sin(spin*3+i*0.6)*prof[i]*0.12*Math.min(1,slump*2); }
-  else if(fragile>0.02){ r += Math.sin(spin*2.4 + i*0.55)*fragile*7; }
-  return Math.max(1, r);
+  const fragile=(1-stability)*(prof[i]<THIN?1.7:0.5); let r=prof[i];
+  if(collapsed){ r=prof[i]*Math.max(0.15,1-slump*0.8); r+=Math.sin(spin*3+i*0.6)*prof[i]*0.12*Math.min(1,slump*2); }
+  else if(fragile>0.02){ r+=Math.sin(spin*2.4+i*0.55)*fragile*7; }
+  return Math.max(1,r);
 }
 function potPath(){
-  ctx.beginPath();
-  ctx.moveTo(colX(0)+dispR(0), rowY(0));
-  for(let i=1;i<ROWS;i++) ctx.lineTo(colX(i)+dispR(i), rowY(i));
-  for(let i=ROWS-1;i>=0;i--) ctx.lineTo(colX(i)-dispR(i), rowY(i));
+  ctx.beginPath(); ctx.moveTo(colX(0)+dispR(0),rowY(0));
+  for(let i=1;i<ROWS;i++) ctx.lineTo(colX(i)+dispR(i),rowY(i));
+  for(let i=ROWS-1;i>=0;i--) ctx.lineTo(colX(i)-dispR(i),rowY(i));
   ctx.closePath();
 }
 function draw(){
-  ctx.clearRect(0,0,W,H);
-  const baseR = dispR(ROWS-1);
-
-  // ---- wheel (solid, matte) + contact shadow ----
+  ctx.clearRect(0,0,W,H); const baseR=dispR(ROWS-1);
+  // wheel + shadow
   const wy=yBot+14, wr=MAXR*1.0, wth=20;
   let cs=ctx.createRadialGradient(cx(),yBot+7,4,cx(),yBot+7,baseR*1.9);
   cs.addColorStop(0,'rgba(0,0,0,.6)'); cs.addColorStop(1,'rgba(0,0,0,0)');
@@ -270,114 +291,127 @@ function draw(){
   ctx.fillStyle=wtop; ctx.beginPath(); ctx.ellipse(cx(),wy,wr,15,0,0,PI2); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.045)'; ctx.lineWidth=1;
   for(let g=0.32;g<1;g+=0.19){ ctx.beginPath(); ctx.ellipse(cx(),wy,wr*g,15*g,0,0,PI2); ctx.stroke(); }
-
-  // ---- ghost target ----
+  // ghost
   if(showGhost && !collapsed){
-    ctx.save(); ctx.beginPath();
-    ctx.moveTo(cx()+target[0],rowY(0));
+    ctx.save(); ctx.beginPath(); ctx.moveTo(cx()+target[0],rowY(0));
     for(let i=1;i<ROWS;i++) ctx.lineTo(cx()+target[i],rowY(i));
     for(let i=ROWS-1;i>=0;i--) ctx.lineTo(cx()-target[i],rowY(i));
-    ctx.closePath();
-    ctx.setLineDash([4,7]); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(103,232,249,.42)'; ctx.stroke();
-    ctx.restore();
+    ctx.closePath(); ctx.setLineDash([4,7]); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(103,232,249,.42)'; ctx.stroke(); ctx.restore();
   }
-
-  // ---- pot body ----
+  // pot
   ctx.save(); potPath(); ctx.clip();
-
-  // base clay, lit from upper-left (asymmetric — not a flat symmetric gradient)
   let base=ctx.createLinearGradient(cx()-MAXR,0,cx()+MAXR,0);
-  base.addColorStop(0,'#4a1c12'); base.addColorStop(.34,'#a8402a');
-  base.addColorStop(.46,'#e0714f'); base.addColorStop(.62,'#b84a30'); base.addColorStop(1,'#54200f');
+  base.addColorStop(0,'#4a1c12'); base.addColorStop(.34,'#a8402a'); base.addColorStop(.46,'#e0714f'); base.addColorStop(.62,'#b84a30'); base.addColorStop(1,'#54200f');
   ctx.fillStyle=base; ctx.fillRect(cx()-MAXR-4,0,MAXR*2+8,H);
-
-  // glaze bands as MATERIAL — drawn before shading so light still plays over them
-  for(let i=0;i<ROWS;i++){ if(!glaze[i]) continue; ctx.globalAlpha=.62; ctx.fillStyle=glaze[i];
-    ctx.fillRect(cx()-MAXR-4, rowY(i)-potH/ROWS/2, MAXR*2+8, potH/ROWS+1.4); }
+  for(let i=0;i<ROWS;i++){ if(!glaze[i]) continue; ctx.globalAlpha=.62; ctx.fillStyle=glaze[i]; ctx.fillRect(cx()-MAXR-4,rowY(i)-potH/ROWS/2,MAXR*2+8,potH/ROWS+1.4); }
   ctx.globalAlpha=1;
-
-  // curvature shading: concave (waist) darker, convex (belly) brighter
   let cg=ctx.createLinearGradient(0,yTop,0,yBot);
-  for(let i=0;i<ROWS;i++){ const a=prof[i-1]??prof[i], b=prof[i+1]??prof[i];
-    let g=0.5-((a+b)/2-prof[i])*0.011; g=Math.max(.34,Math.min(.66,g));
-    const v=Math.round(g*255); cg.addColorStop(i/(ROWS-1),`rgb(${v},${v},${v})`); }
-  ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=.6; ctx.fillStyle=cg; ctx.fillRect(cx()-MAXR-4,0,MAXR*2+8,H);
-  ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
-
-  // vertical form: top catches light, base darker + wet at the foot
+  for(let i=0;i<ROWS;i++){ const a=prof[i-1]??prof[i], b=prof[i+1]??prof[i]; let g=0.5-((a+b)/2-prof[i])*0.011; g=Math.max(.34,Math.min(.66,g)); const v=Math.round(g*255); cg.addColorStop(i/(ROWS-1),`rgb(${v},${v},${v})`); }
+  ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=.6; ctx.fillStyle=cg; ctx.fillRect(cx()-MAXR-4,0,MAXR*2+8,H); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
   let vg=ctx.createLinearGradient(0,yTop,0,yBot+10);
-  vg.addColorStop(0,'rgba(255,240,230,.12)'); vg.addColorStop(.45,'rgba(0,0,0,0)');
-  vg.addColorStop(.85,'rgba(20,6,2,.22)'); vg.addColorStop(1,'rgba(10,3,1,.4)');
+  vg.addColorStop(0,'rgba(255,240,230,.12)'); vg.addColorStop(.45,'rgba(0,0,0,0)'); vg.addColorStop(.85,'rgba(20,6,2,.22)'); vg.addColorStop(1,'rgba(10,3,1,.4)');
   ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
-
-  // matte grain, drifting with the spin (rotating texture)
-  ctx.save(); ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=.10;
-  ctx.translate(((spin*46)%160)-160,0); ctx.fillStyle=noisePat; ctx.fillRect(0,0,W+320,H); ctx.restore();
-
-  // sweeping vertical streaks (front-facing only) — the spin cue
+  ctx.save(); ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=.10; ctx.translate(((spin*46)%160)-160,0); ctx.fillStyle=noisePat; ctx.fillRect(0,0,W+320,H); ctx.restore();
   ctx.globalCompositeOperation='overlay';
-  for(let k=0;k<5;k++){ const ph=spin+k*1.256, front=Math.cos(ph); if(front<=0) continue;
-    const x=cx()+Math.sin(ph)*MAXR*0.82; ctx.globalAlpha=.12*front;
-    let sgd=ctx.createLinearGradient(x-9,0,x+9,0);
-    sgd.addColorStop(0,'rgba(120,120,120,0)'); sgd.addColorStop(.5,'rgba(225,225,225,1)'); sgd.addColorStop(1,'rgba(120,120,120,0)');
+  for(let k=0;k<5;k++){ const ph=spin+k*1.256, front=Math.cos(ph); if(front<=0) continue; const x=cx()+Math.sin(ph)*MAXR*0.82; ctx.globalAlpha=.12*front;
+    let sgd=ctx.createLinearGradient(x-9,0,x+9,0); sgd.addColorStop(0,'rgba(120,120,120,0)'); sgd.addColorStop(.5,'rgba(225,225,225,1)'); sgd.addColorStop(1,'rgba(120,120,120,0)');
     ctx.fillStyle=sgd; ctx.fillRect(x-9,yTop,18,potH); }
   ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
-
-  // static throwing rings (thrown-clay look)
   ctx.globalCompositeOperation='multiply'; ctx.strokeStyle='rgba(70,26,16,.22)'; ctx.lineWidth=1;
-  for(let y=yTop+16;y<yBot-4;y+=12){ const i=yToRow(y), r=dispR(i);
-    ctx.beginPath(); ctx.moveTo(colX(i)-r+2,y); ctx.lineTo(colX(i)+r-2,y); ctx.stroke(); }
+  for(let y=yTop+16;y<yBot-4;y+=12){ const i=yToRow(y), r=dispR(i); ctx.beginPath(); ctx.moveTo(colX(i)-r+2,y); ctx.lineTo(colX(i)+r-2,y); ctx.stroke(); }
   ctx.globalCompositeOperation='source-over';
-
-  // radial specular (upper-left) — sells the rounded, wet surface
   const sx=cx()-MAXR*0.26+Math.sin(spin)*MAXR*0.14, sy=yTop+potH*0.24;
-  let rad=ctx.createRadialGradient(sx,sy,3,sx,sy,MAXR*0.95);
-  rad.addColorStop(0,'rgba(255,247,240,.5)'); rad.addColorStop(.45,'rgba(255,240,230,.12)'); rad.addColorStop(1,'rgba(255,240,230,0)');
-  ctx.globalCompositeOperation='screen'; ctx.fillStyle=rad; ctx.fillRect(0,0,W,H);
-  ctx.globalCompositeOperation='source-over';
-
-  // finger indentation while shaping (dimple + tiny highlight = pressure)
-  if(pointer && !collapsed){
-    let d=ctx.createRadialGradient(pointer.x,pointer.y,1,pointer.x,pointer.y,28);
-    d.addColorStop(0,'rgba(0,0,0,.32)'); d.addColorStop(.6,'rgba(0,0,0,.1)'); d.addColorStop(1,'rgba(0,0,0,0)');
+  let rad=ctx.createRadialGradient(sx,sy,3,sx,sy,MAXR*0.95); rad.addColorStop(0,'rgba(255,247,240,.5)'); rad.addColorStop(.45,'rgba(255,240,230,.12)'); rad.addColorStop(1,'rgba(255,240,230,0)');
+  ctx.globalCompositeOperation='screen'; ctx.fillStyle=rad; ctx.fillRect(0,0,W,H); ctx.globalCompositeOperation='source-over';
+  if(pointer && phase==='shaping' && !collapsed){
+    let d=ctx.createRadialGradient(pointer.x,pointer.y,1,pointer.x,pointer.y,28); d.addColorStop(0,'rgba(0,0,0,.32)'); d.addColorStop(.6,'rgba(0,0,0,.1)'); d.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=d; ctx.fillRect(pointer.x-30,pointer.y-30,60,60);
-    let hl=ctx.createRadialGradient(pointer.x-4,pointer.y-7,1,pointer.x-4,pointer.y-7,11);
-    hl.addColorStop(0,'rgba(255,240,230,.45)'); hl.addColorStop(1,'rgba(255,240,230,0)');
+    let hl=ctx.createRadialGradient(pointer.x-4,pointer.y-7,1,pointer.x-4,pointer.y-7,11); hl.addColorStop(0,'rgba(255,240,230,.45)'); hl.addColorStop(1,'rgba(255,240,230,0)');
     ctx.globalCompositeOperation='screen'; ctx.fillStyle=hl; ctx.fillRect(pointer.x-16,pointer.y-18,32,32); ctx.globalCompositeOperation='source-over';
   }
-  ctx.restore(); // end clip
-
-  // ---- rim: visible wall thickness + inner cavity ----
+  ctx.restore();
+  // rim
   const r0=dispR(0), cxi=colX(0), yr=rowY(0), wall=Math.max(5,Math.min(17,r0*0.16)), ir=Math.max(2,r0-wall);
   ctx.fillStyle='#8a3620'; ctx.beginPath(); ctx.ellipse(cxi,yr,r0,r0*0.24,0,0,PI2); ctx.fill();
-  let cav=ctx.createRadialGradient(cxi-wall*0.4,yr-2,2,cxi,yr,Math.max(3,ir));
-  cav.addColorStop(0,'#180a06'); cav.addColorStop(.7,'#2a120b'); cav.addColorStop(1,'#431c11');
+  let cav=ctx.createRadialGradient(cxi-wall*0.4,yr-2,2,cxi,yr,Math.max(3,ir)); cav.addColorStop(0,'#180a06'); cav.addColorStop(.7,'#2a120b'); cav.addColorStop(1,'#431c11');
   ctx.fillStyle=cav; ctx.beginPath(); ctx.ellipse(cxi,yr,ir,ir*0.24,0,0,PI2); ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,ir,ir*0.24,0,Math.PI*0.06,Math.PI*0.94); ctx.stroke();
   ctx.strokeStyle='rgba(255,224,205,.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,r0,r0*0.24,0,Math.PI*1.06,Math.PI*1.94); ctx.stroke();
-
-  // outline
   potPath(); ctx.lineWidth=1.2; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.stroke();
 }
 
-function loop(now){
-  const dt = Math.min(50, now-last); last=now;
-  spin += dt*0.004;
-  if(collapsed){ slump=Math.min(1.2, slump+dt*0.0016); }
-  else step(dt);
-  draw();
+// ---- share card ----
+function miniPot(g, cxp, w, h, P, G){
+  const yt=6, yb=h-8, ph=yb-yt, sx=(w*0.40)/MAXR;
+  const R=i=>P[i]*sx;
+  g.beginPath(); g.moveTo(cxp+R(0),yt);
+  for(let i=1;i<ROWS;i++) g.lineTo(cxp+R(i),yt+(i/(ROWS-1))*ph);
+  for(let i=ROWS-1;i>=0;i--) g.lineTo(cxp-R(i),yt+(i/(ROWS-1))*ph);
+  g.closePath(); g.save(); g.clip();
+  let base=g.createLinearGradient(cxp-w/2,0,cxp+w/2,0);
+  base.addColorStop(0,'#4a1c12'); base.addColorStop(.4,'#b84a30'); base.addColorStop(.5,'#e0714f'); base.addColorStop(.62,'#b84a30'); base.addColorStop(1,'#54200f');
+  g.fillStyle=base; g.fillRect(cxp-w/2,0,w,h);
+  for(let i=0;i<ROWS;i++){ if(!G[i]) continue; g.globalAlpha=.6; g.fillStyle=G[i]; g.fillRect(cxp-w/2,yt+(i/(ROWS-1))*ph-2,w,ph/ROWS+2); }
+  g.globalAlpha=1;
+  let vg=g.createLinearGradient(0,yt,0,yb); vg.addColorStop(0,'rgba(255,240,230,.14)'); vg.addColorStop(.5,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.3)');
+  g.fillStyle=vg; g.fillRect(cxp-w/2,0,w,h);
+  g.restore();
+  // rim
+  const r0=R(0); g.fillStyle='#2a120b'; g.beginPath(); g.ellipse(cxp,yt,r0,r0*0.22,0,0,PI2); g.fill();
+}
+function drawCard(total){
+  const card=document.getElementById('cardCanvas'); const g=card.getContext('2d');
+  const CW=card.width, CH=card.height;
+  g.setTransform(1,0,0,1,0,0);
+  // bg
+  let bg=g.createLinearGradient(0,0,CW,CH); bg.addColorStop(0,'#0b0e16'); bg.addColorStop(1,'#12101a');
+  g.fillStyle=bg; g.fillRect(0,0,CW,CH);
+  g.fillStyle='rgba(139,124,255,.14)'; g.fillRect(0,0,CW,6);
+  // header
+  g.textBaseline='alphabetic';
+  g.fillStyle='#f5f7ff'; g.font='700 30px Sora, sans-serif'; g.fillText('Kiln', 30, 52);
+  g.fillStyle='#9aa3ba'; g.font='500 18px "Geist Mono", monospace'; g.fillText('Today’s pot · '+TARGETS[curTarget].name, 30, 80);
+  // score
+  g.fillStyle='#8b7cff'; g.font='800 54px Sora, sans-serif'; g.textAlign='right'; g.fillText(String(total), CW-30, 66);
+  g.fillStyle='#9aa3ba'; g.font='500 15px "Geist Mono", monospace'; g.fillText('points', CW-30, 88); g.textAlign='left';
+  // two pots
+  miniPotAt(g, CW*0.32, 108, 150, 210, target, tglaze, 'TARGET');
+  miniPotAt(g, CW*0.68, 108, 150, 210, prof,   glaze,  'YOURS');
+  // footer
+  g.fillStyle='#5c657c'; g.font='500 15px "Geist Mono", monospace'; g.textAlign='center'; g.fillText('skycave.space', CW/2, CH-16); g.textAlign='left';
+}
+function miniPotAt(g, cxp, top, w, h, P, G, label){
+  g.save(); g.translate(0, top); miniPot(g, cxp, w, h, P, G); g.restore();
+  g.fillStyle='#9aa3ba'; g.font='600 14px "Geist Mono", monospace'; g.textAlign='center';
+  g.fillText(label, cxp, top+h+22); g.textAlign='left';
+}
 
-  const m = collapsed?0:matchPct();
-  document.getElementById('matchv').textContent = Math.round(m*100)+'%';
-  document.getElementById('matchv').style.color = m>0.9?'var(--success)':m>0.7?'var(--gold)':'var(--tp)';
-  const sb = document.getElementById('stabbar');
-  sb.style.width = Math.round(stability*100)+'%';
-  sb.style.background = stability>0.5?'var(--success)':stability>0.25?'var(--gold)':'var(--warm)';
-  document.getElementById('stabv').textContent = Math.round(stability*100)+'%';
+// ---- physics ----
+function step(dt){
+  if(collapsed||phase!=='shaping') return;
+  let thin=0; for(let i=0;i<ROWS;i++){ if(prof[i]<THIN) thin+=(THIN-prof[i])/THIN; vel[i]*=0.9; }
+  const speedDrain=Math.max(0,moveSpeed-6)*0.010, thinDrain=thin*0.010, regen=(pointer?0.004:0.010);
+  stability=Math.max(0,Math.min(1,stability-(speedDrain+thinDrain)*dt*0.06+regen*dt*0.06));
+  moveSpeed*=0.92;
+  if(stability<=0) collapse();
+}
+function collapse(){ collapsed=true; slump=0; collapseSide=Math.random()<0.5?-1:1; phase='collapsed'; document.getElementById('collapse').classList.add('on'); }
+
+function loop(now){
+  const dt=Math.min(50,now-last); last=now; spin+=dt*0.004;
+  if(collapsed){ slump=Math.min(1.2,slump+dt*0.0016); }
+  else if(phase==='shaping'){ step(dt); timeLeft=Math.max(0,timeLeft-dt/1000); if(timeLeft<=0) fire(); }
+  draw();
+  const m=collapsed?0:shapeMatch();
+  const mv=document.getElementById('matchv'); mv.textContent=Math.round(m*100)+'%'; mv.style.color=m>0.9?'var(--success)':m>0.7?'var(--gold)':'var(--tp)';
+  const tv=document.getElementById('timev'); tv.textContent=Math.ceil(timeLeft); tv.style.color=timeLeft<=10?'var(--warm)':'var(--tp)';
+  const sb=document.getElementById('stabbar'); sb.style.width=Math.round(stability*100)+'%';
+  sb.style.background=stability>0.5?'var(--success)':stability>0.25?'var(--gold)':'var(--warm)';
+  document.getElementById('stabv').textContent=Math.round(stability*100)+'%';
   requestAnimationFrame(loop);
 }
 
-resize(); resetClay(); requestAnimationFrame(loop);
+resize(); newRound(0); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
