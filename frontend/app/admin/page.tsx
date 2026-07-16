@@ -416,16 +416,26 @@ function OverviewView({ o }: { o: Overview }) {
         <ChartCard title="Top players">
           {ins ? (
             ins.top_players.length ? (
-              <div className="space-y-2">
-                {ins.top_players.map((p, i) => (
-                  <div key={p.handle} className="flex items-center gap-3 text-sm">
-                    <span className="w-5 text-right font-[var(--font-mono)] text-[var(--color-text-secondary)]">{i + 1}</span>
-                    <span className="flex-1 truncate">@{p.handle}</span>
-                    <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{p.games} games</span>
-                    <span className="w-12 text-right font-[var(--font-mono)]">{Math.round(p.win_rate * 100)}%</span>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="flex items-center gap-3 px-1 pb-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  <span className="w-5" />
+                  <span className="flex-1">player</span>
+                  <span className="w-16 text-right">1v1</span>
+                  <span className="w-14 text-right">solo</span>
+                  <span className="w-14 text-right">1v1 win</span>
+                </div>
+                <div className="space-y-2">
+                  {ins.top_players.map((p, i) => (
+                    <div key={p.handle} className="flex items-center gap-3 text-sm">
+                      <span className="w-5 text-right font-[var(--font-mono)] text-[var(--color-text-secondary)]">{i + 1}</span>
+                      <span className="flex-1 truncate">@{p.handle}</span>
+                      <span className="w-16 text-right font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{p.wins}-{p.versus_games - p.wins}</span>
+                      <span className="w-14 text-right font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{p.solo}</span>
+                      <span className="w-14 text-right font-[var(--font-mono)]">{p.versus_games ? `${Math.round(p.win_rate * 100)}%` : "·"}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <p className="text-sm text-[var(--color-text-secondary)]">No ranked players yet.</p>
             )

@@ -150,6 +150,11 @@ export interface Profile {
   games_played: number;
   games_won: number;
   win_rate: number;
+  versus_played: number;
+  versus_won: number;
+  versus_lost: number;
+  versus_win_rate: number;
+  solo_played: number;
   total_score: number;
   rank: number;
   bests: ProfileGame[];

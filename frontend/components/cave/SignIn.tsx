@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { devLogin } from "@/lib/api";
-import { startBlueskyLogin } from "@/lib/bluesky";
+import { BlueskyConnect } from "@/components/ui/BlueskyConnect";
 import { useAuth } from "@/lib/store";
 
 const DEV = process.env.NEXT_PUBLIC_DEV_LOGIN === "true";
@@ -34,16 +34,9 @@ export function CaveSignIn({ returnTo }: { returnTo: string }) {
   return (
     <div className="rounded-[16px] border p-6" style={{ borderColor: "var(--color-border)", background: "#12100d" }}>
       <p className="text-sm" style={{ color: INK }}>The Cave is played with your Bluesky identity. Solving is a two-person job.</p>
-      <button
-        onClick={() => {
-          sessionStorage.setItem("cave_return", returnTo);
-          startBlueskyLogin();
-        }}
-        className="mt-4 h-11 w-full rounded-[10px] text-sm font-semibold"
-        style={{ background: "var(--color-primary)", color: "#05060a" }}
-      >
-        Connect Bluesky
-      </button>
+      <div className="mt-4">
+        <BlueskyConnect beforeStart={() => sessionStorage.setItem("cave_return", returnTo)} />
+      </div>
       {DEV && (
         <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--color-border)" }}>
           <div className="mb-2 font-[var(--font-mono)] text-[11px] uppercase tracking-wide" style={{ color: MUTED }}>dev sign-in (local only)</div>

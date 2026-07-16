@@ -144,11 +144,16 @@ class ProfileResponse(BaseModel):
     display_name: str | None
     avatar_url: str | None
     joined: datetime
-    games_played: int
-    games_won: int
-    win_rate: float
+    games_played: int  # all modes (1v1 + solo)
+    games_won: int  # 1v1 wins (solo has no winner)
+    win_rate: float  # legacy: wins / all games (diluted by solo)
+    versus_played: int  # 1v1 games
+    versus_won: int  # 1v1 wins
+    versus_lost: int  # 1v1 losses (draws = played - won - lost)
+    versus_win_rate: float  # 1v1 wins / 1v1 games
+    solo_played: int  # solo runs
     total_score: int
-    rank: int  # overall, by wins
+    rank: int  # overall, by 1v1 wins
     bests: list[ProfileGame]
     recent: list[ProfileRecent]
     rivals: list[ProfileRival]
@@ -238,9 +243,11 @@ class RetentionSplit(BaseModel):
 
 class TopPlayer(BaseModel):
     handle: str
-    games: int
-    wins: int
-    win_rate: float  # 0..1
+    games: int  # all modes (1v1 + solo)
+    versus_games: int  # 1v1 games
+    solo: int  # solo runs
+    wins: int  # 1v1 wins
+    win_rate: float  # 1v1 wins / 1v1 games (0..1)
 
 
 class GameBalance(BaseModel):

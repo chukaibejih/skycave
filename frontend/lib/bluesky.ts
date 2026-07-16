@@ -83,6 +83,9 @@ export function shareToBluesky(text: string): void {
  * redirects back to /oauth, where the app calls completeBluesky().
  */
 export function startBlueskyLogin(handle?: string): void {
-  const q = handle ? `?handle=${encodeURIComponent(handle)}` : "";
+  // Normalize: trim, drop a leading "@". The handle drives PDS resolution, so a
+  // stray "@nova.bsky.social" must not break the lookup.
+  const h = (handle ?? "").trim().replace(/^@+/, "");
+  const q = h ? `?handle=${encodeURIComponent(h)}` : "";
   window.location.href = `${API}/oauth/login${q}`;
 }

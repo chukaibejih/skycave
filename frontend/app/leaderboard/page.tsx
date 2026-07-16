@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import {
@@ -12,7 +13,6 @@ import {
 } from "@/lib/api";
 import type { GameInfo } from "@/lib/types";
 
-const bskyProfile = (handle: string) => `https://bsky.app/profile/${handle}`;
 // "GeoGuess 1v1" reads oddly next to a Solo tab — trim the suffix for labels.
 const shortName = (name: string) => name.replace(/\s*1v1$/i, "");
 
@@ -143,15 +143,16 @@ export default function LeaderboardPage() {
       ) : (
         <div className="overflow-hidden rounded-[16px] border border-[var(--color-border)]">
           {entries.map((e, i) => (
-            <motion.a
+            <motion.div
               key={e.did}
-              href={bskyProfile(e.handle)}
-              target="_blank"
-              rel="noopener noreferrer"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.03, 0.4) }}
-              className="flex items-center gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 transition-colors first:border-t-0 hover:bg-[var(--color-elevated)] active:bg-[var(--color-elevated)] sm:px-4"
+              className="border-t border-[var(--color-border)] first:border-t-0"
+            >
+            <Link
+              href={`/u/${e.handle}`}
+              className="flex items-center gap-3 bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-elevated)] active:bg-[var(--color-elevated)] sm:px-4"
             >
               <div className="w-7 shrink-0 text-center font-[var(--font-display)] text-lg font-bold" style={{ color: rankColor(e.rank) }}>
                 {e.rank}
@@ -190,7 +191,8 @@ export default function LeaderboardPage() {
                   {solo ? "best" : "wins"}
                 </div>
               </div>
-            </motion.a>
+            </Link>
+            </motion.div>
           ))}
         </div>
       )}

@@ -6,7 +6,7 @@ import { ScoreCard } from "@/components/ui/ScoreCard";
 import { ShareButton } from "@/components/lobby/ShareButton";
 import { Button } from "@/components/ui/Button";
 import { createRoom, getRoom, getScorecard } from "@/lib/api";
-import { startBlueskyLogin } from "@/lib/bluesky";
+import { BlueskyConnect } from "@/components/ui/BlueskyConnect";
 import { downloadScoreCard } from "@/lib/scorecard-image";
 import { resolveSoloBest, soloShareText, gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -276,13 +276,26 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 // Quiet, contextual nudge for guests — shown after a game, never as a modal.
+// Clicking reveals a handle field (required so we resolve the right PDS) rather
+// than jumping straight to bsky.social's login.
 function GuestNudge({ show }: { show: boolean }) {
+  const [open, setOpen] = useState(false);
   if (!show) return null;
+  if (open) {
+    return (
+      <div className="mt-6 w-full max-w-md">
+        <p className="mb-2 text-left font-[var(--font-body)] text-xs leading-5" style={{ color: "#8888AA" }}>
+          Log in with Bluesky to appear on the leaderboard and track your stats.
+        </p>
+        <BlueskyConnect autoFocus />
+      </div>
+    );
+  }
   return (
     <p className="mt-6 max-w-md font-[var(--font-body)] text-xs leading-5" style={{ color: "#8888AA" }}>
       Playing as a guest.{" "}
       <button
-        onClick={() => startBlueskyLogin()}
+        onClick={() => setOpen(true)}
         style={{ color: "#6C63FF" }}
         className="font-semibold underline underline-offset-2"
       >

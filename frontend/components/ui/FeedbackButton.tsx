@@ -49,7 +49,7 @@ export function FeedbackButton() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
-        className="fixed bottom-[max(env(safe-area-inset-bottom),14px)] left-3 z-40 flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/90 px-4 text-sm text-[var(--color-text-secondary)] shadow-[0_6px_20px_rgba(0,0,0,0.45)] backdrop-blur-sm active:text-[var(--color-text-primary)]"
+        className="fixed bottom-[max(env(safe-area-inset-bottom),14px)] right-3 z-40 flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/90 px-4 text-sm text-[var(--color-text-secondary)] shadow-[0_6px_20px_rgba(0,0,0,0.45)] backdrop-blur-sm active:text-[var(--color-text-primary)]"
       >
         <svg
           width="16"

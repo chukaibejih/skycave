@@ -67,6 +67,28 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
     win_rate = (user.games_won / user.games_played) if user.games_played else 0.0
     rank = (await db.scalar(select(func.count()).select_from(User).where(User.games_won > user.games_won)) or 0) + 1
 
+    # 1v1 vs solo split. games_played counts every mode; solo has no winner, so a
+    # single "win rate" over all games is diluted by practice runs. Report the
+    # honest 1v1 record separately.
+    in_versus = (GameSession.mode == "versus") & (
+        (GameSession.player1_id == did) | (GameSession.player2_id == did)
+    )
+    versus_played = await db.scalar(select(func.count()).select_from(GameSession).where(in_versus)) or 0
+    versus_won = await db.scalar(
+        select(func.count()).select_from(GameSession).where(in_versus, GameSession.winner_id == did)
+    ) or 0
+    versus_lost = await db.scalar(
+        select(func.count()).select_from(GameSession).where(
+            in_versus, GameSession.winner_id.isnot(None), GameSession.winner_id != did
+        )
+    ) or 0
+    solo_played = await db.scalar(
+        select(func.count()).select_from(GameSession).where(
+            GameSession.mode == "solo", GameSession.player1_id == did
+        )
+    ) or 0
+    versus_win_rate = (versus_won / versus_played) if versus_played else 0.0
+
     best_rows = (
         await db.execute(
             select(PersonalBest).where(PersonalBest.player_id == did).order_by(desc(PersonalBest.plays))
@@ -137,6 +159,11 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
         games_played=user.games_played,
         games_won=user.games_won,
         win_rate=round(win_rate, 3),
+        versus_played=versus_played,
+        versus_won=versus_won,
+        versus_lost=versus_lost,
+        versus_win_rate=round(versus_win_rate, 3),
+        solo_played=solo_played,
         total_score=user.total_score,
         rank=rank,
         bests=bests,

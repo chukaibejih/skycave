@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, or_, select, text
+from sqlalchemy import bindparam, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -272,17 +272,48 @@ async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminIns
     new_p, returning_p = int(ret[0] or 0), int(ret[1] or 0)
 
     # --- Top players (registered accounts, by games played) ---
+    # games_played spans all modes; solo has no winner, so win rate is reported
+    # over 1v1 games only (else practice runs drag it down). Split 1v1/solo per
+    # player with one grouped pass over both participant slots.
     top_rows = (
         await db.execute(
-            select(User.handle, User.games_played, User.games_won)
+            select(User.did, User.handle, User.games_played, User.games_won)
             .where(User.games_played > 0)
             .order_by(desc(User.games_played))
             .limit(8)
         )
     ).all()
+    top_dids = [r[0] for r in top_rows]
+    vmap: dict[str, int] = {}
+    if top_dids:
+        vrows = (
+            await db.execute(
+                text(
+                    """
+        SELECT pid, count(*) AS versus_games
+        FROM (
+            SELECT player1_id AS pid FROM game_sessions WHERE mode='versus'
+            UNION ALL
+            SELECT player2_id AS pid FROM game_sessions WHERE mode='versus' AND player2_id IS NOT NULL
+        ) t
+        WHERE pid IN :dids
+        GROUP BY pid
+        """
+                ).bindparams(bindparam("dids", expanding=True)),
+                {"dids": top_dids},
+            )
+        ).all()
+        vmap = {pid: int(vg) for pid, vg in vrows}
     top_players = [
-        TopPlayer(handle=h, games=gp, wins=gw, win_rate=(gw / gp if gp else 0.0))
-        for h, gp, gw in top_rows
+        TopPlayer(
+            handle=h,
+            games=gp,
+            versus_games=vmap.get(did_, 0),
+            solo=max(0, gp - vmap.get(did_, 0)),
+            wins=gw,
+            win_rate=(gw / vmap[did_] if vmap.get(did_) else 0.0),
+        )
+        for did_, h, gp, gw in top_rows
     ]
 
     # --- Per-game balance & depth ---

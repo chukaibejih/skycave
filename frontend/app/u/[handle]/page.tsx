@@ -67,19 +67,21 @@ export default function ProfilePage() {
   }
 
   const p = profile;
-  const winPct = Math.round(p.win_rate * 100);
+  const winPct = Math.round(p.versus_win_rate * 100);
+  const draws = Math.max(0, p.versus_played - p.versus_won - p.versus_lost);
+  const wl = p.versus_won === 1 ? "win" : "wins";
   const share = () => {
     const url = `${SITE}/u/${p.handle}`;
     const text = isMe
-      ? `my Skycave card · ${p.games_played} games, ${p.games_won} wins, rank #${p.rank}. come take me on:\n\n${url}`
-      : `@${p.handle} on Skycave · ${p.games_played} games, rank #${p.rank}. think you can beat them?\n\n${url}`;
+      ? `Ranked #${p.rank} on Skycave · ${p.versus_won} 1v1 ${wl} across ${p.versus_played} 1v1 games.\n\n${url}`
+      : `@${p.handle} on Skycave · ranked #${p.rank} with ${p.versus_won} 1v1 ${wl} across ${p.versus_played} 1v1 games.\n\n${url}`;
     shareToBluesky(text);
   };
 
   const stats = [
     { label: "games", value: p.games_played },
-    { label: "wins", value: p.games_won },
-    { label: "win rate", value: `${winPct}%` },
+    { label: "1v1 wins", value: p.versus_won },
+    { label: "1v1 win rate", value: p.versus_played ? `${winPct}%` : "·" },
     { label: "rank", value: `#${p.rank}` },
   ];
 
@@ -108,6 +110,18 @@ export default function ProfilePage() {
           ))}
         </div>
 
+        {/* 1v1 / solo breakdown — spells out what the tiles summarize */}
+        <p className="mt-3 text-center text-xs" style={{ color: MUTED }}>
+          <span style={{ color: "var(--color-text-primary)" }}>{p.versus_won}W</span>
+          {" · "}
+          <span style={{ color: "var(--color-text-primary)" }}>{p.versus_lost}L</span>
+          {draws > 0 && <>{" · "}{draws}D</>}
+          {" in 1v1"}
+          {" · "}
+          <span style={{ color: "var(--color-text-primary)" }}>{p.solo_played}</span>{" "}
+          solo {p.solo_played === 1 ? "run" : "runs"}
+        </p>
+
         {/* Badges */}
         {p.badges.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -120,7 +134,7 @@ export default function ProfilePage() {
         )}
 
         <button onClick={share} className="mt-5 h-11 w-full rounded-[12px] text-sm font-semibold" style={{ background: "var(--color-primary)", color: "#05060a" }}>
-          {isMe ? "Share my profile" : `Challenge @${p.handle}`}
+          {isMe ? "Share my profile" : "Share profile"}
         </button>
 
         {/* Records */}

@@ -22,7 +22,14 @@ async function main() {
 
   // ── Public route 1: start login (PAR -> redirect to the user's PDS) ──
   app.get("/oauth/login", async (req, res) => {
-    const handle = (req.query.handle as string) || "https://bsky.social";
+    const handle = ((req.query.handle as string) || "").trim();
+    // Never default to bsky.social. Without a handle we can't resolve the user's
+    // PDS, and silently authorizing at bsky.social locks out anyone who migrated
+    // to another PDS (e.g. Blacksky) — they'd hit bsky.social's login for an
+    // account that no longer exists there. Bounce back and ask for the handle.
+    if (!handle) {
+      return res.redirect(`${FRONTEND_URL}/?auth_error=handle`);
+    }
     try {
       const url = await client.authorize(handle, { scope: "atproto" });
       res.redirect(url.toString());

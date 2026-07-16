@@ -100,7 +100,14 @@ export interface Insights {
   feedback_by_device: { mobile: number; desktop: number; unknown: number };
   active: { dau: number; wau: number; mau: number };
   retention: { new: number; returning: number };
-  top_players: { handle: string; games: number; wins: number; win_rate: number }[];
+  top_players: {
+    handle: string;
+    games: number;
+    versus_games: number;
+    solo: number;
+    wins: number;
+    win_rate: number;
+  }[];
   game_balance: {
     game_type: string;
     games: number;
