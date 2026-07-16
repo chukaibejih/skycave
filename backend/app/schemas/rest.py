@@ -333,8 +333,13 @@ class AdminFeedbackRow(BaseModel):
     is_guest: bool
     page: str | None
     created_at: datetime
+    resolved: bool
 
 
 class AdminFeedbackResponse(BaseModel):
     total: int
     feedback: list[AdminFeedbackRow]
+
+
+class FeedbackResolveRequest(BaseModel):
+    resolved: bool

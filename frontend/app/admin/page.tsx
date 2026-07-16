@@ -8,6 +8,7 @@ import {
   clearAdminToken,
   getAdminToken,
   getFeedback,
+  setFeedbackResolved,
   getGames,
   getInsights,
   getOverview,
@@ -98,6 +99,19 @@ export default function AdminPage() {
       setAuthed(false);
     }
   }
+
+  const toggleFeedback = async (id: number, resolved: boolean) => {
+    try {
+      await setFeedbackResolved(id, resolved);
+      setFeedback((prev) =>
+        prev
+          ? { ...prev, feedback: prev.feedback.map((f) => (f.id === id ? { ...f, resolved } : f)) }
+          : prev
+      );
+    } catch (e) {
+      handleErr(e);
+    }
+  };
 
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,7 +225,7 @@ export default function AdminPage() {
       )}
       {section === "feedback" && (
         <>
-          <FeedbackView feedback={feedback?.feedback ?? null} />
+          <FeedbackView feedback={feedback?.feedback ?? null} onResolve={toggleFeedback} />
           <Pager loaded={!!feedback} offset={fbOff} pageSize={FB_PAGE} total={feedback?.total ?? 0} onChange={setFbOff} />
         </>
       )}
@@ -219,7 +233,13 @@ export default function AdminPage() {
   );
 }
 
-function FeedbackView({ feedback }: { feedback: FeedbackRow[] | null }) {
+function FeedbackView({
+  feedback,
+  onResolve,
+}: {
+  feedback: FeedbackRow[] | null;
+  onResolve: (id: number, resolved: boolean) => void;
+}) {
   if (!feedback) return <Loading />;
   if (feedback.length === 0) return <Empty label="No feedback yet." />;
   return (
@@ -227,7 +247,8 @@ function FeedbackView({ feedback }: { feedback: FeedbackRow[] | null }) {
       {feedback.map((f) => (
         <div
           key={f.id}
-          className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition-opacity"
+          style={{ opacity: f.resolved ? 0.55 : 1 }}
         >
           <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
             {f.message}
@@ -242,9 +263,24 @@ function FeedbackView({ feedback }: { feedback: FeedbackRow[] | null }) {
               {f.is_guest ? "guest" : "bluesky"}
             </span>
             {f.page && <span>{f.page}</span>}
+            {f.resolved && (
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={{ background: "color-mix(in srgb, var(--color-success) 18%, transparent)", color: "var(--color-success)" }}
+              >
+                resolved
+              </span>
+            )}
             <span className="ml-auto">
               {new Date(f.created_at).toLocaleString()}
             </span>
+            <button
+              onClick={() => onResolve(f.id, !f.resolved)}
+              className="rounded-[8px] border px-2.5 py-1 transition-colors hover:bg-[var(--color-elevated)]"
+              style={{ borderColor: "var(--color-border)", color: f.resolved ? "var(--color-text-secondary)" : "var(--color-success)" }}
+            >
+              {f.resolved ? "Reopen" : "Resolve"}
+            </button>
           </div>
         </div>
       ))}
