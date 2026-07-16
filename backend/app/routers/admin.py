@@ -31,6 +31,7 @@ from app.schemas.rest import (
     AdminTokenResponse,
     AdminUsersResponse,
     ActiveUsers,
+    FeedbackResolveRequest,
     DayBucket,
     DeviceSplit,
     FunnelStat,
@@ -461,7 +462,23 @@ async def feedback(
                 is_guest=f.is_guest,
                 page=f.page,
                 created_at=f.created_at,
+                resolved=f.resolved,
             )
             for f in rows
         ],
     )
+
+
+@router.patch("/feedback/{fid}", status_code=status.HTTP_204_NO_CONTENT)
+async def resolve_feedback(
+    fid: int,
+    body: FeedbackResolveRequest,
+    _: AdminAuth,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Mark a feedback item resolved (or reopen it)."""
+    fb = await db.get(Feedback, fid)
+    if fb is None:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    fb.resolved = body.resolved
+    await db.commit()

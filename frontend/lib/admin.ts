@@ -28,6 +28,26 @@ async function adminGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function adminSend(path: string, method: string, body?: unknown): Promise<void> {
+  const token = getAdminToken();
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    clearAdminToken();
+    throw new AdminAuthError("Session expired");
+  }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+}
+
+export const setFeedbackResolved = (id: number, resolved: boolean) =>
+  adminSend(`/admin/feedback/${id}`, "PATCH", { resolved });
+
 export async function adminLogin(password: string): Promise<void> {
   const res = await fetch(`${API}/admin/login`, {
     method: "POST",
@@ -80,6 +100,7 @@ export interface FeedbackRow {
   is_guest: boolean;
   page: string | null;
   created_at: string;
+  resolved: boolean;
 }
 
 export interface DayBucket {

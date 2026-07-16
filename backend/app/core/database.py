@@ -53,3 +53,9 @@ async def init_db() -> None:
                 "ADD COLUMN IF NOT EXISTS mode VARCHAR(16) NOT NULL DEFAULT 'versus'"
             )
         )
+        await conn.execute(
+            text(
+                "ALTER TABLE feedback "
+                "ADD COLUMN IF NOT EXISTS resolved BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
