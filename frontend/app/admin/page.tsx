@@ -514,13 +514,16 @@ function UsersView({ users }: { users: UserRow[] | null }) {
   if (!users) return <Loading />;
   if (users.length === 0) return <Empty label="No Bluesky users yet (guests aren't stored)." />;
   return (
-    <Table head={["#", "Handle", "Played", "Won", "Win %", "Score"]}>
+    <Table head={["#", "Handle", "Joined", "Played", "Won", "Win %", "Score"]}>
       {users.map((u, i) => (
         <tr key={u.did} className="border-t border-[var(--color-border)]">
           <Td className="text-[var(--color-text-secondary)]">{i + 1}</Td>
           <Td>
             <div className="font-medium">{u.display_name ?? u.handle}</div>
             <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">@{u.handle}</div>
+          </Td>
+          <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
+            {u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}
           </Td>
           <Td>{u.games_played}</Td>
           <Td>{u.games_won}</Td>

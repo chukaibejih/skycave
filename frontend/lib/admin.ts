@@ -59,6 +59,7 @@ export interface UserRow {
   games_won: number;
   total_score: number;
   win_rate: number;
+  created_at: string | null;
 }
 export interface GameRow {
   id: number;

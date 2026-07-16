@@ -108,6 +108,7 @@ class UserStats(BaseModel):
     games_won: int
     total_score: int
     win_rate: float
+    created_at: datetime | None = None  # account created (admin list only)
 
 
 # --- Player profile ---

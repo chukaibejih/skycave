@@ -376,7 +376,7 @@ async def users(
     rows = (
         await db.execute(
             select(User)
-            .order_by(desc(User.total_score), desc(User.games_won))
+            .order_by(desc(User.created_at))
             .limit(limit)
             .offset(offset)
         )
@@ -393,6 +393,7 @@ async def users(
                 games_won=u.games_won,
                 total_score=u.total_score,
                 win_rate=round(u.games_won / u.games_played, 3) if u.games_played else 0.0,
+                created_at=u.created_at,
             )
             for u in rows
         ],
