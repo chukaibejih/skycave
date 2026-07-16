@@ -57,6 +57,28 @@ function dotsHint(h: (string | null)[], v: (string | null)[], cols: number, rows
 }
 
 export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
+  // Assist hint from null-guarded inputs so these hooks ALWAYS run before the
+  // early return below. A hook sitting under `if (!board)` crashes with React
+  // error #310 when board flips back to null on game end / state reset.
+  const gH = board?.h ?? [];
+  const gV = board?.v ?? [];
+  const gCols = board?.cols ?? 0;
+  const gRows = board?.rows ?? 0;
+  const gNumH = board?.num_h ?? (gRows + 1) * gCols;
+  const gBoxes = board?.boxes ?? [];
+  const gOrder = board?.order ?? [];
+  const gMe = (meId && gOrder.includes(meId) ? meId : gOrder[0]) ?? "";
+  const gOpp = gOrder.find((id) => id !== gMe) ?? gOrder[1] ?? "";
+  const gOver = gBoxes.length > 0 && gBoxes.every((o) => o !== null);
+  const [assist, setAssist] = useAssist();
+  const gActive = assist && gOpp === "ai" && !!board && board.turn === gMe && !gOver;
+  const drawn = gH.filter(Boolean).length + gV.filter(Boolean).length;
+  const hintEdge = useMemo(
+    () => (gActive ? dotsHint(gH, gV, gCols, gRows, gNumH) : null),
+    [gActive, gH, gV, gCols, gRows, gNumH]
+  );
+  const showHint = useIdleHint(gActive && hintEdge != null, drawn);
+
   if (!board) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center font-[var(--font-display)] text-2xl text-[var(--color-text-secondary)]">
@@ -89,15 +111,6 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
     if (!myTurn || over) return;
     onAction({ edge: edgeId });
   };
-
-  const [assist, setAssist] = useAssist();
-  const canAssist = assist && isSolo; // hints only vs the Caver, never against a human
-  const drawn = h.filter(Boolean).length + v.filter(Boolean).length;
-  const hintEdge = useMemo(
-    () => (canAssist && myTurn && !over ? dotsHint(h, v, cols, rows, numH) : null),
-    [canAssist, myTurn, over, h, v, cols, rows, numH]
-  );
-  const showHint = useIdleHint(canAssist && myTurn && !over && hintEdge != null, drawn);
   // Coords of the suggested edge, for the pulse overlay.
   let hintLine: { x1: number; y1: number; x2: number; y2: number } | null = null;
   if (showHint && hintEdge != null) {

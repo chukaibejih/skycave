@@ -58,6 +58,7 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
   const prevOwner = useRef<(string | null)[] | null>(null);
   const [fresh, setFresh] = useState<Set<number>>(() => new Set());
   const [gen, setGen] = useState(0);
+  const [assist, setAssist] = useAssist();
   useEffect(() => {
     if (!board) return;
     const prev = prevOwner.current;
@@ -71,6 +72,24 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
     }
     prevOwner.current = board.owner.slice();
   }, [board]);
+
+  // Assist hint from null-guarded inputs so these hooks ALWAYS run. `board` can
+  // flip back to null (game end / state reset); an early return sitting above a
+  // hook is what crashed the app with React error #310.
+  const gOwner = board?.owner ?? null;
+  const gCols = board?.cols ?? 0;
+  const gRows = board?.rows ?? 0;
+  const gOrder = board?.order ?? [];
+  const gMe = (meId && gOrder.includes(meId) ? meId : gOrder[0]) ?? "";
+  const gOpp = gOrder.find((id) => id !== gMe) ?? gOrder[1] ?? "";
+  const gOver = board?.winner != null || (!!gOwner && gOwner.every((o) => o !== null));
+  const gActive = assist && gOpp === "ai" && !!board && board.turn === gMe && !gOver;
+  const placed = gOwner ? gOwner.filter(Boolean).length : 0;
+  const hintCol = useMemo(
+    () => (gOwner && gActive ? connect4Hint(gOwner, gCols, gRows, gMe, gOpp) : null),
+    [gOwner, gActive, gCols, gRows, gMe, gOpp]
+  );
+  const showHint = useIdleHint(gActive && hintCol != null, placed);
 
   if (!board) {
     return (
@@ -90,16 +109,7 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
   const won = board.winner != null;
   const full = owner.every((o) => o !== null);
   const over = won || full;
-
-  const [assist, setAssist] = useAssist();
-  const canAssist = assist && isSolo; // hints only vs the Caver, never against a human
-  const placed = owner.filter(Boolean).length;
-  const hintCol = useMemo(
-    () => (canAssist && myTurn && !over ? connect4Hint(owner, cols, rows, me, opp) : null),
-    [canAssist, myTurn, over, owner, cols, rows, me, opp]
-  );
   const hintRow = hintCol != null ? dropRow(owner, hintCol, cols, rows) : null;
-  const showHint = useIdleHint(canAssist && myTurn && !over && hintCol != null, placed);
 
   const colorFor = (o: string | null) => (o === me ? YOU : o === opp ? OPP : EMPTY);
 
