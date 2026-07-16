@@ -125,11 +125,15 @@ export const getInsights = () => adminGet<Insights>("/admin/insights");
 export const getOverview = () => adminGet<Overview>("/admin/overview");
 export const getTimeseries = (days = 30) =>
   adminGet<Timeseries>(`/admin/timeseries?days=${days}`);
-export const getUsers = (limit = 100) =>
-  adminGet<{ total: number; users: UserRow[] }>(`/admin/users?limit=${limit}`);
-export const getGames = (limit = 100) =>
-  adminGet<{ total: number; games: GameRow[] }>(`/admin/games?limit=${limit}`);
-export const getFeedback = (limit = 200) =>
+export const getUsers = (limit = 25, offset = 0) =>
+  adminGet<{ total: number; users: UserRow[] }>(
+    `/admin/users?limit=${limit}&offset=${offset}`
+  );
+export const getGames = (limit = 25, offset = 0) =>
+  adminGet<{ total: number; games: GameRow[] }>(
+    `/admin/games?limit=${limit}&offset=${offset}`
+  );
+export const getFeedback = (limit = 15, offset = 0) =>
   adminGet<{ total: number; feedback: FeedbackRow[] }>(
-    `/admin/feedback?limit=${limit}`
+    `/admin/feedback?limit=${limit}&offset=${offset}`
   );

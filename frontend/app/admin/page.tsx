@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   AdminAuthError,
@@ -20,6 +21,10 @@ import {
   type UserRow,
 } from "@/lib/admin";
 import { BarList, Legend, SplitBar, TimeChart } from "@/components/admin/AdminCharts";
+import { Avatar } from "@/components/ui/Avatar";
+
+const PAGE = 25; // rows per page for the users + games tables
+const FB_PAGE = 15; // feedback cards are taller, show fewer
 
 const GAME_NAME: Record<string, string> = {
   geoguess: "GeoGuess 1v1",
@@ -42,9 +47,12 @@ export default function AdminPage() {
   const [section, setSection] = useState<Section>("overview");
 
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [users, setUsers] = useState<UserRow[] | null>(null);
-  const [games, setGames] = useState<GameRow[] | null>(null);
-  const [feedback, setFeedback] = useState<FeedbackRow[] | null>(null);
+  const [users, setUsers] = useState<{ total: number; users: UserRow[] } | null>(null);
+  const [games, setGames] = useState<{ total: number; games: GameRow[] } | null>(null);
+  const [feedback, setFeedback] = useState<{ total: number; feedback: FeedbackRow[] } | null>(null);
+  const [usersOff, setUsersOff] = useState(0);
+  const [gamesOff, setGamesOff] = useState(0);
+  const [fbOff, setFbOff] = useState(0);
 
   // Login form
   const [password, setPassword] = useState("");
@@ -68,14 +76,22 @@ export default function AdminPage() {
     else setChecking(false);
   }, [loadOverview]);
 
-  // Lazy-load sections.
+  // Lazy-load + paginate each section. Refetch when its page offset changes.
   useEffect(() => {
-    if (!authed) return;
-    if (section === "users" && !users) getUsers().then((r) => setUsers(r.users)).catch(handleErr);
-    if (section === "games" && !games) getGames().then((r) => setGames(r.games)).catch(handleErr);
-    if (section === "feedback" && !feedback) getFeedback().then((r) => setFeedback(r.feedback)).catch(handleErr);
+    if (!authed || section !== "users") return;
+    getUsers(PAGE, usersOff).then(setUsers).catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, authed]);
+  }, [section, authed, usersOff]);
+  useEffect(() => {
+    if (!authed || section !== "games") return;
+    getGames(PAGE, gamesOff).then(setGames).catch(handleErr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, authed, gamesOff]);
+  useEffect(() => {
+    if (!authed || section !== "feedback") return;
+    getFeedback(FB_PAGE, fbOff).then(setFeedback).catch(handleErr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, authed, fbOff]);
 
   function handleErr(e: unknown) {
     if (e instanceof AdminAuthError) {
@@ -181,9 +197,24 @@ export default function AdminPage() {
       </div>
 
       {section === "overview" && overview && <OverviewView o={overview} />}
-      {section === "users" && <UsersView users={users} />}
-      {section === "games" && <GamesView games={games} />}
-      {section === "feedback" && <FeedbackView feedback={feedback} />}
+      {section === "users" && (
+        <>
+          <UsersView users={users?.users ?? null} startIndex={usersOff} />
+          <Pager loaded={!!users} offset={usersOff} pageSize={PAGE} total={users?.total ?? 0} onChange={setUsersOff} />
+        </>
+      )}
+      {section === "games" && (
+        <>
+          <GamesView games={games?.games ?? null} />
+          <Pager loaded={!!games} offset={gamesOff} pageSize={PAGE} total={games?.total ?? 0} onChange={setGamesOff} />
+        </>
+      )}
+      {section === "feedback" && (
+        <>
+          <FeedbackView feedback={feedback?.feedback ?? null} />
+          <Pager loaded={!!feedback} offset={fbOff} pageSize={FB_PAGE} total={feedback?.total ?? 0} onChange={setFbOff} />
+        </>
+      )}
     </main>
   );
 }
@@ -510,17 +541,22 @@ function ChartSkeleton() {
   return <div className="h-[200px] animate-pulse rounded-[12px] bg-[var(--color-surface)]" />;
 }
 
-function UsersView({ users }: { users: UserRow[] | null }) {
+function UsersView({ users, startIndex = 0 }: { users: UserRow[] | null; startIndex?: number }) {
   if (!users) return <Loading />;
   if (users.length === 0) return <Empty label="No Bluesky users yet (guests aren't stored)." />;
   return (
     <Table head={["#", "Handle", "Joined", "Played", "Won", "Win %", "Score"]}>
       {users.map((u, i) => (
         <tr key={u.did} className="border-t border-[var(--color-border)]">
-          <Td className="text-[var(--color-text-secondary)]">{i + 1}</Td>
+          <Td className="text-[var(--color-text-secondary)]">{startIndex + i + 1}</Td>
           <Td>
-            <div className="font-medium">{u.display_name ?? u.handle}</div>
-            <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">@{u.handle}</div>
+            <Link href={`/u/${u.handle}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 -my-1 py-1 hover:text-[var(--color-primary)]">
+              <Avatar id={u.did} name={u.display_name ?? u.handle} avatarUrl={u.avatar_url} size={32} />
+              <div className="min-w-0">
+                <div className="truncate font-medium">{u.display_name ?? u.handle}</div>
+                <div className="truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">@{u.handle}</div>
+              </div>
+            </Link>
           </Td>
           <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
             {u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}
@@ -593,6 +629,40 @@ function Center({ children }: { children: React.ReactNode }) {
 }
 function Loading() {
   return <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">loading…</p>;
+}
+function Pager({
+  loaded,
+  offset,
+  pageSize,
+  total,
+  onChange,
+}: {
+  loaded: boolean;
+  offset: number;
+  pageSize: number;
+  total: number;
+  onChange: (offset: number) => void;
+}) {
+  if (!loaded || total <= pageSize) return null;
+  const from = offset + 1;
+  const to = Math.min(offset + pageSize, total);
+  const btn =
+    "rounded-[8px] border border-[var(--color-border)] px-3 py-1.5 text-sm transition-colors enabled:hover:bg-[var(--color-elevated)] disabled:opacity-40";
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3">
+      <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+        {from}–{to} of {total}
+      </span>
+      <div className="flex gap-2">
+        <button className={btn} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - pageSize))}>
+          Prev
+        </button>
+        <button className={btn} disabled={to >= total} onClick={() => onChange(offset + pageSize)}>
+          Next
+        </button>
+      </div>
+    </div>
+  );
 }
 function Empty({ label }: { label: string }) {
   return <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">{label}</p>;
