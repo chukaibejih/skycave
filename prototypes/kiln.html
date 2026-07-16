@@ -52,6 +52,7 @@
   .overlay .brk{display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--ts);}
   .overlay .brk b{color:var(--tp);}
   #cardCanvas{width:320px;border-radius:12px;border:1px solid var(--border);}
+  #startTarget{width:130px;height:auto;}
   .flashsub{font-size:13px;color:var(--ts);max-width:260px;}
   .warm{color:var(--warm);}
 
@@ -85,6 +86,13 @@
   <div class="stage" id="stage">
     <canvas id="c"></canvas>
 
+    <div class="overlay" id="start">
+      <b class="k">Today’s pot · <span id="startName">Belly jar</span></b>
+      <canvas id="startTarget" width="300" height="380"></canvas>
+      <span class="flashsub">Study the target and its glaze. Spin to start the clock.</span>
+      <button class="primary" onclick="startRound()">Spin</button>
+    </div>
+
     <div class="overlay" id="collapse">
       <b class="k warm">It collapsed.</b>
       <span class="flashsub">The wall got too thin, too fast. Slow, even pressure keeps a pot alive.</span>
@@ -109,7 +117,7 @@
   </div>
 
   <div class="row">
-    <button class="primary" id="fireBtn" onclick="fire()">Fire it</button>
+    <button class="primary" id="primaryBtn" onclick="primaryAction()">Spin</button>
     <button id="ghostBtn" class="on" onclick="toggleGhost()">Ghost: on</button>
     <div class="swatches" id="swatches"></div>
   </div>
@@ -142,7 +150,7 @@ window.addEventListener('resize', resize);
 const ROWS = 64;
 const yTop = 46, yBot = 424;
 const potH = yBot - yTop;
-const MAXR = 132, MINWALL = 5, THIN = 16;
+const MAXR = 132, MINWALL = 2, CLAY_MIN = 9, THIN = 16;
 const ROUND_SECS = 45;
 const cx = () => W/2;
 const rowY = i => yTop + (i/(ROWS-1))*potH;
@@ -179,15 +187,25 @@ function newRound(which){
   prof=[]; glaze=[]; vel=[];
   for(let i=0;i<ROWS;i++){
     const t=i/(ROWS-1);
-    prof[i] = (0.44 + 0.10*Math.sin(t*Math.PI))*MAXR + Math.sin(i*0.7)*4;   // a fresh, neutral lump
-    prof[i] = Math.max(MINWALL, Math.min(MAXR, prof[i]));
+    // start as a centered pile of clay: a mound low on the wheel, air above it
+    prof[i] = t<0.58 ? 2 : Math.max(2, MAXR*0.44*Math.sin(((t-0.58)/0.42)*(Math.PI/2)));
     glaze[i]=null; vel[i]=0;
   }
-  stability=1; collapsed=false; timeLeft=ROUND_SECS; phase='shaping';
+  stability=1; collapsed=false; slump=0; timeLeft=ROUND_SECS; phase='ready';
   document.getElementById('collapse').classList.remove('on');
   document.getElementById('result').classList.remove('on');
-  document.getElementById('fireBtn').disabled=false;
+  document.getElementById('startName').textContent=TARGETS[curTarget].name;
+  drawStartTarget();
+  document.getElementById('start').classList.add('on');
+  const pb=document.getElementById('primaryBtn'); pb.textContent='Spin'; pb.disabled=false;
 }
+function startRound(){
+  if(phase!=='ready') return;
+  phase='shaping'; timeLeft=ROUND_SECS;
+  document.getElementById('start').classList.remove('on');
+  document.getElementById('primaryBtn').textContent='Fire it';
+}
+function primaryAction(){ if(phase==='ready') startRound(); else if(phase==='shaping') fire(); }
 
 // ---- state ----
 let stability=1, collapsed=false, spin=0, showGhost=true, slump=0, collapseSide=1;
@@ -225,7 +243,7 @@ function shapeAt(px,py,dist){
     const w=Math.exp(-Math.pow((j-i0)/(BRUSH*0.6),2)); const before=prof[j];
     prof[j]+=(desired-prof[j])*w*strength; prof[j]=Math.max(MINWALL,Math.min(MAXR,prof[j]));
     vel[j]=0.6*vel[j]+Math.abs(prof[j]-before);
-    if(glazeColor && Math.abs(Math.abs(px-cx())-prof[j])<26) glaze[j]=glazeColor;
+    if(glazeColor && prof[j]>=CLAY_MIN && Math.abs(Math.abs(px-cx())-prof[j])<26) glaze[j]=glazeColor;
   }
 }
 
@@ -243,7 +261,7 @@ function glazeMatch(){
 // ---- round control ----
 function fire(){
   if(phase!=='shaping') return;
-  phase='fired'; pointer=null; document.getElementById('fireBtn').disabled=true;
+  phase='fired'; pointer=null; document.getElementById('primaryBtn').disabled=true;
   const sh=shapeMatch(), gl=glazeMatch(), nv=stability;
   const shPts=Math.round(sh*600), glPts=Math.round(gl*300), nvPts=Math.round(nv*100);
   const total=shPts+glPts+nvPts;
@@ -271,10 +289,12 @@ function dispR(i){
   else if(fragile>0.02){ r+=Math.sin(spin*2.4+i*0.55)*fragile*7; }
   return Math.max(1,r);
 }
+function topRow(){ for(let i=0;i<ROWS;i++) if(prof[i]>=CLAY_MIN) return i; return ROWS-1; }
 function potPath(){
-  ctx.beginPath(); ctx.moveTo(colX(0)+dispR(0),rowY(0));
-  for(let i=1;i<ROWS;i++) ctx.lineTo(colX(i)+dispR(i),rowY(i));
-  for(let i=ROWS-1;i>=0;i--) ctx.lineTo(colX(i)-dispR(i),rowY(i));
+  const t0=topRow();
+  ctx.beginPath(); ctx.moveTo(colX(t0)+dispR(t0),rowY(t0));
+  for(let i=t0+1;i<ROWS;i++) ctx.lineTo(colX(i)+dispR(i),rowY(i));
+  for(let i=ROWS-1;i>=t0;i--) ctx.lineTo(colX(i)-dispR(i),rowY(i));
   ctx.closePath();
 }
 function draw(){
@@ -331,33 +351,53 @@ function draw(){
   }
   ctx.restore();
   // rim
-  const r0=dispR(0), cxi=colX(0), yr=rowY(0), wall=Math.max(5,Math.min(17,r0*0.16)), ir=Math.max(2,r0-wall);
+  const t0=topRow(); const r0=dispR(t0), cxi=colX(t0), yr=rowY(t0), wall=Math.max(5,Math.min(17,r0*0.16)), ir=Math.max(2,r0-wall);
   ctx.fillStyle='#8a3620'; ctx.beginPath(); ctx.ellipse(cxi,yr,r0,r0*0.24,0,0,PI2); ctx.fill();
   let cav=ctx.createRadialGradient(cxi-wall*0.4,yr-2,2,cxi,yr,Math.max(3,ir)); cav.addColorStop(0,'#180a06'); cav.addColorStop(.7,'#2a120b'); cav.addColorStop(1,'#431c11');
   ctx.fillStyle=cav; ctx.beginPath(); ctx.ellipse(cxi,yr,ir,ir*0.24,0,0,PI2); ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,ir,ir*0.24,0,Math.PI*0.06,Math.PI*0.94); ctx.stroke();
   ctx.strokeStyle='rgba(255,224,205,.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,r0,r0*0.24,0,Math.PI*1.06,Math.PI*1.94); ctx.stroke();
   potPath(); ctx.lineWidth=1.2; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.stroke();
+
+  if(phase==='shaping') drawReference();
+}
+
+// pinned colored target reference while shaping
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawReference(){
+  const pw=80, ph=114, px=W-pw-10, py=10;
+  ctx.save();
+  ctx.fillStyle='rgba(8,10,16,.78)'; roundRect(px,py,pw,ph,10); ctx.fill();
+  ctx.strokeStyle='rgba(40,48,68,.9)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.save(); ctx.translate(px+2,py+2); miniPot(ctx, pw/2, pw-4, ph-20, target, tglaze); ctx.restore();
+  ctx.fillStyle='#9aa3ba'; ctx.font='600 9px "Geist Mono", monospace'; ctx.textAlign='center';
+  ctx.fillText('TARGET', px+pw/2, py+ph-6); ctx.textAlign='left';
+  ctx.restore();
 }
 
 // ---- share card ----
 function miniPot(g, cxp, w, h, P, G){
   const yt=6, yb=h-8, ph=yb-yt, sx=(w*0.40)/MAXR;
-  const R=i=>P[i]*sx;
-  g.beginPath(); g.moveTo(cxp+R(0),yt);
-  for(let i=1;i<ROWS;i++) g.lineTo(cxp+R(i),yt+(i/(ROWS-1))*ph);
-  for(let i=ROWS-1;i>=0;i--) g.lineTo(cxp-R(i),yt+(i/(ROWS-1))*ph);
+  let t0=0; while(t0<ROWS-1 && P[t0]<CLAY_MIN) t0++;
+  const R=i=>P[i]*sx, Y=i=>yt+(i/(ROWS-1))*ph;
+  g.beginPath(); g.moveTo(cxp+R(t0),Y(t0));
+  for(let i=t0+1;i<ROWS;i++) g.lineTo(cxp+R(i),Y(i));
+  for(let i=ROWS-1;i>=t0;i--) g.lineTo(cxp-R(i),Y(i));
   g.closePath(); g.save(); g.clip();
   let base=g.createLinearGradient(cxp-w/2,0,cxp+w/2,0);
   base.addColorStop(0,'#4a1c12'); base.addColorStop(.4,'#b84a30'); base.addColorStop(.5,'#e0714f'); base.addColorStop(.62,'#b84a30'); base.addColorStop(1,'#54200f');
   g.fillStyle=base; g.fillRect(cxp-w/2,0,w,h);
-  for(let i=0;i<ROWS;i++){ if(!G[i]) continue; g.globalAlpha=.6; g.fillStyle=G[i]; g.fillRect(cxp-w/2,yt+(i/(ROWS-1))*ph-2,w,ph/ROWS+2); }
+  for(let i=t0;i<ROWS;i++){ if(!G[i]) continue; g.globalAlpha=.6; g.fillStyle=G[i]; g.fillRect(cxp-w/2,Y(i)-2,w,ph/ROWS+2); }
   g.globalAlpha=1;
   let vg=g.createLinearGradient(0,yt,0,yb); vg.addColorStop(0,'rgba(255,240,230,.14)'); vg.addColorStop(.5,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.3)');
   g.fillStyle=vg; g.fillRect(cxp-w/2,0,w,h);
   g.restore();
-  // rim
-  const r0=R(0); g.fillStyle='#2a120b'; g.beginPath(); g.ellipse(cxp,yt,r0,r0*0.22,0,0,PI2); g.fill();
+  const r0=R(t0); g.fillStyle='#2a120b'; g.beginPath(); g.ellipse(cxp,Y(t0),r0,r0*0.22,0,0,PI2); g.fill();
+}
+function drawStartTarget(){
+  const c=document.getElementById('startTarget'); const g=c.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,c.width,c.height);
+  miniPot(g, c.width/2, c.width, c.height, target, tglaze);
 }
 function drawCard(total){
   const card=document.getElementById('cardCanvas'); const g=card.getContext('2d');
@@ -389,16 +429,16 @@ function miniPotAt(g, cxp, top, w, h, P, G, label){
 // ---- physics ----
 function step(dt){
   if(collapsed||phase!=='shaping') return;
-  let thin=0; for(let i=0;i<ROWS;i++){ if(prof[i]<THIN) thin+=(THIN-prof[i])/THIN; vel[i]*=0.9; }
+  let thin=0; for(let i=0;i<ROWS;i++){ if(prof[i]>=CLAY_MIN && prof[i]<THIN) thin+=(THIN-prof[i])/THIN; vel[i]*=0.9; }
   const speedDrain=Math.max(0,moveSpeed-6)*0.010, thinDrain=thin*0.010, regen=(pointer?0.004:0.010);
   stability=Math.max(0,Math.min(1,stability-(speedDrain+thinDrain)*dt*0.06+regen*dt*0.06));
   moveSpeed*=0.92;
   if(stability<=0) collapse();
 }
-function collapse(){ collapsed=true; slump=0; collapseSide=Math.random()<0.5?-1:1; phase='collapsed'; document.getElementById('collapse').classList.add('on'); }
+function collapse(){ collapsed=true; slump=0; collapseSide=Math.random()<0.5?-1:1; phase='collapsed'; document.getElementById('primaryBtn').disabled=true; document.getElementById('collapse').classList.add('on'); }
 
 function loop(now){
-  const dt=Math.min(50,now-last); last=now; spin+=dt*0.004;
+  const dt=Math.min(50,now-last); last=now; if(phase!=='ready') spin+=dt*0.004;
   if(collapsed){ slump=Math.min(1.2,slump+dt*0.0016); }
   else if(phase==='shaping'){ step(dt); timeLeft=Math.max(0,timeLeft-dt/1000); if(timeLeft<=0) fire(); }
   draw();
