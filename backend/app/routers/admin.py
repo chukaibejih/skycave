@@ -469,16 +469,17 @@ async def feedback(
     )
 
 
-@router.patch("/feedback/{fid}", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/feedback/{fid}")
 async def resolve_feedback(
     fid: int,
     body: FeedbackResolveRequest,
     _: AdminAuth,
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> dict[str, int | bool]:
     """Mark a feedback item resolved (or reopen it)."""
     fb = await db.get(Feedback, fid)
     if fb is None:
         raise HTTPException(status_code=404, detail="Feedback not found")
     fb.resolved = body.resolved
     await db.commit()
+    return {"id": fid, "resolved": body.resolved}
