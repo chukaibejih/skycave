@@ -117,6 +117,49 @@ export async function logout(isGuest: boolean): Promise<void> {
 // ── Games ──
 export const listGames = () => request<GameInfo[]>("/games");
 
+// ── Player profile ──
+export interface ProfileGame {
+  game_type: string;
+  best_score: number;
+  plays: number;
+}
+export interface ProfileRecent {
+  game_type: string;
+  mode: string;
+  result: "win" | "loss" | "draw" | "solo";
+  opponent: string | null;
+  your_score: number;
+  created_at: string;
+}
+export interface ProfileRival {
+  handle: string;
+  wins: number;
+  losses: number;
+  games: number;
+}
+export interface ProfileBadge {
+  key: string;
+  label: string;
+  detail: string;
+}
+export interface Profile {
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  joined: string;
+  games_played: number;
+  games_won: number;
+  win_rate: number;
+  total_score: number;
+  rank: number;
+  bests: ProfileGame[];
+  recent: ProfileRecent[];
+  rivals: ProfileRival[];
+  badges: ProfileBadge[];
+}
+export const getProfile = (handle: string) =>
+  request<Profile>(`/users/handle/${encodeURIComponent(handle)}/profile`);
+
 // ── Rooms ──
 export const createRoom = (
   gameType: string,

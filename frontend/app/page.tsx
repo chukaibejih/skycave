@@ -307,6 +307,20 @@ function AccountMenu({
                 {identity.is_guest ? "playing as guest" : `@${identity.handle}`}
               </div>
             </div>
+            {!identity.is_guest && (
+              <Link
+                href={`/u/${identity.handle}`}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 border-b border-[var(--color-border)] px-4 py-3 text-left text-sm active:bg-[var(--color-surface)]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                My profile
+              </Link>
+            )}
             <button
               role="menuitem"
               disabled={busy}

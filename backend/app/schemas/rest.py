@@ -110,6 +110,51 @@ class UserStats(BaseModel):
     win_rate: float
 
 
+# --- Player profile ---
+class ProfileGame(BaseModel):
+    game_type: str
+    best_score: int
+    plays: int
+
+
+class ProfileRecent(BaseModel):
+    game_type: str
+    mode: str  # versus | solo
+    result: str  # win | loss | draw | solo
+    opponent: str | None  # opponent handle, or "Caver" for solo
+    your_score: int
+    created_at: datetime
+
+
+class ProfileRival(BaseModel):
+    handle: str
+    wins: int
+    losses: int
+    games: int
+
+
+class Badge(BaseModel):
+    key: str
+    label: str
+    detail: str
+
+
+class ProfileResponse(BaseModel):
+    handle: str
+    display_name: str | None
+    avatar_url: str | None
+    joined: datetime
+    games_played: int
+    games_won: int
+    win_rate: float
+    total_score: int
+    rank: int  # overall, by wins
+    bests: list[ProfileGame]
+    recent: list[ProfileRecent]
+    rivals: list[ProfileRival]
+    badges: list[Badge]
+
+
 # --- Score card ---
 
 class ScorecardRequest(BaseModel):
