@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
-import Script from "next/script";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
 import "./globals.css";
 
@@ -44,13 +43,6 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-// Only load analytics for real production traffic: excludes local dev
-// (NODE_ENV !== production) and Vercel preview deploys (VERCEL_ENV === preview),
-// while still covering Vercel prod and any self-hosted prod build.
-const analyticsEnabled =
-  process.env.NODE_ENV === "production" &&
-  process.env.VERCEL_ENV !== "preview";
-
 export default function RootLayout({
   children,
 }: {
@@ -65,15 +57,6 @@ export default function RootLayout({
         {children}
         <FeedbackButton />
       </body>
-      {/* Heetsesh analytics — production only (async, non-blocking, every page). */}
-      {analyticsEnabled && (
-        <Script
-          src="https://cdn.heetsesh.com/heetsesh.js"
-          strategy="afterInteractive"
-          data-project-key="hk_BCrjdpIjdwIeP9SdvUpXRbReTnjTv0-1"
-          data-endpoint="https://ingest.heetsesh.com/ingest"
-        />
-      )}
     </html>
   );
 }
