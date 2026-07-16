@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Kiln · prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --base:#05060a;--surface:#10131c;--elevated:#171b27;--primary:#8b7cff;
+    --warm:#ff725e;--cyan:#67e8f9;--gold:#ffd166;--tp:#f5f7ff;--ts:#9aa3ba;
+    --success:#56f0aa;--border:#283044;
+    --display:'Sora',system-ui,sans-serif;--body:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#05060a;height:100%}
+  body{
+    font-family:var(--body);color:var(--tp);-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(120% 80% at 80% -10%, #8b7cff18 0%, transparent 55%),
+      radial-gradient(90% 70% at -10% 20%, #67e8f912 0%, transparent 50%),
+      linear-gradient(180deg,#070914 0%,#05060a 52%,#030407 100%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:430px;margin:0 auto;padding:20px 16px 28px;}
+  .head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;}
+  h1{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em;}
+  .tag{font-family:var(--mono);font-size:11px;color:var(--ts);}
+  .sub{font-size:13px;color:var(--ts);margin-bottom:12px;}
+
+  .hud{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .match{font-family:var(--display);font-weight:700;font-size:26px;line-height:1;}
+  .match small{font-family:var(--mono);font-weight:400;font-size:11px;color:var(--ts);display:block;letter-spacing:.06em;text-transform:uppercase;margin-top:3px;}
+  .stab{flex:1;}
+  .stab .lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);margin-bottom:5px;}
+  .bar{height:8px;border-radius:9999px;background:#0c0f17;border:1px solid var(--border);overflow:hidden;}
+  .bar > i{display:block;height:100%;width:100%;border-radius:9999px;transition:width .08s linear,background .2s;}
+
+  .stage{position:relative;border-radius:18px;border:1px solid var(--border);overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 15%, #1b2030 0%, #0b0e16 70%);touch-action:none;}
+  canvas{display:block;width:100%;}
+  .flash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;
+    background:rgba(5,6,10,.72);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;text-align:center;padding:24px;}
+  .flash.on{opacity:1;pointer-events:auto;}
+  .flash b{font-family:var(--display);font-weight:700;font-size:20px;color:var(--warm);}
+  .flash span{font-size:13px;color:var(--ts);max-width:260px;}
+
+  .row{display:flex;gap:8px;margin-top:12px;}
+  button{font-family:var(--body);font-weight:600;font-size:13px;border-radius:10px;padding:10px 12px;cursor:pointer;border:1px solid var(--border);
+    background:var(--surface);color:var(--tp);transition:background .15s,border-color .15s;}
+  button:hover{background:var(--elevated);}
+  button.primary{background:var(--primary);border-color:var(--primary);color:#05060a;}
+  button.on{border-color:var(--cyan);color:var(--cyan);}
+  .hint{margin-top:12px;font-size:12px;line-height:1.5;color:var(--ts);}
+  .hint b{color:var(--tp);font-weight:600;}
+  .swatches{display:flex;gap:6px;margin-left:auto;}
+  .sw{width:26px;height:26px;border-radius:8px;border:2px solid transparent;cursor:pointer;}
+  .sw.on{border-color:var(--tp);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Kiln</h1><span class="tag">prototype · shaping feel</span></div>
+  <div class="sub">Shape the clay to match the ghost. Precision scores. Nerve keeps it standing.</div>
+
+  <div class="hud">
+    <div class="match"><span id="matchv">0%</span><small>match</small></div>
+    <div class="stab">
+      <div class="lab"><span>stability</span><span id="stabv">100%</span></div>
+      <div class="bar"><i id="stabbar"></i></div>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="c"></canvas>
+    <div class="flash" id="flash">
+      <b>It collapsed.</b>
+      <span>The wall got too thin, too fast. Slow, even pressure keeps a pot alive.</span>
+      <button class="primary" onclick="resetClay()">Throw again</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="ghostBtn" class="on" onclick="toggleGhost()">Ghost: on</button>
+    <button onclick="resetClay()">Reset clay</button>
+    <div class="swatches" id="swatches"></div>
+  </div>
+
+  <p class="hint">
+    <b>Drag on the clay</b> to push the wall out or pinch it in at that height.
+    Pull it <b>too thin or too fast</b> and it wobbles, drains stability, and collapses.
+    Pick a glaze color to <b>paint a band</b> as you drag near the surface.
+  </p>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+
+// ---- geometry ----
+const CSSW = () => stage.clientWidth;
+const CSSH = 470;
+let dpr = Math.min(window.devicePixelRatio || 1, 3);
+let W = 0, H = CSSH;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = CSSW();
+  canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+
+const ROWS = 64;
+const yTop = 46, yBot = 424;         // pot vertical extent on canvas
+const potH = yBot - yTop;
+const MAXR = 132;                    // widest allowed radius
+const MINWALL = 5;                   // absolute min radius
+const THIN = 16;                     // below this = fragile
+const cx = () => W/2;
+
+const rowY = i => yTop + (i/(ROWS-1))*potH;
+const yToRow = y => Math.max(0, Math.min(ROWS-1, Math.round(((y-yTop)/potH)*(ROWS-1))));
+
+// target vase (normalized radius of MAXR), interpolated from keyframes
+const KEYS = [[0,.40],[.07,.27],[.16,.38],[.40,.94],[.58,.82],[.80,.34],[1,.30]];
+function targetR(i){
+  const t = i/(ROWS-1);
+  for(let k=0;k<KEYS.length-1;k++){
+    const [t0,r0]=KEYS[k],[t1,r1]=KEYS[k+1];
+    if(t>=t0 && t<=t1){ const f=(t-t0)/(t1-t0); const s=f*f*(3-2*f); return (r0+(r1-r0)*s)*MAXR; }
+  }
+  return KEYS[KEYS.length-1][1]*MAXR;
+}
+let target = [], prof = [], glaze = [], vel = [];
+function resetClay(){
+  target = []; prof = []; glaze = []; vel = [];
+  for(let i=0;i<ROWS;i++){
+    target[i] = targetR(i);
+    const t=i/(ROWS-1);
+    // start: a rough lump, part-way toward the target so there is clay to work
+    const lump = (0.46 + 0.12*Math.sin(t*Math.PI))*MAXR;
+    prof[i] = lump*0.5 + target[i]*0.5 + (Math.sin(i*0.7)*6);
+    prof[i] = Math.max(MINWALL, Math.min(MAXR, prof[i]));
+    glaze[i] = null; vel[i] = 0;
+  }
+  stability = 1; collapsed = false; document.getElementById('flash').classList.remove('on');
+}
+
+// ---- state ----
+let stability = 1, collapsed = false, spin = 0, showGhost = true;
+let last = performance.now();
+let pointer = null, lastMove = 0, moveSpeed = 0;
+
+// glaze palette
+const GLAZES = ['#c0503b','#8b7cff','#67e8f9','#ffd166','#f5f7ff','#2e7d5b'];
+let glazeColor = null;
+const swWrap = document.getElementById('swatches');
+GLAZES.forEach((c,idx)=>{
+  const b=document.createElement('div'); b.className='sw'; b.style.background=c;
+  b.onclick=()=>{ glazeColor = glazeColor===c?null:c; [...swWrap.children].forEach(x=>x.classList.remove('on')); if(glazeColor===c) b.classList.add('on'); };
+  swWrap.appendChild(b);
+});
+
+function toggleGhost(){ showGhost=!showGhost; document.getElementById('ghostBtn').textContent='Ghost: '+(showGhost?'on':'off'); document.getElementById('ghostBtn').classList.toggle('on',showGhost); }
+
+// ---- input ----
+function evPos(e){
+  const r = canvas.getBoundingClientRect();
+  const p = (e.touches && e.touches[0]) || e;
+  return { x:(p.clientX-r.left), y:(p.clientY-r.top) };
+}
+function down(e){ if(collapsed) return; e.preventDefault(); pointer = evPos(e); lastMove = performance.now(); }
+function move(e){
+  if(!pointer || collapsed) return; e.preventDefault();
+  const p = evPos(e);
+  const now = performance.now();
+  const dt = Math.max(1, now-lastMove);
+  const dist = Math.hypot(p.x-pointer.x, p.y-pointer.y);
+  moveSpeed = 0.7*moveSpeed + 0.3*(dist/dt*16);   // px per ~frame, smoothed
+  shapeAt(p.x, p.y, dist);
+  pointer = p; lastMove = now;
+}
+function up(){ pointer = null; }
+canvas.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+canvas.addEventListener('touchstart',down,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+
+const BRUSH = 6;               // rows of influence each side
+function shapeAt(px, py, dist){
+  const i0 = yToRow(py);
+  const desired = Math.max(MINWALL, Math.min(MAXR, Math.abs(px - cx())));
+  const strength = Math.min(0.6, 0.22 + dist*0.02);
+  for(let j=Math.max(0,i0-BRUSH); j<=Math.min(ROWS-1,i0+BRUSH); j++){
+    const w = Math.exp(-Math.pow((j-i0)/(BRUSH*0.6), 2));
+    const before = prof[j];
+    prof[j] += (desired - prof[j]) * w * strength;
+    prof[j] = Math.max(MINWALL, Math.min(MAXR, prof[j]));
+    vel[j] = 0.6*vel[j] + Math.abs(prof[j]-before);
+    if(glazeColor && Math.abs(Math.abs(px-cx())-prof[j]) < 26) glaze[j] = glazeColor;
+  }
+}
+
+// ---- scoring ----
+function matchPct(){
+  let s=0; for(let i=0;i<ROWS;i++) s += Math.abs(prof[i]-target[i]);
+  const mean = s/ROWS;
+  return Math.max(0, Math.min(1, 1 - mean/(0.34*MAXR)));
+}
+
+// ---- physics: nerve ----
+function step(dt){
+  if(collapsed) return;
+  let thin=0, agitation=0;
+  for(let i=0;i<ROWS;i++){ if(prof[i]<THIN) thin += (THIN-prof[i])/THIN; agitation += vel[i]; vel[i]*=0.9; }
+  const speedDrain = Math.max(0, moveSpeed-6) * 0.010;
+  const thinDrain  = thin * 0.010;
+  const regen = (pointer? 0.004 : 0.010);        // recovers when you ease off
+  stability = Math.max(0, Math.min(1, stability - (speedDrain+thinDrain)*dt*0.06 + regen*dt*0.06));
+  moveSpeed *= 0.92;
+  if(stability<=0) collapse();
+}
+let slump=0;
+function collapse(){ collapsed=true; slump=0; document.getElementById('flash').classList.add('on'); }
+
+// ---- render ----
+function clayGradient(w){
+  const g = ctx.createLinearGradient(cx()-MAXR,0,cx()+MAXR,0);
+  g.addColorStop(0,'#5f2418'); g.addColorStop(.30,'#b0472f');
+  g.addColorStop(.5,'#e07152'); g.addColorStop(.70,'#b0472f'); g.addColorStop(1,'#5f2418');
+  return g;
+}
+function dispR(i){
+  // visible wobble grows as stability falls and walls thin
+  const fragile = (1-stability) * (prof[i]<THIN? 1.6:0.5);
+  let r = prof[i];
+  if(collapsed){ r = prof[i]*Math.max(0,1-slump) ; r += Math.sin(spin*3+i*0.5)*prof[i]*0.35*Math.min(1,slump*2); }
+  else if(fragile>0.02){ r += Math.sin(spin*2.4 + i*0.55)*fragile*7; }
+  return Math.max(1, r);
+}
+function potPath(){
+  ctx.beginPath();
+  ctx.moveTo(cx()+dispR(0), rowY(0));
+  for(let i=1;i<ROWS;i++) ctx.lineTo(cx()+dispR(i), rowY(i));
+  for(let i=ROWS-1;i>=0;i--) ctx.lineTo(cx()-dispR(i), rowY(i));
+  ctx.closePath();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // wheel platform
+  ctx.save();
+  ctx.translate(cx(), yBot+16);
+  ctx.fillStyle='#0a0d15'; ctx.beginPath(); ctx.ellipse(0,0,MAXR*1.05,26,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(139,124,255,.25)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.ellipse(0,0,MAXR*1.05,26,0,0,Math.PI*2); ctx.stroke();
+  // rotation ticks on the wheel
+  for(let k=0;k<18;k++){ const a=spin+k*(Math.PI*2/18); ctx.globalAlpha=.35+.25*Math.sin(a);
+    ctx.strokeStyle='rgba(103,232,249,.5)'; ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*MAXR*0.86, Math.sin(a)*22); ctx.lineTo(Math.cos(a)*MAXR*1.0, Math.sin(a)*25); ctx.stroke(); }
+  ctx.globalAlpha=1; ctx.restore();
+
+  // ghost target outline
+  if(showGhost && !collapsed){
+    ctx.save(); ctx.beginPath();
+    ctx.moveTo(cx()+target[0],rowY(0));
+    for(let i=1;i<ROWS;i++) ctx.lineTo(cx()+target[i],rowY(i));
+    for(let i=ROWS-1;i>=0;i--) ctx.lineTo(cx()-target[i],rowY(i));
+    ctx.closePath();
+    ctx.setLineDash([5,6]); ctx.lineWidth=1.5; ctx.strokeStyle='rgba(103,232,249,.55)'; ctx.stroke();
+    ctx.restore();
+  }
+
+  // pot body
+  ctx.save();
+  potPath(); ctx.save(); ctx.clip();
+  ctx.fillStyle = clayGradient(); ctx.fillRect(cx()-MAXR-4,0,MAXR*2+8,H);
+  // glaze bands
+  for(let i=0;i<ROWS;i++){ if(!glaze[i]) continue; ctx.globalAlpha=.9;
+    ctx.fillStyle=glaze[i]; ctx.fillRect(cx()-MAXR-4, rowY(i)-potH/ROWS/2, MAXR*2+8, potH/ROWS+1.2); }
+  ctx.globalAlpha=1;
+  // form shadow top->bottom
+  const vg=ctx.createLinearGradient(0,yTop,0,yBot);
+  vg.addColorStop(0,'rgba(255,255,255,.10)'); vg.addColorStop(.5,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.28)');
+  ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  // moving specular (sells the spin)
+  const sx = cx() + Math.sin(spin)*MAXR*0.5;
+  const sg=ctx.createLinearGradient(sx-46,0,sx+46,0);
+  sg.addColorStop(0,'rgba(255,240,230,0)'); sg.addColorStop(.5,'rgba(255,245,235,.55)'); sg.addColorStop(1,'rgba(255,240,230,0)');
+  ctx.globalCompositeOperation='screen'; ctx.fillStyle=sg; ctx.fillRect(sx-46,0,92,H);
+  ctx.globalCompositeOperation='source-over';
+  ctx.restore();
+  // rim of the opening
+  const r0=dispR(0);
+  ctx.beginPath(); ctx.ellipse(cx(),rowY(0),r0,r0*0.26,0,0,Math.PI*2);
+  ctx.fillStyle='#3a170f'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx(),rowY(0),r0,r0*0.26,0,Math.PI*1.05,Math.PI*1.95);
+  ctx.strokeStyle='rgba(255,220,200,.5)'; ctx.lineWidth=2; ctx.stroke();
+  // outline
+  potPath(); ctx.lineWidth=1.2; ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.stroke();
+  ctx.restore();
+}
+
+function loop(now){
+  const dt = Math.min(50, now-last); last=now;
+  spin += dt*0.004;
+  if(collapsed){ slump=Math.min(1.2, slump+dt*0.0016); }
+  else step(dt);
+  draw();
+
+  const m = collapsed?0:matchPct();
+  document.getElementById('matchv').textContent = Math.round(m*100)+'%';
+  document.getElementById('matchv').style.color = m>0.9?'var(--success)':m>0.7?'var(--gold)':'var(--tp)';
+  const sb = document.getElementById('stabbar');
+  sb.style.width = Math.round(stability*100)+'%';
+  sb.style.background = stability>0.5?'var(--success)':stability>0.25?'var(--gold)':'var(--warm)';
+  document.getElementById('stabv').textContent = Math.round(stability*100)+'%';
+  requestAnimationFrame(loop);
+}
+
+resize(); resetClay(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
