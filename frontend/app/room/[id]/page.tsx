@@ -91,7 +91,9 @@ export default function RoomPage() {
   // card screen. Versus stays in the room and shows the seamless rematch screen
   // (below), keeping both players and the live socket together.
   useEffect(() => {
-    if (gameEnd && room?.id === id && room?.mode === "solo") {
+    // Clay shows its own result overlay (score + play again), so don't bounce
+    // solo Clay to the shared results page.
+    if (gameEnd && room?.id === id && room?.mode === "solo" && room?.game_type !== "clay") {
       const t = setTimeout(() => router.push(`/results/${id}`), 600);
       return () => clearTimeout(t);
     }
@@ -143,7 +145,7 @@ export default function RoomPage() {
 
   // Versus game finished: stay in the room and offer a seamless rematch on the
   // same room. Solo redirected to results above, so this is versus only.
-  if (ready && gameEnd && room!.status === "finished" && room!.mode !== "solo") {
+  if (ready && gameEnd && room!.status === "finished" && room!.mode !== "solo" && room!.game_type !== "clay") {
     return (
       <>
         <ConnectionBadge status={status} />

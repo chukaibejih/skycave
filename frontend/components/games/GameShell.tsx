@@ -19,6 +19,7 @@ const WordHunt = dynamic(() => import("./WordHunt").then((m) => m.WordHunt), { s
 const TileTakeover = dynamic(() => import("./TileTakeover").then((m) => m.TileTakeover), { ssr: false });
 const Connect4 = dynamic(() => import("./Connect4").then((m) => m.Connect4), { ssr: false });
 const DotsAndBoxes = dynamic(() => import("./DotsAndBoxes").then((m) => m.DotsAndBoxes), { ssr: false });
+const Clay = dynamic(() => import("./Clay").then((m) => m.Clay), { ssr: false });
 
 export function GameShell() {
   const {
@@ -36,6 +37,10 @@ export function GameShell() {
   const meId = useAuth((s) => s.identity?.id);
 
   if (!room || !game) return null;
+
+  // Clay owns its whole screen (canvas + timer + result), reading the store
+  // directly — not the round-based ScoreHeader flow.
+  if (game.game_type === "clay") return <Clay />;
 
   // Turn-based games drive their own full-screen board, not the round-based
   // ScoreHeader flow. Pick the board component by game type.

@@ -11,5 +11,6 @@ export const GAME_NAME: Record<string, string> = {
   tile_takeover: "Tile Takeover",
   connect4: "Connect 4",
   dots_boxes: "Dots and Boxes",
+  clay: "Clay",
 };
 export const gameName = (t: string) => GAME_NAME[t] ?? t;

@@ -14,6 +14,7 @@ const ACCENT: Record<string, string> = {
   tile_takeover: "var(--color-success)",
   connect4: "var(--color-gold)",
   dots_boxes: "var(--color-cyan)",
+  clay: "var(--color-warm)",
 };
 const accentOf = (t: string) => ACCENT[t] ?? "var(--color-primary)";
 

@@ -37,6 +37,9 @@ const GAME_NAME: Record<string, string> = {
   mad_math: "Mad Math",
   word_hunt: "Word Hunt",
   tile_takeover: "Tile Takeover",
+  connect4: "Connect 4",
+  dots_boxes: "Dots and Boxes",
+  clay: "Clay",
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 

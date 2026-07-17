@@ -15,6 +15,7 @@ const ACCENT: Record<string, string> = {
   tile_takeover: "var(--color-success)",
   connect4: "var(--color-gold)",
   dots_boxes: "var(--color-cyan)",
+  clay: "var(--color-warm)",
 };
 
 const META: Record<string, { code: string; stat: string }> = {
@@ -29,6 +30,7 @@ const META: Record<string, { code: string; stat: string }> = {
   tile_takeover: { code: "TKO", stat: "board" },
   connect4: { code: "C4", stat: "4 in a row" },
   dots_boxes: { code: "D&B", stat: "boxes" },
+  clay: { code: "CLY", stat: "pottery" },
 };
 
 // Lightweight inline glyph per game (no icon dependency).
@@ -126,6 +128,14 @@ function Glyph({ type, color }: { type: string; color: string }) {
           <rect x="13" y="13" width="7" height="7" rx="1.4" fill={color} fillOpacity="0.4" />
         </svg>
       );
+    case "clay":
+      // a vase on the wheel
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none" strokeLinejoin="round">
+          <path d="M9 4h6" />
+          <path d="M9 4c0 2-2 3-2 6s2 4 2 5c-3 1-4 2-4 3.5 0 0 3 1.5 7 1.5s7-1.5 7-1.5c0-1.5-1-2.5-4-3.5 0-1 2-2 2-5s-2-4-2-6" fill={color} fillOpacity="0.22" />
+        </svg>
+      );
     default:
       // flag_rush
       return (
@@ -143,6 +153,7 @@ const NEW_DAYS = 5;
 const NEW_SINCE: Record<string, string> = {
   connect4: "2026-07-15",
   dots_boxes: "2026-07-15",
+  clay: "2026-07-17",
 };
 export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];

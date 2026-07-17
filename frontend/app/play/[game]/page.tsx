@@ -69,13 +69,14 @@ export default function PlayPage() {
     }
   }, [status, room, roomId, sendReady]);
 
-  // On finish, go to the (solo-aware) results page.
+  // On finish, go to the (solo-aware) results page. Clay shows its own result
+  // in-component, so it opts out of the redirect.
   useEffect(() => {
-    if (gameEnd && roomId && room?.id === roomId) {
+    if (gameEnd && roomId && room?.id === roomId && gameType !== "clay") {
       const t = setTimeout(() => router.push(`/results/${roomId}`), 600);
       return () => clearTimeout(t);
     }
-  }, [gameEnd, roomId, room, router]);
+  }, [gameEnd, roomId, room, router, gameType]);
 
   if (error) {
     return (
