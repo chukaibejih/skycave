@@ -233,6 +233,7 @@ async def handle_action(
             "timed",
             "words",
             "ladder",
+            "canvas",
         ):
             end_after = await _solo_handle(room, game, player_id, action)
         elif game.mode == TURN_BASED:
@@ -405,7 +406,7 @@ async def _solo_begin(room_id: str) -> None:
         kind = gs.get("solo_kind")
         now = time.time()
 
-        if kind in ("timed", "words"):
+        if kind in ("timed", "words", "canvas"):
             duration = game.solo_duration
             public, secret = game.new_round(1)
             public = {**public, "round_time": duration}
@@ -441,7 +442,7 @@ async def _solo_begin(room_id: str) -> None:
         else:
             return
 
-    if kind in ("timed", "words"):
+    if kind in ("timed", "words", "canvas"):
         await manager.broadcast(room_id, events.message(events.ROUND_START, {
             "round": 1, "total_rounds": 0, "round_data": rdata,
             "scores": scores, "ends_at": ends_at,  # fixed session end (no ends_in)
@@ -519,6 +520,18 @@ async def _solo_handle(room: dict[str, Any], game, player_id: str, action: dict)
             "delta": delta, "score": gs["scores"].get(player_id, 0), "used": used,
         }))
         return False
+
+    if kind == "canvas":
+        # The client submits its shaped pot; the server scores it against the
+        # target (reusing resolve, so scoring stays in the game class). The
+        # latest submission wins; `fired` ends the run early (else the timer does).
+        pts = game.resolve(public, secret, {player_id: action}).get(player_id, 0)
+        gs["scores"][player_id] = pts
+        await rooms.save_room(room)
+        await manager.send(room_id, player_id, events.message(
+            events.PLAYER_ACTION, {"player_id": player_id, "score": pts}
+        ))
+        return bool(action.get("fired"))
 
     if kind == "ladder":
         _cancel_timer(room_id)

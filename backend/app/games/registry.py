@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.games.base import BaseGame
+from app.games.clay import Clay
 from app.games.color_clash import ColorClash
 from app.games.connect4 import Connect4
 from app.games.dots_boxes import DotsAndBoxes
@@ -28,6 +29,7 @@ _GAMES: dict[str, BaseGame] = {
         TileTakeover(),
         Connect4(),
         DotsAndBoxes(),
+        Clay(),
     )
 }
 
