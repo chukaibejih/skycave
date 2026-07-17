@@ -30,6 +30,7 @@ interface Sim {
   collapseSide: number;
   spin: number;
   pointer: { x: number; y: number } | null;
+  offset: number; // active shaping offset (0 for mouse, OFFSET_Y for touch)
   moveSpeed: number;
   lastMove: number;
   glazeColor: string | null;
@@ -38,6 +39,7 @@ interface Sim {
 const CLAY_MIN = 9;
 const THIN = 16;
 const MINWALL = 2;
+const OFFSET_Y = 44; // touch shaping happens this many px ABOVE the fingertip
 
 export function Clay() {
   const roundData = useRoom((s) => s.roundData) as
@@ -90,6 +92,7 @@ export function Clay() {
       collapseSide: 1,
       spin: 0,
       pointer: null,
+      offset: 0,
       moveSpeed: 0,
       lastMove: 0,
       glazeColor: null,
@@ -168,6 +171,8 @@ export function Clay() {
       const s = S.current;
       if (!s || s.collapsed || phase !== "play") return;
       e.preventDefault();
+      // A mouse cursor is precise, so no offset; a finger shapes above itself.
+      s.offset = e.pointerType === "mouse" ? 0 : OFFSET_Y;
       s.pointer = pos(e);
       s.lastMove = performance.now();
     };
@@ -343,7 +348,7 @@ const rowY = (s: Sim, i: number) => s.yTop + (i / (s.ROWS - 1)) * s.potH;
 const yToRow = (s: Sim, y: number) => Math.max(0, Math.min(s.ROWS - 1, Math.round(((y - s.yTop) / s.potH) * (s.ROWS - 1))));
 
 function shapeAt(s: Sim, centerX: number, px: number, py: number, dist: number) {
-  const i0 = yToRow(s, py);
+  const i0 = yToRow(s, py - s.offset); // shape above the fingertip (offset touch)
   const desired = Math.max(MINWALL, Math.min(s.MAXR, Math.abs(px - centerX)));
   const strength = Math.min(0.6, 0.22 + dist * 0.02);
   const BRUSH = 6;
@@ -490,12 +495,13 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   ctx.fillRect(0, 0, W, H);
   ctx.globalCompositeOperation = "source-over";
   if (s.pointer && !s.collapsed) {
-    const d = ctx.createRadialGradient(s.pointer.x, s.pointer.y, 1, s.pointer.x, s.pointer.y, 28);
-    d.addColorStop(0, "rgba(0,0,0,.32)");
+    const py2 = s.pointer.y - s.offset;
+    const d = ctx.createRadialGradient(s.pointer.x, py2, 1, s.pointer.x, py2, 26);
+    d.addColorStop(0, "rgba(0,0,0,.3)");
     d.addColorStop(0.6, "rgba(0,0,0,.1)");
     d.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = d;
-    ctx.fillRect(s.pointer.x - 30, s.pointer.y - 30, 60, 60);
+    ctx.fillRect(s.pointer.x - 28, py2 - 28, 56, 56);
   }
   ctx.restore();
 
@@ -521,4 +527,19 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   ctx.lineWidth = 1.2;
   ctx.strokeStyle = "rgba(0,0,0,.4)";
   ctx.stroke();
+
+  // offset-touch handle: a cyan control dot ABOVE the fingertip, linked down to
+  // it — so the finger never covers the point being shaped or the ghost there.
+  if (s.pointer && !s.collapsed && s.offset > 0) {
+    const py2 = s.pointer.y - s.offset;
+    ctx.strokeStyle = "rgba(103,232,249,.6)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(s.pointer.x, s.pointer.y);
+    ctx.lineTo(s.pointer.x, py2 + 7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(s.pointer.x, py2, 6, 0, PI2);
+    ctx.stroke();
+  }
 }

@@ -223,7 +223,10 @@ function toggleGhost(){ showGhost=!showGhost; const b=document.getElementById('g
 
 // ---- input ----
 function evPos(e){ const r=canvas.getBoundingClientRect(); const p=(e.touches&&e.touches[0])||e; return {x:p.clientX-r.left,y:p.clientY-r.top}; }
-function down(e){ if(phase!=='shaping'||collapsed) return; e.preventDefault(); pointer=evPos(e); lastMove=performance.now(); }
+const OFFSET_Y=44; let touchOffset=0;
+// Prototype forces the offset on for BOTH mouse + touch so you can feel it on a
+// laptop. The real game (Clay.tsx) applies it only to touch (a mouse is precise).
+function down(e){ if(phase!=='shaping'||collapsed) return; e.preventDefault(); touchOffset=OFFSET_Y; pointer=evPos(e); lastMove=performance.now(); }
 function move(e){
   if(!pointer||phase!=='shaping'||collapsed) return; e.preventDefault();
   const p=evPos(e), now=performance.now(), dt=Math.max(1,now-lastMove);
@@ -237,7 +240,7 @@ canvas.addEventListener('touchstart',down,{passive:false}); canvas.addEventListe
 
 const BRUSH=6;
 function shapeAt(px,py,dist){
-  const i0=yToRow(py); const desired=Math.max(MINWALL,Math.min(MAXR,Math.abs(px-cx())));
+  const i0=yToRow(py-touchOffset); const desired=Math.max(MINWALL,Math.min(MAXR,Math.abs(px-cx())));
   const strength=Math.min(0.6,0.22+dist*0.02);
   for(let j=Math.max(0,i0-BRUSH); j<=Math.min(ROWS-1,i0+BRUSH); j++){
     const w=Math.exp(-Math.pow((j-i0)/(BRUSH*0.6),2)); const before=prof[j];
@@ -344,10 +347,11 @@ function draw(){
   let rad=ctx.createRadialGradient(sx,sy,3,sx,sy,MAXR*0.95); rad.addColorStop(0,'rgba(255,247,240,.5)'); rad.addColorStop(.45,'rgba(255,240,230,.12)'); rad.addColorStop(1,'rgba(255,240,230,0)');
   ctx.globalCompositeOperation='screen'; ctx.fillStyle=rad; ctx.fillRect(0,0,W,H); ctx.globalCompositeOperation='source-over';
   if(pointer && phase==='shaping' && !collapsed){
-    let d=ctx.createRadialGradient(pointer.x,pointer.y,1,pointer.x,pointer.y,28); d.addColorStop(0,'rgba(0,0,0,.32)'); d.addColorStop(.6,'rgba(0,0,0,.1)'); d.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=d; ctx.fillRect(pointer.x-30,pointer.y-30,60,60);
-    let hl=ctx.createRadialGradient(pointer.x-4,pointer.y-7,1,pointer.x-4,pointer.y-7,11); hl.addColorStop(0,'rgba(255,240,230,.45)'); hl.addColorStop(1,'rgba(255,240,230,0)');
-    ctx.globalCompositeOperation='screen'; ctx.fillStyle=hl; ctx.fillRect(pointer.x-16,pointer.y-18,32,32); ctx.globalCompositeOperation='source-over';
+    const py2=pointer.y-touchOffset;
+    let d=ctx.createRadialGradient(pointer.x,py2,1,pointer.x,py2,26); d.addColorStop(0,'rgba(0,0,0,.3)'); d.addColorStop(.6,'rgba(0,0,0,.1)'); d.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=d; ctx.fillRect(pointer.x-28,py2-28,56,56);
+    let hl=ctx.createRadialGradient(pointer.x-4,py2-7,1,pointer.x-4,py2-7,11); hl.addColorStop(0,'rgba(255,240,230,.45)'); hl.addColorStop(1,'rgba(255,240,230,0)');
+    ctx.globalCompositeOperation='screen'; ctx.fillStyle=hl; ctx.fillRect(pointer.x-16,py2-18,32,32); ctx.globalCompositeOperation='source-over';
   }
   ctx.restore();
   // rim
@@ -358,6 +362,14 @@ function draw(){
   ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,ir,ir*0.24,0,Math.PI*0.06,Math.PI*0.94); ctx.stroke();
   ctx.strokeStyle='rgba(255,224,205,.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(cxi,yr,r0,r0*0.24,0,Math.PI*1.06,Math.PI*1.94); ctx.stroke();
   potPath(); ctx.lineWidth=1.2; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.stroke();
+
+  // offset-touch handle: cyan control dot ABOVE the fingertip, linked down to it
+  if(pointer && phase==='shaping' && !collapsed && touchOffset>0){
+    const py2=pointer.y-touchOffset;
+    ctx.strokeStyle='rgba(103,232,249,.6)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(pointer.x,pointer.y); ctx.lineTo(pointer.x,py2+7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(pointer.x,py2,6,0,PI2); ctx.stroke();
+  }
 
   if(phase==='shaping') drawReference();
 }
