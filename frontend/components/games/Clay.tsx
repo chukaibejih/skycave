@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth, useRoom } from "@/lib/store";
 
 // Clay's gameplay is a canvas; the server issues the target and scores the
@@ -57,6 +58,7 @@ export function Clay() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const S = useRef<Sim | null>(null);
+  const cardRef = useRef<HTMLCanvasElement | null>(null);
   const submittedRef = useRef(false);
   const [glazeColor, setGlazeColor] = useState<string | null>(null);
   const [hud, setHud] = useState({ match: 0, stability: 100, time: 0 });
@@ -234,6 +236,12 @@ export function Clay() {
     return () => cancelAnimationFrame(raf);
   }, [phase, roundEndsAt, submitPot]);
 
+  // Draw the share card (TARGET vs YOURS + score) once the game ends.
+  useEffect(() => {
+    if (!gameEnd || !S.current || !cardRef.current) return;
+    drawCard(cardRef.current, S.current, gameEnd.scores[meId ?? ""] ?? 0, target?.name ?? "");
+  }, [gameEnd, meId, target?.name]);
+
   const fire = () => submitPot(true);
 
   if (!target) {
@@ -281,23 +289,37 @@ export function Clay() {
         <canvas ref={canvasRef} className="block w-full" />
 
         {gameEnd && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[rgba(5,6,10,.82)] p-6 text-center backdrop-blur-sm">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[rgba(5,6,10,.82)] p-5 text-center backdrop-blur-sm">
             <b className="font-[var(--font-display)] text-xl font-bold">{outcome}</b>
-            <div className="font-[var(--font-display)] text-5xl font-extrabold" style={{ color: "var(--color-primary)" }}>{myScore}</div>
+            <canvas ref={cardRef} width={640} height={360} className="w-[290px] rounded-[12px] border border-[var(--color-border)]" />
             {!isSolo && oppScore != null && (
               <div className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">you {myScore} · opponent {oppScore}</div>
             )}
-            <div className="mt-2 flex gap-2">
+            <div className="mt-1 flex gap-2">
               {isSolo && (
                 <a
                   href="/play/clay"
-                  className="grid h-11 place-items-center rounded-[12px] px-5 text-sm font-semibold"
+                  className="grid h-11 place-items-center rounded-[12px] px-4 text-sm font-semibold"
                   style={{ background: "var(--color-primary)", color: "#05060a" }}
                 >
                   Play again
                 </a>
               )}
-              <Link href="/" className="grid h-11 place-items-center rounded-[12px] border px-5 text-sm font-semibold" style={{ borderColor: "var(--color-border)" }}>
+              <button
+                onClick={() => {
+                  const line = isSolo
+                    ? `Shaped a ${target.name} on Clay · ${myScore} pts.`
+                    : outcome === "you win"
+                      ? `Won a Clay pot-off · ${myScore} pts.`
+                      : `Clay pot-off · ${myScore} pts.`;
+                  shareToBluesky(`${line}\n\nskycave.space`);
+                }}
+                className="grid h-11 place-items-center rounded-[12px] px-4 text-sm font-semibold"
+                style={{ background: "#1185FE", color: "#fff" }}
+              >
+                Share
+              </button>
+              <Link href="/" className="grid h-11 place-items-center rounded-[12px] border px-4 text-sm font-semibold" style={{ borderColor: "var(--color-border)" }}>
                 Hub
               </Link>
             </div>
@@ -626,4 +648,53 @@ function drawRef(ctx: CanvasRenderingContext2D, s: Sim, W: number) {
   ctx.textAlign = "left";
   ctx.restore();
   void W;
+}
+
+// The shareable score card: TARGET vs YOURS pots side by side + the score.
+function drawCard(canvas: HTMLCanvasElement, s: Sim, score: number, name: string) {
+  const g = canvas.getContext("2d");
+  if (!g) return;
+  const CW = canvas.width;
+  const CH = canvas.height;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const bg = g.createLinearGradient(0, 0, CW, CH);
+  bg.addColorStop(0, "#0b0e16");
+  bg.addColorStop(1, "#12101a");
+  g.fillStyle = bg;
+  g.fillRect(0, 0, CW, CH);
+  g.fillStyle = "rgba(139,124,255,.16)";
+  g.fillRect(0, 0, CW, 6);
+  g.textBaseline = "alphabetic";
+  g.fillStyle = "#f5f7ff";
+  g.font = "700 30px system-ui, sans-serif";
+  g.fillText("Clay", 30, 52);
+  g.fillStyle = "#9aa3ba";
+  g.font = "500 17px ui-monospace, monospace";
+  g.fillText(name, 30, 80);
+  g.fillStyle = "#8b7cff";
+  g.font = "800 52px system-ui, sans-serif";
+  g.textAlign = "right";
+  g.fillText(String(score), CW - 30, 64);
+  g.fillStyle = "#9aa3ba";
+  g.font = "500 14px ui-monospace, monospace";
+  g.fillText("points", CW - 30, 86);
+  g.textAlign = "left";
+  miniPotAt(g, s, CW * 0.32, 108, 150, 208, s.target, s.tglaze, "TARGET");
+  miniPotAt(g, s, CW * 0.68, 108, 150, 208, s.prof, s.glaze, "YOURS");
+  g.fillStyle = "#5c657c";
+  g.font = "500 14px ui-monospace, monospace";
+  g.textAlign = "center";
+  g.fillText("skycave.space", CW / 2, CH - 16);
+  g.textAlign = "left";
+}
+function miniPotAt(g: CanvasRenderingContext2D, s: Sim, cxp: number, top: number, w: number, h: number, P: number[], G: (string | null)[], label: string) {
+  g.save();
+  g.translate(0, top);
+  miniPot(g, s, cxp, w, h, P, G);
+  g.restore();
+  g.fillStyle = "#9aa3ba";
+  g.font = "600 13px ui-monospace, monospace";
+  g.textAlign = "center";
+  g.fillText(label, cxp, top + h + 18);
+  g.textAlign = "left";
 }
