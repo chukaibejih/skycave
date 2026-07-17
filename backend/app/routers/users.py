@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +12,8 @@ from app.schemas.rest import (
     ProfileRecent,
     ProfileResponse,
     ProfileRival,
+    RankingEntry,
+    RankingResponse,
     UserStats,
 )
 
@@ -57,6 +59,41 @@ async def user_stats(did: str, db: AsyncSession = Depends(get_db)) -> UserStats:
     )
 
 
+@router.get("/ranking", response_model=RankingResponse)
+async def ranking(db: AsyncSession = Depends(get_db), limit: int = 500) -> RankingResponse:
+    """Global player ranking: 1v1 wins, then total score (same order as the
+    profile rank). Inactive accounts (no games, no score) are omitted; they never
+    outrank an active player, so the ranks of everyone shown are unaffected."""
+    rank_col = func.rank().over(
+        order_by=(User.games_won.desc(), User.total_score.desc())
+    ).label("rank")
+    rows = (
+        await db.execute(
+            select(
+                rank_col,
+                User.did,
+                User.handle,
+                User.display_name,
+                User.avatar_url,
+                User.games_won,
+                User.total_score,
+            )
+            .where(or_(User.games_played > 0, User.total_score > 0))
+            .order_by(User.games_won.desc(), User.total_score.desc(), User.handle)
+            .limit(limit)
+        )
+    ).all()
+    return RankingResponse(
+        entries=[
+            RankingEntry(
+                rank=r[0], did=r[1], handle=r[2], display_name=r[3],
+                avatar_url=r[4], games_won=r[5], total_score=r[6],
+            )
+            for r in rows
+        ]
+    )
+
+
 @router.get("/handle/{handle}/profile", response_model=ProfileResponse)
 async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileResponse:
     """Public player profile, resolved by Bluesky handle."""
@@ -65,7 +102,24 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
         raise HTTPException(status_code=404, detail="Player not found")
     did = user.did
     win_rate = (user.games_won / user.games_played) if user.games_played else 0.0
-    rank = (await db.scalar(select(func.count()).select_from(User).where(User.games_won > user.games_won)) or 0) + 1
+    # Rank by 1v1 wins, then total score as the tiebreak (a player ranks above
+    # you if they have more wins, or the same wins but a higher total score).
+    rank = (
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(
+                or_(
+                    User.games_won > user.games_won,
+                    and_(
+                        User.games_won == user.games_won,
+                        User.total_score > user.total_score,
+                    ),
+                )
+            )
+        )
+        or 0
+    ) + 1
 
     # 1v1 vs solo split. games_played counts every mode; solo has no winner, so a
     # single "win rate" over all games is diluted by practice runs. Report the

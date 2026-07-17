@@ -165,6 +165,18 @@ export interface Profile {
 export const getProfile = (handle: string) =>
   request<Profile>(`/users/handle/${encodeURIComponent(handle)}/profile`);
 
+export interface RankingEntry {
+  rank: number;
+  did: string;
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  games_won: number;
+  total_score: number;
+}
+export const getRanking = () =>
+  request<{ entries: RankingEntry[] }>("/users/ranking");
+
 // ── Rooms ──
 export const createRoom = (
   gameType: string,

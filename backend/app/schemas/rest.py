@@ -343,3 +343,17 @@ class AdminFeedbackResponse(BaseModel):
 
 class FeedbackResolveRequest(BaseModel):
     resolved: bool
+
+
+class RankingEntry(BaseModel):
+    rank: int
+    did: str
+    handle: str
+    display_name: str | None
+    avatar_url: str | None
+    games_won: int
+    total_score: int
+
+
+class RankingResponse(BaseModel):
+    entries: list[RankingEntry]
