@@ -216,8 +216,9 @@ export function Clay() {
         else if (phase === "play") stepPhysics(s, dt);
         draw(ctx, s, canvasRef.current!.clientWidth, 470, phase);
 
-        // timer + auto-fire
-        const left = roundEndsAt ? Math.max(0, roundEndsAt - now / 1000) : 0;
+        // timer + auto-fire. roundEndsAt is a Unix-epoch time (seconds), so it
+        // must be compared to Date.now(), NOT the rAF/performance clock.
+        const left = roundEndsAt ? Math.max(0, roundEndsAt - Date.now() / 1000) : 0;
         if (phase === "play" && left <= 0.8 && !submittedRef.current) submitPot(true);
         setHud((h) => {
           const match = s.collapsed ? 0 : Math.round(shapeMatch(s) * 100);
@@ -258,7 +259,7 @@ export function Clay() {
             : "you lose";
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col justify-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       <div className="flex items-center gap-4 py-3">
         <Stat v={`${hud.match}%`} l="match" color={hud.match > 90 ? "var(--color-success)" : hud.match > 70 ? "var(--color-gold)" : "var(--color-text-primary)"} />
         <Stat v={`${hud.time}`} l="seconds" color={hud.time <= 10 ? "var(--color-warm)" : "var(--color-text-primary)"} />
@@ -542,4 +543,87 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
     ctx.arc(s.pointer.x, py2, 6, 0, PI2);
     ctx.stroke();
   }
+
+  if (!s.collapsed) drawRef(ctx, s, W);
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// A small colored render of the target pot (the "reference image").
+function miniPot(ctx: CanvasRenderingContext2D, s: Sim, cxp: number, w: number, h: number, P: number[], G: (string | null)[]) {
+  const yt = 6;
+  const ph = h - 12;
+  const scale = (w * 0.4) / s.MAXR;
+  let t0 = 0;
+  while (t0 < s.ROWS - 1 && P[t0] < CLAY_MIN) t0++;
+  const R = (i: number) => P[i] * scale;
+  const Y = (i: number) => yt + (i / (s.ROWS - 1)) * ph;
+  ctx.beginPath();
+  ctx.moveTo(cxp + R(t0), Y(t0));
+  for (let i = t0 + 1; i < s.ROWS; i++) ctx.lineTo(cxp + R(i), Y(i));
+  for (let i = s.ROWS - 1; i >= t0; i--) ctx.lineTo(cxp - R(i), Y(i));
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  const base = ctx.createLinearGradient(cxp - w / 2, 0, cxp + w / 2, 0);
+  base.addColorStop(0, "#4a1c12");
+  base.addColorStop(0.4, "#b84a30");
+  base.addColorStop(0.5, "#e0714f");
+  base.addColorStop(0.62, "#b84a30");
+  base.addColorStop(1, "#54200f");
+  ctx.fillStyle = base;
+  ctx.fillRect(cxp - w / 2, 0, w, h);
+  for (let i = t0; i < s.ROWS; i++) {
+    if (!G[i]) continue;
+    ctx.globalAlpha = 0.62;
+    ctx.fillStyle = G[i] as string;
+    ctx.fillRect(cxp - w / 2, Y(i) - 2, w, ph / s.ROWS + 2);
+  }
+  ctx.globalAlpha = 1;
+  const vg = ctx.createLinearGradient(0, yt, 0, yt + ph);
+  vg.addColorStop(0, "rgba(255,240,230,.14)");
+  vg.addColorStop(0.5, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,.3)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(cxp - w / 2, 0, w, h);
+  ctx.restore();
+  const r0 = R(t0);
+  ctx.fillStyle = "#2a120b";
+  ctx.beginPath();
+  ctx.ellipse(cxp, Y(t0), r0, r0 * 0.22, 0, 0, PI2);
+  ctx.fill();
+}
+
+// Pinned colored TARGET reference in the top-left corner (opposite the rim).
+function drawRef(ctx: CanvasRenderingContext2D, s: Sim, W: number) {
+  const pw = 74;
+  const ph = 104;
+  const px = 10;
+  const py = 10;
+  ctx.save();
+  ctx.fillStyle = "rgba(8,10,16,.82)";
+  roundRect(ctx, px, py, pw, ph, 10);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(40,48,68,.9)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(px, py + 2);
+  miniPot(ctx, s, pw / 2, pw, ph - 22, s.target, s.tglaze);
+  ctx.restore();
+  ctx.fillStyle = "#9aa3ba";
+  ctx.font = "600 9px 'Geist Mono', ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("TARGET", px + pw / 2, py + ph - 7);
+  ctx.textAlign = "left";
+  ctx.restore();
+  void W;
 }
