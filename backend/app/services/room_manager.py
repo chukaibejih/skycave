@@ -65,7 +65,7 @@ async def create_room(
         "game_type": game_type,
         # "versus" = 1v1 (waits for an opponent); "solo" = single-player, starts
         # as soon as the lone player is ready.
-        "mode": mode if mode in ("versus", "solo") else "versus",
+        "mode": mode if mode in ("versus", "solo", "daily") else "versus",
         "status": "waiting",
         "host_id": host["id"],
         "host_handle": host["handle"],

@@ -88,7 +88,7 @@ async def start_game(room_id: str) -> None:
         if room["status"] == "in_progress":
             return  # already running (guard against duplicate READY)
 
-        is_solo = room.get("mode") == "solo"
+        is_solo = room.get("mode") in ("solo", "daily")  # both are single-player
         solo_kind = game.solo_kind if is_solo else "rounds"
         scores = {p["id"]: 0 for p in room["players"]}
         game_state = {
@@ -107,6 +107,7 @@ async def start_game(room_id: str) -> None:
             "round_ends_at": None,
             "last_result": None,
             "solo_state": None,     # per-session private state (words used, level)
+            "daily": room.get("mode") == "daily",  # Daily Pot: date-seeded + bonus
         }
         if game.mode == TURN_BASED:
             # One evolving board, no rounds. Solo adds a synthetic "ai" opponent.
@@ -229,7 +230,7 @@ async def handle_action(
         # Single-player continuous sessions have their own driver. It returns
         # True when the run is over (a ladder miss) — we end *outside* the lock
         # because end_game re-acquires it (asyncio locks aren't reentrant).
-        if room.get("mode") == "solo" and gs.get("solo_kind") in (
+        if room.get("mode") in ("solo", "daily") and gs.get("solo_kind") in (
             "timed",
             "words",
             "ladder",
@@ -407,8 +408,14 @@ async def _solo_begin(room_id: str) -> None:
         now = time.time()
 
         if kind in ("timed", "words", "canvas"):
-            duration = game.solo_duration
-            public, secret = game.new_round(1)
+            daily = gs.get("daily")
+            if daily and hasattr(game, "new_round_seeded"):
+                seed = int(time.strftime("%Y%m%d", time.gmtime()))
+                public, secret = game.new_round_seeded(1, seed)
+                duration = float(public.get("round_time", game.solo_duration))
+            else:
+                duration = game.solo_duration
+                public, secret = game.new_round(1)
             public = {**public, "round_time": duration}
             gs["round"] = 1
             gs["round_data"] = public
@@ -526,6 +533,8 @@ async def _solo_handle(room: dict[str, Any], game, player_id: str, action: dict)
         # target (reusing resolve, so scoring stays in the game class). The
         # latest submission wins; `fired` ends the run early (else the timer does).
         pts = game.resolve(public, secret, {player_id: action}).get(player_id, 0)
+        if gs.get("daily"):
+            pts += getattr(game, "daily_bonus", 0)  # Daily Pot bonus
         gs["scores"][player_id] = pts
         await rooms.save_room(room)
         await manager.send(room_id, player_id, events.message(
@@ -670,7 +679,7 @@ async def end_game(room_id: str) -> None:
         if _tb_game and _tb_game.mode == TURN_BASED and gs.get("turn_state"):
             gs["scores"] = _tb_game.turn_scores(gs["turn_state"])
         scores = gs["scores"]
-        is_solo = room.get("mode") == "solo"
+        is_solo = room.get("mode") in ("solo", "daily")
         room["status"] = "finished"
         gs["phase"] = "finished"
         # Clear ready flags so a rematch starts clean.
@@ -732,12 +741,12 @@ async def _persist_game(
     gs = room["game"]
     scores = gs["scores"]
     p1 = players[0]
-    p2 = players[1] if len(players) > 1 and mode != "solo" else None
+    p2 = players[1] if len(players) > 1 and mode not in ("solo", "daily") else None
 
-    # Round-by-round breakdown for the (1v1) score card; solo has no card.
+    # Round-by-round breakdown for the (1v1) score card; solo/daily have no card.
     rounds = (
         []
-        if mode == "solo"
+        if mode in ("solo", "daily")
         else [
             {
                 "round": h["round"],

@@ -137,21 +137,30 @@ class Clay(BaseGame):
     solo_kind = "canvas"   # client submits a shaped pot; engine scores it
     solo_duration = 60.0
 
+    daily_bonus = 150      # added to the Daily Pot score (return/participation)
+    daily_duration = 45.0  # the Daily Pot is shorter
+
     def _pick(self, round_number: int) -> int:
-        """Which target this round. Random for solo/1v1; the Daily Pot overrides
-        this with a date seed so everyone gets the same pot that day."""
+        """Which target this round. Random for solo/1v1; the Daily Pot uses a
+        date seed instead so everyone gets the same pot that day."""
         return random.randrange(len(TARGETS))
 
-    def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        idx = self._pick(round_number)
+    def _build(self, idx: int, round_time: float) -> tuple[dict[str, Any], dict[str, Any]]:
         radius, glaze = target_arrays(idx)
         public = {
             "target": {"name": TARGETS[idx][0], "radius": radius, "glaze": glaze},
             "rows": ROWS,
             "max_r": MAXR,
-            "round_time": self.round_time,
+            "round_time": round_time,
         }
         return public, {"idx": idx}
+
+    def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        return self._build(self._pick(round_number), self.round_time)
+
+    def new_round_seeded(self, round_number: int, seed: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Deterministic target for the Daily Pot — same pot for everyone that day."""
+        return self._build(seed % len(TARGETS), self.daily_duration)
 
     def resolve(
         self,

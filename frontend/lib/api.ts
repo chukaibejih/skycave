@@ -180,7 +180,7 @@ export const getRanking = () =>
 // ── Rooms ──
 export const createRoom = (
   gameType: string,
-  mode: "versus" | "solo" = "versus"
+  mode: "versus" | "solo" | "daily" = "versus"
 ) =>
   request<Room>("/rooms", {
     method: "POST",

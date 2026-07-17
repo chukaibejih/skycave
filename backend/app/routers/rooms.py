@@ -66,7 +66,25 @@ async def create_room(
     game = get_game(body.game_type)
     if game is None:
         raise HTTPException(status_code=400, detail="Unknown game type")
-    mode = body.mode if body.mode in ("versus", "solo") else "versus"
+    mode = body.mode if body.mode in ("versus", "solo", "daily") else "versus"
+
+    # Daily Pot: one per UTC day for logged-in players (guests aren't tracked).
+    if mode == "daily" and not identity.id.startswith("guest:"):
+        from datetime import datetime, timezone
+        from sqlalchemy import func, select
+        from app.models import GameSession
+
+        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        played = await db.scalar(
+            select(func.count()).select_from(GameSession).where(
+                GameSession.player1_id == identity.id,
+                GameSession.game_type == body.game_type,
+                GameSession.mode == "daily",
+                GameSession.created_at >= start,
+            )
+        )
+        if played:
+            raise HTTPException(status_code=409, detail="You already played today's pot. Come back tomorrow.")
 
     # Generate a unique room id (retry on the rare collision).
     for _ in range(5):

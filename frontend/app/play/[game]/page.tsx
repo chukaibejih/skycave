@@ -7,7 +7,7 @@ import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
 import { preloadGlobe } from "@/components/games/GlobePicker";
-import { createRoom } from "@/lib/api";
+import { ApiError, createRoom } from "@/lib/api";
 import { gameTypeFromSlug } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
@@ -23,6 +23,7 @@ export default function PlayPage() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [gameName, setGameName] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [dailyDone, setDailyDone] = useState<string | null>(null);
   const startedRef = useRef(false);
   const readiedRef = useRef(false);
 
@@ -40,13 +41,19 @@ export default function PlayPage() {
     startedRef.current = true;
     (async () => {
       try {
-        const r = await createRoom(gameType, "solo");
+        const mode =
+          new URLSearchParams(window.location.search).get("mode") === "daily" ? "daily" : "solo";
+        const r = await createRoom(gameType, mode);
         setRoomId(r.id);
         setGameName(r.game_name ?? null);
         connect(r.id);
-      } catch {
+      } catch (e) {
         startedRef.current = false;
-        setError(true);
+        if (e instanceof ApiError && e.status === 409) {
+          setDailyDone(e.message || "You already played today's pot.");
+        } else {
+          setError(true);
+        }
       }
     })();
     return () => {
@@ -77,6 +84,19 @@ export default function PlayPage() {
       return () => clearTimeout(t);
     }
   }, [gameEnd, roomId, room, router, gameType]);
+
+  if (dailyDone) {
+    return (
+      <Centered>
+        <h1 className="font-[var(--font-display)] text-2xl font-semibold">Today&apos;s pot is done.</h1>
+        <p className="max-w-sm text-[var(--color-text-secondary)]">{dailyDone}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => router.push("/play/clay")}>Play solo</Button>
+          <Button variant="secondary" onClick={() => router.push("/")}>Hub</Button>
+        </div>
+      </Centered>
+    );
+  }
 
   if (error) {
     return (

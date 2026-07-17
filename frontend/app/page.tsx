@@ -25,7 +25,7 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   // Game whose mode is being chosen, and the pending {game, mode} awaiting auth.
   const [chooser, setChooser] = useState<GameInfo | null>(null);
-  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" } | null>(null);
+  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" | "daily" } | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Instant dock + signal from the cached catalog (rendered before paint), so
@@ -54,10 +54,11 @@ export default function Home() {
       .catch(() => {});
   }, [hydrate]);
 
-  const go = async (game: GameInfo, m: "versus" | "solo") => {
-    if (m === "solo") {
-      // Solo skips the lobby — the /play route creates the room + drops in.
-      router.push(`/play/${gameSlug(game.type)}`);
+  const go = async (game: GameInfo, m: "versus" | "solo" | "daily") => {
+    if (m === "solo" || m === "daily") {
+      // Solo + daily skip the lobby — the /play route creates the room + drops
+      // in. Daily passes ?mode=daily so /play creates a daily room.
+      router.push(`/play/${gameSlug(game.type)}${m === "daily" ? "?mode=daily" : ""}`);
       return;
     }
     setCreating(true);
@@ -73,7 +74,7 @@ export default function Home() {
   // reference so the memoized orbit/cards don't re-render on modal open/close.
   const launch = useCallback((game: GameInfo) => setChooser(game), []);
 
-  const choose = async (game: GameInfo, m: "versus" | "solo") => {
+  const choose = async (game: GameInfo, m: "versus" | "solo" | "daily") => {
     setChooser(null);
     if (!identity) {
       setPending({ game, mode: m }); // auth first, then launch
@@ -354,7 +355,7 @@ function ModeChooser({
 }: {
   game: GameInfo | null;
   onClose: () => void;
-  onChoose: (game: GameInfo, mode: "versus" | "solo") => void;
+  onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily") => void;
 }) {
   return (
     <AnimatePresence>
@@ -391,6 +392,21 @@ function ModeChooser({
                 Solo
               </button>
             </div>
+            {game.type === "clay" && (
+              <button
+                onClick={() => onChoose(game, "daily")}
+                className="mt-3 flex h-16 w-full flex-col items-center justify-center rounded-[var(--radius-card)] border font-[var(--font-display)] active:brightness-110"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--color-warm) 55%, transparent)",
+                  background: "color-mix(in srgb, var(--color-warm) 12%, transparent)",
+                }}
+              >
+                <span className="text-lg font-bold">Daily Pot</span>
+                <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  once a day · 45s · bonus
+                </span>
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}
