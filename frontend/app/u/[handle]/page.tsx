@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
+import { RankModal } from "@/components/ui/RankModal";
 import { getProfile, type Profile } from "@/lib/api";
 import { shareToBluesky } from "@/lib/bluesky";
 import { gameName } from "@/lib/gameNames";
@@ -39,6 +40,7 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
+  const [rankOpen, setRankOpen] = useState(false);
 
   useEffect(() => {
     setState("loading");
@@ -100,14 +102,36 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stat tiles */}
+        {/* Stat tiles — the rank tile opens the overall ranking */}
         <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-[14px] border p-3 text-center sm:p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
-              <div className="font-[var(--font-display)] text-2xl font-bold sm:text-3xl">{s.value}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide" style={{ color: MUTED }}>{s.label}</div>
-            </div>
-          ))}
+          {stats.map((s) => {
+            const inner = (
+              <>
+                <div className="font-[var(--font-display)] text-2xl font-bold sm:text-3xl">{s.value}</div>
+                <div className="mt-1 text-[11px] uppercase tracking-wide" style={{ color: MUTED }}>{s.label}</div>
+              </>
+            );
+            const box = { borderColor: "var(--color-border)", background: "var(--color-surface)" };
+            if (s.label === "rank") {
+              return (
+                <button
+                  key={s.label}
+                  onClick={() => setRankOpen(true)}
+                  className="rounded-[14px] border p-3 text-center transition-colors hover:border-[var(--color-primary)] sm:p-4"
+                  style={box}
+                  aria-label="See the overall ranking"
+                >
+                  {inner}
+                  <div className="mt-0.5 text-[9px]" style={{ color: "var(--color-primary)" }}>tap to see</div>
+                </button>
+              );
+            }
+            return (
+              <div key={s.label} className="rounded-[14px] border p-3 text-center sm:p-4" style={box}>
+                {inner}
+              </div>
+            );
+          })}
         </div>
 
         {/* 1v1 / solo breakdown — spells out what the tiles summarize */}
@@ -189,6 +213,7 @@ export default function ProfilePage() {
           </Section>
         )}
       </motion.div>
+      <RankModal open={rankOpen} onClose={() => setRankOpen(false)} meHandle={p.handle} />
     </Shell>
   );
 }
