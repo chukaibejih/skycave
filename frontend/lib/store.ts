@@ -148,7 +148,7 @@ export const useRoom = create<RoomState>((set, get) => ({
           room.status === "finished" && room.game
             ? {
                 scores: room.game.scores,
-                winner_id: null,
+                winner_id: (room.game as { winner_id?: string | null }).winner_id ?? null,
                 history: room.game.history,
                 players: room.players,
                 series: room.series ?? {},

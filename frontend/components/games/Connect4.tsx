@@ -173,13 +173,22 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
                           <motion.span
                             key={`${gen}-${i}`}
                             initial={isFresh ? { y: "-360%", opacity: 0.6 } : false}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ type: "spring", stiffness: 460, damping: 26 }}
+                            animate={
+                              winCells.has(i)
+                                ? { y: 0, opacity: 1, scale: [1, 1.16, 1] }
+                                : { y: 0, opacity: won && !winCells.has(i) ? 0.4 : 1, scale: 1 }
+                            }
+                            transition={
+                              winCells.has(i)
+                                ? { scale: { duration: 0.66, repeat: Infinity, ease: "easeInOut" }, opacity: { duration: 0.3 } }
+                                : { type: "spring", stiffness: 460, damping: 26, opacity: { duration: 0.4 } }
+                            }
                             className="absolute inset-0 rounded-full"
                             style={{
                               background: colorFor(o),
+                              zIndex: winCells.has(i) ? 2 : 1,
                               boxShadow: winCells.has(i)
-                                ? `0 0 0 2px #fff, 0 0 12px ${colorFor(o)}`
+                                ? `0 0 0 3px #fff, 0 0 20px ${colorFor(o)}, 0 0 34px ${colorFor(o)}`
                                 : `inset 0 2px 3px rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.5)`,
                             }}
                           />

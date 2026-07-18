@@ -312,6 +312,11 @@ async def handle_action(
 # Turn-based driver (Tile Takeover)
 # --------------------------------------------------------------------------- #
 
+# Hold on the final board (winning line highlighted) before the results screen,
+# so a game like Connect 4 doesn't snap to the score the instant someone wins.
+_TURN_END_HOLD = 2.6
+
+
 async def _turn_begin(room_id: str) -> None:
     """Open a turn-based game: go active and broadcast the initial board."""
     async with rooms.room_lock(room_id):
@@ -343,7 +348,10 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
         room_id, events.message(events.GAME_STATE, game.turn_public(new))
     )
     if game.turn_over(new):
-        return True
+        # Hold on the finished board before the score screen (see _TURN_END_HOLD).
+        # apply_turn already rejects further moves once there's a winner/full board.
+        _schedule(room_id, _TURN_END_HOLD, lambda: end_game(room_id))
+        return False
     # Solo: the AI replies after a short beat so the player sees their move land.
     if gs.get("turn_ai") and new["turn"] == gs["turn_ai"]:
         _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
@@ -383,7 +391,7 @@ async def _turn_ai_move(room_id: str) -> None:
         end_after = game.turn_over(new)
         again = not end_after and new["turn"] == ai  # AI earned a bonus move
     if end_after:
-        await end_game(room_id)
+        _schedule(room_id, _TURN_END_HOLD, lambda: end_game(room_id))  # dramatic hold
     elif again:
         _schedule(room_id, 0.5, lambda: _turn_ai_move(room_id))
 
@@ -671,6 +679,7 @@ async def end_game(room_id: str) -> None:
         # Running series tally across rematches in this room (versus only). A draw
         # advances nobody. Persisted on the room so a rejoin/reconnect sees it.
         winner_id = None if is_solo else _decide_winner(scores)
+        gs["winner_id"] = winner_id  # so a ROOM_STATE rehydrate keeps the result
         if winner_id:
             series = room.setdefault("series", {})
             series[winner_id] = series.get(winner_id, 0) + 1

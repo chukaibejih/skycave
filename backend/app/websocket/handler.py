@@ -54,6 +54,7 @@ def _public_room(room: dict, player_id: str) -> dict:
             "round_ends_at": game.get("round_ends_at"),
             "last_result": game.get("last_result"),
             "solo_summary": game.get("solo_summary"),
+            "winner_id": game.get("winner_id"),  # keep the result on rehydrate
             "my_round_state": {
                 "locked": prior == "locked",
                 "submitted": prior is not None,

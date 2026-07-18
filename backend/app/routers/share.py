@@ -25,6 +25,7 @@ async def scorecard(body: ScorecardRequest) -> ScorecardResponse:
 
     p1, p2 = players[0], players[1]
     scores = gs["scores"]
+    series = room.get("series", {})
     text = scorecard_text(
         game_name,
         p1["display_name"],
@@ -32,6 +33,8 @@ async def scorecard(body: ScorecardRequest) -> ScorecardResponse:
         p2["display_name"],
         scores.get(p2["id"], 0),
         room["id"],
+        p1_series=series.get(p1["id"], 0),
+        p2_series=series.get(p2["id"], 0),
     )
     # image_url is Phase 2 (R2 / Playwright OG image generation).
     return ScorecardResponse(text=text, intent_url=compose_intent(text), image_url=None)

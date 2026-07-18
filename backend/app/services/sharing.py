@@ -43,14 +43,21 @@ def scorecard_text(
     p2_score: int,
     room_id: str,
     when: date | None = None,
+    p1_series: int = 0,
+    p2_series: int = 0,
 ) -> str:
     when = when or date.today()
-    # e.g. "GeoGuess 1v1 on Skycave · Jun 27"
-    header = f"{game_name} on Skycave · {when.strftime('%b %-d')}"
+    # A rematch series (more than one decided game in the room): post the running
+    # aggregate, not just the last game.
+    series_total = p1_series + p2_series
+    if series_total > 1:
+        header = f"{game_name} on Skycave · series"
+        a, b = p1_series, p2_series
+    else:
+        # e.g. "GeoGuess 1v1 on Skycave · Jun 27"
+        header = f"{game_name} on Skycave · {when.strftime('%b %-d')}"
+        a, b = p1_score, p2_score
     # Align the two score lines on a simple column.
     width = max(len(p1_handle), len(p2_handle)) + 3
-    body = (
-        f"{p1_handle.ljust(width)}{p1_score}\n"
-        f"{p2_handle.ljust(width)}{p2_score}"
-    )
+    body = f"{p1_handle.ljust(width)}{a}\n{p2_handle.ljust(width)}{b}"
     return f"{header}\n\n{body}\n\nyour turn:\n{results_url(room_id)}"
