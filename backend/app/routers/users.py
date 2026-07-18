@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.games.registry import get_game
 from app.models import GameSession, PersonalBest, User
 from app.schemas.rest import (
     Badge,
@@ -20,23 +23,70 @@ from app.schemas.rest import (
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _profile_badges(user: User, bests: list[ProfileGame]) -> list[Badge]:
-    """Lightweight milestones derived from existing stats (no extra tables)."""
+def _profile_badges(
+    user: User,
+    bests: list[ProfileGame],
+    versus_played: int,
+    versus_won: int,
+    solo_played: int,
+    rivals: list[ProfileRival],
+) -> list[Badge]:
+    """Milestones derived from existing stats (no badge table — recomputed live,
+    so a badge can also disappear if the stat behind it falls back)."""
     badges: list[Badge] = []
+
+    # Volume tier: only the highest one you qualify for is shown.
     for n, label in ((500, "Legend"), (100, "Century"), (50, "Regular"), (10, "Getting started")):
         if user.games_played >= n:
             badges.append(Badge(key=f"games_{n}", label=label, detail=f"{n}+ games played"))
             break
+
     if user.games_won >= 1:
-        badges.append(Badge(key="first_win", label="First win", detail="won your first match"))
+        badges.append(Badge(key="first_win", label="First win", detail="won your first 1v1"))
     if user.games_won >= 50:
-        badges.append(Badge(key="wins_50", label="Sharpshooter", detail="50+ wins"))
-    if user.games_played >= 20 and (user.games_won / user.games_played) >= 0.6:
-        badges.append(Badge(key="on_a_tear", label="On a tear", detail="60%+ win rate"))
+        badges.append(Badge(key="wins_50", label="Sharpshooter", detail="50+ 1v1 wins"))
+
+    # Form, over 1v1 games ONLY — solo runs must not dilute the rate.
+    if versus_played >= 20 and (versus_won / versus_played) >= 0.6:
+        badges.append(Badge(key="on_a_tear", label="On a tear", detail="60%+ 1v1 win rate"))
+
+    # Commitment to each side of the game.
+    if versus_played >= 25:
+        badges.append(Badge(key="duelist", label="Duelist", detail=f"{versus_played} 1v1 games"))
+    if solo_played >= 25:
+        badges.append(Badge(key="soloist", label="Soloist", detail=f"{solo_played} solo runs"))
+
+    # Breadth: how many different games they've actually put a score on.
+    if len(bests) >= 5:
+        badges.append(Badge(key="explorer", label="Explorer", detail=f"scored in {len(bests)} different games"))
+
+    # A real head-to-head rivalry.
+    if rivals:
+        top_rival = max(rivals, key=lambda r: r.games)
+        if top_rival.games >= 5:
+            badges.append(Badge(
+                key="nemesis", label="Nemesis",
+                detail=f"{top_rival.games} games vs @{top_rival.handle}",
+            ))
+
+    if user.total_score >= 10_000:
+        badges.append(Badge(key="stacked", label="Stacked", detail=f"{user.total_score:,} total points"))
+
+    # Time served.
+    created = user.created_at
+    if created is not None:
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        days = (datetime.now(timezone.utc) - created).days
+        if days >= 30:
+            badges.append(Badge(key="veteran", label="Veteran", detail=f"{days} days in the cave"))
+
     if bests:
         top = max(bests, key=lambda b: b.plays)
         if top.plays >= 15:
-            badges.append(Badge(key="devoted", label="Devoted", detail=f"{top.plays} plays of {top.game_type}"))
+            g = get_game(top.game_type)
+            name = g.name if g else top.game_type
+            badges.append(Badge(key="devoted", label="Devoted", detail=f"{top.plays} plays of {name}"))
     return badges
 
 
@@ -223,5 +273,5 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
         bests=bests,
         recent=recent,
         rivals=rivals,
-        badges=_profile_badges(user, bests),
+        badges=_profile_badges(user, bests, versus_played, versus_won, solo_played, rivals),
     )
