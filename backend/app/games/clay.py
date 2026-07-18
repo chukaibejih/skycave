@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import random
+from datetime import date
 from typing import Any
 
 from app.games.base import SIMULTANEOUS, BaseGame
@@ -26,16 +27,106 @@ from app.games.base import SIMULTANEOUS, BaseGame
 ROWS = 64          # profile samples top->bottom; client and server must agree
 MAXR = 132.0       # widest allowed radius (px in the client's canvas units)
 
+# The glaze palette is owned HERE and shipped with the round, so the swatches a
+# player can pick are always exactly the colours a target can ask for. (They used
+# to be declared separately client-side, which let targets request unmatchable
+# colours.)
+CLAY = "#c0503b"
+VIOLET = "#8b7cff"
+CYAN = "#67e8f9"
+GOLD = "#ffd166"
+WHITE = "#f5f7ff"
+GREEN = "#2e7d5b"
+GLAZES = [CLAY, VIOLET, CYAN, GOLD, WHITE, GREEN]
+
 # (name, shape keyframes [(t, radius_fraction)], glaze bands [(t0, t1, hex)])
-# t is normalized height 0 (rim) .. 1 (base). Ported from the prototype.
+# t is normalized height: 0 = rim/top, 1 = base. A radius near 0 means "no clay
+# at this height", which is how the short forms (bowls, cups) sit low on the
+# wheel. Every target carries at least one glaze band so the glaze score is
+# always earned rather than given away.
 TARGETS: list[tuple[str, list[tuple[float, float]], list[tuple[float, float, str]]]] = [
+    # --- classic vases / jars ---
     ("Belly jar", [(0, .40), (.07, .27), (.16, .38), (.40, .94), (.58, .82), (.80, .34), (1, .30)],
-     [(0, .09, "#8b7cff"), (.34, .60, "#67e8f9")]),
+     [(0, .09, VIOLET), (.34, .60, CYAN)]),
     ("Bud vase", [(0, .33), (.10, .19), (.24, .25), (.46, .35), (.66, .31), (.86, .27), (1, .25)],
-     [(0, .11, "#ffd166")]),
+     [(0, .11, GOLD)]),
     ("Amphora", [(0, .30), (.08, .22), (.20, .52), (.36, .80), (.50, .63), (.66, .83), (.82, .40), (1, .30)],
-     [(0, .07, "#ff725e"), (.44, .66, "#56f0aa")]),
+     [(0, .07, CLAY), (.44, .66, GREEN)]),
+    ("Ginger jar", [(0, .28), (.08, .24), (.22, .62), (.42, .88), (.62, .82), (.84, .50), (1, .40)],
+     [(0, .10, CYAN), (.30, .58, WHITE)]),
+    ("Olla", [(0, .22), (.06, .18), (.20, .66), (.42, .92), (.66, .86), (.88, .46), (1, .36)],
+     [(.30, .70, CLAY)]),
+    ("Stout jug", [(0, .34), (.12, .28), (.28, .62), (.50, .84), (.72, .80), (.90, .52), (1, .44)],
+     [(0, .12, GREEN), (.46, .78, GOLD)]),
+    ("Pitcher", [(0, .40), (.14, .32), (.30, .56), (.52, .82), (.74, .74), (.92, .44), (1, .38)],
+     [(.26, .56, VIOLET)]),
+    ("Cauldron", [(0, .46), (.10, .42), (.30, .80), (.55, .92), (.80, .70), (1, .44)],
+     [(0, .12, WHITE), (.40, .74, CLAY)]),
+    ("Urn", [(0, .44), (.10, .36), (.30, .84), (.55, .60), (.78, .44), (.92, .56), (1, .50)],
+     [(.24, .48, GOLD), (.84, 1, VIOLET)]),
+    ("Moon jar", [(0, .34), (.09, .30), (.26, .74), (.48, .90), (.70, .78), (.90, .44), (1, .38)],
+     [(.20, .80, WHITE)]),
+
+    # --- bottles / long necks ---
+    ("Bottle", [(0, .20), (.28, .16), (.38, .30), (.55, .80), (.72, .78), (.90, .42), (1, .34)],
+     [(0, .30, CYAN), (.50, .78, CLAY)]),
+    ("Carafe", [(0, .26), (.18, .20), (.34, .46), (.55, .86), (.75, .70), (.92, .40), (1, .36)],
+     [(.48, .80, GREEN)]),
+    ("Bulb vase", [(0, .22), (.30, .18), (.48, .24), (.64, .72), (.82, .78), (.95, .46), (1, .40)],
+     [(0, .34, GOLD), (.60, .88, VIOLET)]),
+    ("Swan neck", [(0, .18), (.22, .14), (.40, .22), (.60, .66), (.80, .72), (.94, .44), (1, .36)],
+     [(.56, .84, CYAN)]),
+    ("Decanter", [(0, .24), (.14, .18), (.30, .34), (.52, .78), (.76, .84), (.93, .48), (1, .40)],
+     [(0, .16, WHITE), (.46, .82, CLAY)]),
+
+    # --- straight / tapered forms ---
+    ("Tumbler", [(0, .52), (.34, .50), (.68, .48), (1, .46)],
+     [(0, .16, VIOLET), (.70, 1, VIOLET)]),
+    ("Tall cylinder", [(0, .44), (.30, .44), (.70, .44), (1, .42)],
+     [(.34, .62, GOLD)]),
+    ("Beaker", [(0, .58), (.35, .52), (.70, .48), (1, .50)],
+     [(0, .14, CLAY)]),
+    ("Column", [(0, .40), (.06, .48), (.14, .40), (.60, .40), (.90, .42), (1, .46)],
+     [(0, .16, GREEN), (.86, 1, GREEN)]),
+    ("Tapered vase", [(0, .56), (.25, .48), (.55, .38), (.80, .30), (1, .26)],
+     [(.18, .52, CYAN)]),
+    ("Spindle", [(0, .26), (.20, .30), (.50, .44), (.80, .32), (1, .26)],
+     [(.36, .64, WHITE)]),
+    ("Cone pot", [(0, .24), (.30, .42), (.60, .62), (.85, .78), (1, .72)],
+     [(.55, .90, CLAY)]),
+
+    # --- flared / sculpted ---
+    ("Flare cup", [(0, .72), (.30, .56), (.70, .36), (1, .28)],
+     [(0, .18, GOLD)]),
+    ("Trumpet vase", [(0, .86), (.20, .58), (.42, .34), (.66, .26), (.86, .30), (1, .38)],
+     [(0, .16, VIOLET), (.72, 1, CLAY)]),
+    ("Chalice", [(0, .62), (.22, .52), (.34, .30), (.55, .14), (.78, .16), (.90, .44), (1, .58)],
+     [(0, .24, GOLD), (.84, 1, GOLD)]),
+    ("Hourglass", [(0, .62), (.22, .56), (.50, .28), (.78, .58), (1, .62)],
+     [(.38, .62, CYAN)]),
+    ("Bell", [(0, .30), (.25, .34), (.50, .44), (.75, .66), (.92, .88), (1, .80)],
+     [(.70, 1, GREEN)]),
+    ("Gourd", [(0, .24), (.10, .18), (.26, .50), (.38, .44), (.55, .86), (.75, .76), (.92, .40), (1, .32)],
+     [(.20, .42, GOLD), (.50, .80, GREEN)]),
+
+    # --- short forms: no clay up top, the pot sits low on the wheel ---
+    ("Wide bowl", [(0, .02), (.44, .02), (.50, .86), (.62, .88), (.80, .62), (1, .36)],
+     [(.48, .60, WHITE)]),
+    ("Deep bowl", [(0, .02), (.30, .02), (.36, .78), (.55, .88), (.80, .55), (1, .34)],
+     [(.34, .50, CLAY), (.70, .92, CYAN)]),
+    ("Squat pot", [(0, .02), (.22, .02), (.30, .62), (.50, .92), (.75, .80), (1, .44)],
+     [(.28, .46, VIOLET)]),
+    ("Teacup", [(0, .02), (.38, .02), (.46, .66), (.66, .72), (.86, .42), (1, .30)],
+     [(.44, .56, GOLD)]),
+    ("Saucer bowl", [(0, .02), (.56, .02), (.62, .90), (.78, .80), (1, .42)],
+     [(.60, .74, GREEN)]),
 ]
+
+# A fixed shuffle of the catalogue, walked one step per day, so the Daily Pot
+# feels unordered and can't repeat until every target has been used. Seeded with
+# a constant so every server/restart agrees on the same order.
+_DAILY_ORDER = list(range(len(TARGETS)))
+random.Random(20260101).shuffle(_DAILY_ORDER)
 
 
 def _interp(keys: list[tuple[float, float]], i: int) -> float:
@@ -152,6 +243,7 @@ class Clay(BaseGame):
             "rows": ROWS,
             "max_r": MAXR,
             "round_time": round_time,
+            "glazes": GLAZES,  # the swatches the client offers == what targets ask for
         }
         return public, {"idx": idx}
 
@@ -159,8 +251,19 @@ class Clay(BaseGame):
         return self._build(self._pick(round_number), self.round_time)
 
     def new_round_seeded(self, round_number: int, seed: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Deterministic target for the Daily Pot — same pot for everyone that day."""
-        return self._build(seed % len(TARGETS), self.daily_duration)
+        """Deterministic target for the Daily Pot — the same pot for everyone that
+        day (that's the whole point of a daily), but walking a shuffled order so
+        it never marches predictably and won't repeat until all are used.
+
+        `seed` is YYYYMMDD; convert to an ordinal day so the step is exactly 1/day
+        across month and year boundaries.
+        """
+        y, m, d = seed // 10000, (seed // 100) % 100, seed % 100
+        try:
+            day = date(y, m, d).toordinal()
+        except ValueError:  # defensive: never let a bad seed break the round
+            day = seed
+        return self._build(_DAILY_ORDER[day % len(_DAILY_ORDER)], self.daily_duration)
 
     def resolve(
         self,

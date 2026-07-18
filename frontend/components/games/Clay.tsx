@@ -44,7 +44,7 @@ const OFFSET_Y = 44; // touch shaping happens this many px ABOVE the fingertip
 
 export function Clay() {
   const roundData = useRoom((s) => s.roundData) as
-    | { target?: Target; rows?: number; max_r?: number }
+    | { target?: Target; rows?: number; max_r?: number; glazes?: string[] }
     | null;
   const roundEndsAt = useRoom((s) => s.roundEndsAt);
   const gameEnd = useRoom((s) => s.gameEnd);
@@ -337,7 +337,7 @@ export function Clay() {
           {phase === "play" ? "Fire it" : "fired"}
         </button>
         <div className="ml-auto flex gap-1.5">
-          {GLAZES.map((c) => (
+          {(roundData?.glazes ?? GLAZES).map((c) => (
             <button
               key={c}
               onClick={() => setGlazeColor(glazeColor === c ? null : c)}
@@ -458,13 +458,16 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   ctx.ellipse(cx, wy, wr, 15, 0, 0, PI2);
   ctx.fill();
 
-  // ghost target
+  // ghost target — start at the target's first real clay row so short forms
+  // (bowls, cups) don't trail a sliver up to the top of the wheel.
   if (!s.collapsed) {
+    let g0 = 0;
+    while (g0 < s.ROWS - 1 && s.target[g0] < CLAY_MIN) g0++;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(cx + s.target[0], rowY(s, 0));
-    for (let i = 1; i < s.ROWS; i++) ctx.lineTo(cx + s.target[i], rowY(s, i));
-    for (let i = s.ROWS - 1; i >= 0; i--) ctx.lineTo(cx - s.target[i], rowY(s, i));
+    ctx.moveTo(cx + s.target[g0], rowY(s, g0));
+    for (let i = g0 + 1; i < s.ROWS; i++) ctx.lineTo(cx + s.target[i], rowY(s, i));
+    for (let i = s.ROWS - 1; i >= g0; i--) ctx.lineTo(cx - s.target[i], rowY(s, i));
     ctx.closePath();
     ctx.setLineDash([4, 7]);
     ctx.lineWidth = 1.4;
