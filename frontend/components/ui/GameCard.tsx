@@ -153,7 +153,7 @@ const NEW_DAYS = 5;
 const NEW_SINCE: Record<string, string> = {
   connect4: "2026-07-15",
   dots_boxes: "2026-07-15",
-  clay: "2026-07-17",
+  clay: "2026-07-18",  // launch day
 };
 export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];
