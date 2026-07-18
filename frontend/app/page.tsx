@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { GameCard, isNewGame } from "@/components/ui/GameCard";
+import { GameCard } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
 import { CaveDoor } from "@/components/hub/CaveDoor";
 import { AuthModal } from "@/components/ui/AuthModal";
@@ -208,7 +208,8 @@ export default function Home() {
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {/* NEW games float to the top of the dock; a stable sort keeps the rest in
             order. They drop back automatically once their NEW window expires. */}
-        {[...games].sort((a, b) => (isNewGame(b.type) ? 1 : 0) - (isNewGame(a.type) ? 1 : 0)).map((g) => (
+        {/* The catalog already arrives newest-first (see routers/games.py). */}
+        {games.map((g) => (
           <GameCard key={g.type} game={g} onPlay={launch} />
         ))}
         {games.length === 0 && (
@@ -392,21 +393,6 @@ function ModeChooser({
                 Solo
               </button>
             </div>
-            {game.type === "clay" && (
-              <button
-                onClick={() => onChoose(game, "daily")}
-                className="mt-3 flex h-16 w-full flex-col items-center justify-center rounded-[var(--radius-card)] border font-[var(--font-display)] active:brightness-110"
-                style={{
-                  borderColor: "color-mix(in srgb, var(--color-warm) 55%, transparent)",
-                  background: "color-mix(in srgb, var(--color-warm) 12%, transparent)",
-                }}
-              >
-                <span className="text-lg font-bold">Daily Pot</span>
-                <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  once a day · 45s · bonus
-                </span>
-              </button>
-            )}
           </motion.div>
         </motion.div>
       )}

@@ -222,14 +222,14 @@ class Clay(BaseGame):
     tagline = "Shape the spinning pot to match the target. Closest wins."
     mode = SIMULTANEOUS
     total_rounds = 1
-    round_time = 60.0
+    round_time = 45.0      # every mode runs on the same 45s clock
     result_delay = 3.0
 
     solo_kind = "canvas"   # client submits a shaped pot; engine scores it
-    solo_duration = 60.0
+    solo_duration = 45.0
 
     daily_bonus = 150      # added to the Daily Pot score (return/participation)
-    daily_duration = 45.0  # the Daily Pot is shorter
+    daily_duration = 45.0
 
     def _pick(self, round_number: int) -> int:
         """Which target this round. Random for solo/1v1; the Daily Pot uses a

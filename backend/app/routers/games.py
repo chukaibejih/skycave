@@ -7,6 +7,10 @@ router = APIRouter(tags=["games"])
 
 # The game catalog is static per deploy — build the payload once at import so
 # each request just serializes a cached list instead of rebuilding it.
+#
+# Newest game first: the registry is maintained in launch order (new games are
+# appended), so reversing it puts the latest release at the top of the hub and
+# keeps it that way without a per-game date to maintain.
 _GAMES: list[GameInfo] = [
     GameInfo(
         type=g.type,
@@ -15,7 +19,7 @@ _GAMES: list[GameInfo] = [
         total_rounds=g.total_rounds,
         mode=g.mode,
     )
-    for g in all_games()
+    for g in reversed(all_games())
 ]
 
 
