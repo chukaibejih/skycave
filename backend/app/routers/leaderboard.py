@@ -38,7 +38,7 @@ WEEK = timedelta(days=7)
 async def leaderboard(
     db: AsyncSession = Depends(get_db),
     game: str = Query(...),
-    mode: str = Query("versus", pattern="^(versus|solo)$"),
+    mode: str = Query("versus", pattern="^(versus|solo|total)$"),
     period: str = Query("all", pattern="^(all|week)$"),
     limit: int = Query(10, ge=1, le=50),
 ) -> LeaderboardResponse:
@@ -53,11 +53,12 @@ async def leaderboard(
     if cached:
         return LeaderboardResponse.model_validate_json(cached)
 
-    resp = (
-        await _solo(db, game, limit)
-        if mode == "solo"
-        else await _versus(db, game, period, limit)
-    )
+    if mode == "solo":
+        resp = await _solo(db, game, limit)
+    elif mode == "total":
+        resp = await _total(db, game, period, limit)
+    else:
+        resp = await _versus(db, game, period, limit)
     await r.set(key, resp.model_dump_json(), ex=CACHE_TTL)
     return resp
 
@@ -71,10 +72,10 @@ async def _users_by_did(db: AsyncSession, dids: list[str]) -> dict[str, User]:
     }
 
 
-async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
-    conds = [GameSession.game_type == game, GameSession.mode == "versus"]
-    if period == "week":
-        conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
+async def _aggregate(
+    db: AsyncSession, conds: list, order_by: list, limit: int
+) -> LeaderboardResponse:
+    """Union both player sides of game_sessions, group by DID, rank by `order_by`."""
 
     def side(pid_col, handle_col, score_col):
         return select(
@@ -98,7 +99,7 @@ async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> Leade
             func.sum(plays.c.won).label("won"),
         )
         .group_by(plays.c.pid)
-        .order_by(desc("won"), desc("total"))  # wins first, score breaks ties
+        .order_by(*order_by)
         .limit(limit)
     )
     rows = (await db.execute(agg)).all()
@@ -122,6 +123,24 @@ async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> Leade
             )
         )
     return LeaderboardResponse(entries=entries)
+
+
+async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
+    conds = [GameSession.game_type == game, GameSession.mode == "versus"]
+    if period == "week":
+        conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
+    # wins first, cumulative score breaks ties
+    return await _aggregate(db, conds, [desc("won"), desc("total")], limit)
+
+
+async def _total(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
+    """Cumulative points for a game across EVERY mode — solo, daily and 1v1 all
+    add up. Used by games like Clay where each play should grow one running
+    total rather than compete on a single best run or on wins."""
+    conds = [GameSession.game_type == game]
+    if period == "week":
+        conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
+    return await _aggregate(db, conds, [desc("total")], limit)
 
 
 async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:

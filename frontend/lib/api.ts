@@ -212,7 +212,8 @@ export interface LeaderboardEntry {
   win_rate: number;
 }
 export type LeaderboardPeriod = "all" | "week";
-export type LeaderboardMode = "versus" | "solo";
+// "total" = cumulative points across every mode (used by Clay).
+export type LeaderboardMode = "versus" | "solo" | "total";
 export const getLeaderboard = (opts: {
   game: string;
   mode: LeaderboardMode;

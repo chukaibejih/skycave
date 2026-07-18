@@ -33,7 +33,15 @@ export default function LeaderboardPage() {
       .catch(() => {});
   }, []);
 
+  // Clay is scored cumulatively: every play (daily, solo, 1v1) adds to one
+  // running total, so it has no 1v1/Solo split.
+  const cumulative = game === "clay";
+  useEffect(() => {
+    setMode(cumulative ? "total" : "versus");
+  }, [cumulative]);
+
   const solo = mode === "solo";
+  const total = mode === "total";
   const effPeriod: LeaderboardPeriod = solo ? "all" : period;
   const key = `${mode}:${game}:${effPeriod}`;
   const entries = game ? cache[key] ?? null : null;
@@ -100,11 +108,17 @@ export default function LeaderboardPage() {
       {/* Mode + period */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
-          {(["versus", "solo"] as LeaderboardMode[]).map((m) => (
-            <Toggle key={m} on={mode === m} onClick={() => setMode(m)}>
-              {m === "versus" ? "1v1" : "Solo"}
+          {cumulative ? (
+            <Toggle on onClick={() => setMode("total")}>
+              Total points
             </Toggle>
-          ))}
+          ) : (
+            (["versus", "solo"] as LeaderboardMode[]).map((m) => (
+              <Toggle key={m} on={mode === m} onClick={() => setMode(m)}>
+                {m === "versus" ? "1v1" : "Solo"}
+              </Toggle>
+            ))
+          )}
         </div>
         {!solo && (
           <div className="flex gap-2">
@@ -122,11 +136,15 @@ export default function LeaderboardPage() {
       ) : entries.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-16 text-center">
           <div className="font-[var(--font-display)] text-xl font-semibold">
-            {solo
-              ? "No solo scores yet."
-              : period === "week"
-                ? "No 1v1 games this week."
-                : "No 1v1 games yet."}
+            {total
+              ? period === "week"
+                ? "No points scored this week."
+                : "No points scored yet."
+              : solo
+                ? "No solo scores yet."
+                : period === "week"
+                  ? "No 1v1 games this week."
+                  : "No 1v1 games yet."}
           </div>
           <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--color-text-secondary)]">
             Log in with Bluesky and play {activeGame ? shortName(activeGame.name) : "a game"} to
@@ -168,7 +186,12 @@ export default function LeaderboardPage() {
               </div>
               {/* Stats: 1v1 shows played/won on wider screens; solo shows plays */}
               <div className="hidden text-right sm:block">
-                {solo ? (
+                {total ? (
+                  <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+                    {e.games_played} {e.games_played === 1 ? "play" : "plays"}
+                    {e.games_won > 0 && ` · ${e.games_won} won`}
+                  </div>
+                ) : solo ? (
                   <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
                     {e.games_played} {e.games_played === 1 ? "run" : "runs"}
                   </div>
@@ -185,10 +208,10 @@ export default function LeaderboardPage() {
               </div>
               <div className="w-16 shrink-0 text-right sm:w-20">
                 <div className="font-[var(--font-display)] text-lg font-bold text-[var(--color-primary)]">
-                  {solo ? e.total_score.toLocaleString() : e.games_won}
+                  {solo || total ? e.total_score.toLocaleString() : e.games_won}
                 </div>
                 <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  {solo ? "best" : "wins"}
+                  {total ? "points" : solo ? "best" : "wins"}
                 </div>
               </div>
             </Link>
@@ -198,11 +221,15 @@ export default function LeaderboardPage() {
       )}
 
       <p className="mt-4 text-center font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
-        {solo
-          ? "best single-run score"
-          : period === "week"
-            ? "1v1 wins from the last 7 days"
-            : "1v1 wins, all time"}
+        {total
+          ? period === "week"
+            ? "every play counts · points from the last 7 days"
+            : "every play counts · daily, solo and 1v1 added up"
+          : solo
+            ? "best single-run score"
+            : period === "week"
+              ? "1v1 wins from the last 7 days"
+              : "1v1 wins, all time"}
       </p>
     </main>
   );
