@@ -7,9 +7,18 @@ interface Props {
   player: PlayerSlot | null;
   accent?: "primary" | "warm";
   label?: string;
+  // Copy for the empty slot. The lobby overrides it to name the state ("open
+  // seat") rather than just describe the wait, so the slot reads as something
+  // the user can act on.
+  emptyLabel?: string;
 }
 
-export function PlayerCard({ player, accent = "primary", label }: Props) {
+export function PlayerCard({
+  player,
+  accent = "primary",
+  label,
+  emptyLabel = "waiting for opponent...",
+}: Props) {
   const color =
     accent === "warm" ? "var(--color-warm)" : "var(--color-primary)";
 
@@ -20,7 +29,7 @@ export function PlayerCard({ player, accent = "primary", label }: Props) {
         transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
         className="flex min-h-[96px] flex-1 items-center justify-center rounded-[20px] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/35 px-4 py-3 text-sm text-[var(--color-text-secondary)]"
       >
-        waiting for opponent...
+        {emptyLabel}
       </motion.div>
     );
   }

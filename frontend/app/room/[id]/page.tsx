@@ -3,8 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { RoomPortal } from "@/components/lobby/RoomPortal";
 import { PlayerCard } from "@/components/lobby/PlayerCard";
-import { ShareButton } from "@/components/lobby/ShareButton";
-import { ChallengeFlow } from "@/components/lobby/ChallengeFlow";
+import { InvitePanel } from "@/components/lobby/InvitePanel";
 import { RoomCountdown } from "@/components/lobby/RoomCountdown";
 import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { AuthModal } from "@/components/ui/AuthModal";
@@ -13,7 +12,6 @@ import { GameShell } from "@/components/games/GameShell";
 import { GameOver } from "@/components/games/GameOver";
 import { preloadGlobe } from "@/components/games/GlobePicker";
 import { createRoom, getInvite, getRoom, joinRoom } from "@/lib/api";
-import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth, useRoom } from "@/lib/store";
 
 export default function RoomPage() {
@@ -36,7 +34,6 @@ export default function RoomPage() {
   const [timedOut, setTimedOut] = useState(false); // countdown reached zero locally
   const [inviteText, setInviteText] = useState("");
   const [iAmReady, setIAmReady] = useState(false);
-  const [challengeOpen, setChallengeOpen] = useState(false);
   // Guards the join+connect to run exactly once per mount. Critically it does
   // NOT depend on `room`, so the socket's `room: null` reset can't re-trigger
   // it. That race was causing a rapid connect/disconnect loop on the joiner
@@ -230,49 +227,22 @@ export default function RoomPage() {
       {/* The real content of this screen: who is in the room. */}
       <div className="space-y-3">
         <PlayerCard player={me} accent="primary" label="you" />
-        <PlayerCard player={opponent} accent="primary" label="opponent" />
+        <PlayerCard
+          player={opponent}
+          accent="primary"
+          label="opponent"
+          emptyLabel="open seat"
+        />
       </div>
 
       {/* Actions, in priority order, all reachable without scrolling. */}
       <div className="mt-5 space-y-3">
         {!bothHere && (
-          <>
-            {inviteText && <ShareButton text={inviteText} full />}
-
-            {!challengeOpen && (
-              <button
-                onClick={() => setChallengeOpen(true)}
-                style={{
-                  borderColor:
-                    "color-mix(in srgb, var(--color-primary) 55%, transparent)",
-                  color: "var(--color-text-primary)",
-                }}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[12px] border-2 text-base font-semibold transition-[filter] active:brightness-95"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M14.5 3.5 21 10l-9.5 9.5a2.1 2.1 0 0 1-3 0L3 14a2.1 2.1 0 0 1 0-3z" />
-                  <path d="M7 7h.01" />
-                </svg>
-                Challenge someone
-              </button>
-            )}
-
-            <ChallengeFlow
-              roomCode={id}
-              gameName={room?.game_name ?? room?.game_type ?? "this game"}
-              open={challengeOpen}
-              onOpenChange={setChallengeOpen}
-            />
-
-            {!challengeOpen && inviteText && (
-              <button
-                onClick={() => shareToBluesky(inviteText)}
-                className="w-full pt-0.5 text-center text-xs text-[var(--color-text-secondary)] underline underline-offset-2 active:text-[var(--color-text-primary)]"
-              >
-                Reshare the invite
-              </button>
-            )}
-          </>
+          <InvitePanel
+            roomCode={id}
+            gameName={room?.game_name ?? room?.game_type ?? "this game"}
+            inviteText={inviteText}
+          />
         )}
 
         {bothHere && (

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
+import { SITE } from "@/lib/site";
 import {
   searchActors,
   resolveActor,
@@ -19,9 +20,6 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
 }
 
-// Room links always point at the live product, not a dev/tunnel origin, since
-// these get posted publicly on Bluesky.
-const SITE = "skycave.space";
 
 // Five ways to word the challenge. Index 0 is the pre-selected default so a
 // user can just tap send without picking anything.
