@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { shareToBluesky } from "@/lib/bluesky";
 import { useAuth, useRoom } from "@/lib/store";
 
@@ -50,6 +51,8 @@ export function Clay() {
   const gameEnd = useRoom((s) => s.gameEnd);
   const sendAction = useRoom((s) => s.sendAction);
   const room = useRoom((s) => s.room);
+  const sendRematch = useRoom((s) => s.sendRematch);
+  const rematchRequestedBy = useRoom((s) => s.rematchRequestedBy);
   const meId = useAuth((s) => s.identity?.id);
 
   const isSolo = (room?.players.length ?? 1) === 1;
@@ -64,6 +67,7 @@ export function Clay() {
   const [glazeColor, setGlazeColor] = useState<string | null>(null);
   const [hud, setHud] = useState({ match: 0, stability: 100, time: 0 });
   const [phase, setPhase] = useState<"play" | "fired">("play");
+  const [sharing, setSharing] = useState(false);
 
   // ---- init the sim when the target arrives ----
   useEffect(() => {
@@ -261,19 +265,139 @@ export function Clay() {
     );
   }
 
-  const myScore = gameEnd ? gameEnd.scores[meId ?? ""] ?? 0 : null;
-  const oppId = room?.players.find((p) => p.id !== meId)?.id;
-  const oppScore = gameEnd && oppId ? gameEnd.scores[oppId] ?? 0 : null;
-  const outcome =
-    gameEnd == null
-      ? null
-      : isSolo
-        ? "fired"
-        : gameEnd.winner_id === meId
-          ? "you win"
-          : gameEnd.winner_id == null
-            ? "a draw"
-            : "you lose";
+  const myScore = gameEnd ? gameEnd.scores[meId ?? ""] ?? 0 : 0;
+  const opp = room?.players.find((p) => p.id !== meId) ?? null;
+  const oppScore = gameEnd && opp ? gameEnd.scores[opp.id] ?? 0 : null;
+
+  const shareLine = isSolo
+    ? `Shaped a ${target.name} on Clay · ${myScore} pts.`
+    : gameEnd?.winner_id === meId
+      ? `Won a Clay pot-off · ${myScore} pts.`
+      : `Clay pot-off · ${myScore} pts.`;
+
+  /**
+   * Share the actual pot, not a line of text. Bluesky's web composer can't take
+   * an attached image, so we hand the PNG to the OS share sheet (which Bluesky
+   * accepts as a real image post). Where that isn't available we save the file
+   * and open the composer so it can be attached by hand.
+   */
+  const shareCard = async () => {
+    const text = `${shareLine}\n\nskycave.space`;
+    const canvas = cardRef.current;
+    if (!canvas) return shareToBluesky(text);
+    setSharing(true);
+    try {
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
+      if (blob) {
+        const file = new File([blob], "clay-pot.png", { type: "image/png" });
+        if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], text });
+          return; // shared with the picture attached
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "clay-pot.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      shareToBluesky(text);
+    } catch (e) {
+      // Dismissing the share sheet is a normal outcome, not a failure.
+      if ((e as Error)?.name !== "AbortError") shareToBluesky(text);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  // ---- result: a full screen, matching the other game-over pages ----
+  if (gameEnd) {
+    const iRequested = rematchRequestedBy.includes(meId ?? "");
+    const oppRequested = !!opp && rematchRequestedBy.includes(opp.id);
+    const headline = isSolo
+      ? "Fired."
+      : gameEnd.winner_id === meId
+        ? "You win."
+        : gameEnd.winner_id == null
+          ? "Draw."
+          : `${opp?.display_name ?? "Opponent"} wins.`;
+    return (
+      <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 26 }}
+        >
+          <h1 className="font-[var(--font-display)] text-5xl font-bold leading-none">{headline}</h1>
+          <p className="mt-3 font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">
+            <span className="font-[var(--font-display)] text-base font-bold" style={{ color: "var(--color-primary)" }}>
+              {myScore.toLocaleString()}
+            </span>{" "}
+            points · {target.name}
+          </p>
+
+          {/* The pot itself is the result — target beside yours. */}
+          <canvas
+            ref={cardRef}
+            width={1280}
+            height={720}
+            className="mt-5 w-full rounded-[14px] border border-[var(--color-border)]"
+          />
+
+          {!isSolo && oppScore != null && (
+            <div className="mt-5 flex flex-col gap-2">
+              <ScoreRow name="You" score={myScore} lead={myScore >= oppScore} />
+              <ScoreRow name={opp?.display_name ?? "Opponent"} score={oppScore} lead={oppScore > myScore} />
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-col gap-2.5">
+            <button
+              onClick={shareCard}
+              disabled={sharing}
+              className="flex h-[52px] w-full items-center justify-center rounded-[12px] text-base font-semibold transition-[filter] active:brightness-95 disabled:opacity-60"
+              style={{ background: "var(--color-primary)", color: "#05060a" }}
+            >
+              {sharing ? "Preparing your pot..." : "Share your pot"}
+            </button>
+            <div className="flex items-center justify-center gap-4 pt-1">
+              {isSolo ? (
+                <a
+                  href="/play/clay"
+                  className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                >
+                  Play again
+                </a>
+              ) : (
+                // Same room, same opponent — the rematch keeps a 1v1 alive
+                // instead of dumping both players back to the hub.
+                <button
+                  onClick={sendRematch}
+                  disabled={iRequested || !opp}
+                  className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base disabled:opacity-60"
+                  style={{
+                    borderColor: oppRequested && !iRequested ? "var(--color-primary)" : "var(--color-border)",
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {iRequested ? "Waiting..." : oppRequested ? "Accept rematch" : "Rematch"}
+                </button>
+              )}
+              <Link href="/" className="flex h-12 items-center justify-center px-3 text-sm text-[var(--color-text-secondary)]">
+                hub
+              </Link>
+            </div>
+            {oppRequested && !iRequested && (
+              <p className="text-center text-sm" style={{ color: "var(--color-primary)" }}>
+                {opp?.display_name} wants a rematch.
+              </p>
+            )}
+          </div>
+        </motion.div>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col justify-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
@@ -297,43 +421,6 @@ export function Clay() {
       <div ref={stageRef} className="relative overflow-hidden rounded-[18px] border border-[var(--color-border)]" style={{ background: "radial-gradient(120% 90% at 50% 15%, #1b2030 0%, #0b0e16 70%)", touchAction: "none" }}>
         <canvas ref={canvasRef} className="block w-full" />
 
-        {gameEnd && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[rgba(5,6,10,.82)] p-5 text-center backdrop-blur-sm">
-            <b className="font-[var(--font-display)] text-xl font-bold">{outcome}</b>
-            <canvas ref={cardRef} width={640} height={360} className="w-[290px] rounded-[12px] border border-[var(--color-border)]" />
-            {!isSolo && oppScore != null && (
-              <div className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">you {myScore} · opponent {oppScore}</div>
-            )}
-            <div className="mt-1 flex gap-2">
-              {isSolo && (
-                <a
-                  href="/play/clay"
-                  className="grid h-11 place-items-center rounded-[12px] px-4 text-sm font-semibold"
-                  style={{ background: "var(--color-primary)", color: "#05060a" }}
-                >
-                  Play again
-                </a>
-              )}
-              <button
-                onClick={() => {
-                  const line = isSolo
-                    ? `Shaped a ${target.name} on Clay · ${myScore} pts.`
-                    : outcome === "you win"
-                      ? `Won a Clay pot-off · ${myScore} pts.`
-                      : `Clay pot-off · ${myScore} pts.`;
-                  shareToBluesky(`${line}\n\nskycave.space`);
-                }}
-                className="grid h-11 place-items-center rounded-[12px] px-4 text-sm font-semibold"
-                style={{ background: "#1185FE", color: "#fff" }}
-              >
-                Share
-              </button>
-              <Link href="/" className="grid h-11 place-items-center rounded-[12px] border px-4 text-sm font-semibold" style={{ borderColor: "var(--color-border)" }}>
-                Hub
-              </Link>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="mt-3 flex items-center gap-2">
@@ -361,6 +448,20 @@ export function Clay() {
         Target: <b className="text-[var(--color-text-primary)]">{target.name}</b> · drag to shape · tap a glaze then drag to paint · go slow or it collapses
       </p>
     </main>
+  );
+}
+
+function ScoreRow({ name, score, lead }: { name: string; score: number; lead: boolean }) {
+  return (
+    <div
+      className="flex items-center justify-between rounded-[10px] border px-4 py-2.5"
+      style={{ borderColor: lead ? "var(--color-primary)" : "var(--color-border)" }}
+    >
+      <span className="truncate text-sm" style={{ color: lead ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
+        {name}
+      </span>
+      <span className="font-[var(--font-mono)] text-base font-semibold">{score.toLocaleString()}</span>
+    </div>
   );
 }
 
@@ -666,9 +767,12 @@ function drawRef(ctx: CanvasRenderingContext2D, s: Sim, W: number) {
 function drawCard(canvas: HTMLCanvasElement, s: Sim, score: number, name: string) {
   const g = canvas.getContext("2d");
   if (!g) return;
-  const CW = canvas.width;
-  const CH = canvas.height;
-  g.setTransform(1, 0, 0, 1, 0, 0);
+  // Drawn in a 640x360 layout but rasterised at 2x, so the PNG people actually
+  // post is crisp on a phone screen.
+  const SCALE = 2;
+  const CW = canvas.width / SCALE;
+  const CH = canvas.height / SCALE;
+  g.setTransform(SCALE, 0, 0, SCALE, 0, 0);
   const bg = g.createLinearGradient(0, 0, CW, CH);
   bg.addColorStop(0, "#0b0e16");
   bg.addColorStop(1, "#12101a");
