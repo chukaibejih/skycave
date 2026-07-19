@@ -17,6 +17,7 @@ interface Target {
   glaze: (string | null)[];
 }
 interface Sim {
+  name: string; // kept here so the result survives round_data being cleared
   ROWS: number;
   MAXR: number;
   yTop: number;
@@ -86,7 +87,10 @@ export function Clay() {
 
   // ---- init the sim when the target arrives ----
   useEffect(() => {
-    if (!target) return;
+    // Only (re)build the clay when a round is actually OPEN. GAME_END clears the
+    // deadline, and re-initialising on that wiped the finished pot before the
+    // share card was drawn — the card showed a fresh mound instead of your work.
+    if (!target || roundEndsAt == null) return;
     const ROWS = roundData?.rows ?? 64;
     const MAXR = roundData?.max_r ?? 132;
     const yTop = 46;
@@ -99,6 +103,7 @@ export function Clay() {
       glaze[i] = null;
     }
     S.current = {
+      name: target.name,
       ROWS,
       MAXR,
       yTop,
@@ -267,25 +272,19 @@ export function Clay() {
   // Draw the share card (TARGET vs YOURS + score) once the game ends.
   useEffect(() => {
     if (!gameEnd || !S.current || !cardRef.current) return;
-    drawCard(cardRef.current, S.current, gameEnd.scores[meId ?? ""] ?? 0, target?.name ?? "");
-  }, [gameEnd, meId, target?.name]);
+    drawCard(cardRef.current, S.current, gameEnd.scores[meId ?? ""] ?? 0, S.current.name);
+  }, [gameEnd, meId]);
 
   const fire = () => submitPot(true);
-
-  if (!target) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center font-[var(--font-display)] text-2xl text-[var(--color-text-secondary)]">
-        centering the clay...
-      </div>
-    );
-  }
 
   const myScore = gameEnd ? gameEnd.scores[meId ?? ""] ?? 0 : 0;
   const opp = room?.players.find((p) => p.id !== meId) ?? null;
   const oppScore = gameEnd && opp ? gameEnd.scores[opp.id] ?? 0 : null;
+  // A finished room stops sending round_data, so lean on the sim's own copy.
+  const potName = S.current?.name ?? target?.name ?? "your pot";
 
   const shareLine = isSolo
-    ? `Shaped a ${target.name} on Clay · ${myScore} pts.`
+    ? `Shaped a ${potName} on Clay · ${myScore} pts.`
     : gameEnd?.winner_id === meId
       ? `Won a Clay pot-off · ${myScore} pts.`
       : `Clay pot-off · ${myScore} pts.`;
@@ -348,7 +347,7 @@ export function Clay() {
             <span className="font-[var(--font-display)] text-base font-bold" style={{ color: "var(--color-primary)" }}>
               {myScore.toLocaleString()}
             </span>{" "}
-            points · {target.name}
+            points · {potName}
           </p>
 
           {/* The pot itself is the result — target beside yours. */}
@@ -411,6 +410,16 @@ export function Clay() {
           </div>
         </motion.div>
       </main>
+    );
+  }
+
+  // Only a round that hasn't opened yet shows the loader — checked AFTER the
+  // result, so returning to a finished game never lands back on "centering".
+  if (!target) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center font-[var(--font-display)] text-2xl text-[var(--color-text-secondary)]">
+        centering the clay...
+      </div>
     );
   }
 
