@@ -77,6 +77,8 @@ export function Clay() {
   const [glazeColor, setGlazeColor] = useState<string | null>(null);
   const [hud, setHud] = useState({ match: 0, stability: 100, time: 0 });
   const [phase, setPhase] = useState<"play" | "fired">("play");
+  const [collapsed, setCollapsed] = useState(false);
+  const collapsedRef = useRef(false);
   const [sharing, setSharing] = useState(false);
   // Handlers read the phase through a ref so gating never depends on when the
   // listeners were bound (no stale closure, no rebinding needed).
@@ -126,6 +128,8 @@ export function Clay() {
     };
     submittedRef.current = false;
     setPhase("play");
+    setCollapsed(false);
+    collapsedRef.current = false;
     // Keyed on the round's deadline, not just the target name: two games can
     // draw the same pot, and keying on the name alone left the second one stuck
     // in "fired" (dead clay) because this reset never ran.
@@ -242,7 +246,18 @@ export function Clay() {
       if (s && ctx) {
         const dt = Math.min(50, now - last);
         s.spin += dt * 0.004;
-        if (s.collapsed) s.slump = Math.min(1.2, s.slump + dt * 0.0016);
+        if (s.collapsed) {
+          s.slump = Math.min(1.2, s.slump + dt * 0.0011);
+          // Flip React state once, not every frame.
+          if (!collapsedRef.current) {
+            collapsedRef.current = true;
+            setCollapsed(true);
+          }
+          // A collapse used to leave the player staring at a dead wheel until
+          // the clock ran out. Once the fall has played, send what's left and
+          // move on to the result.
+          if (s.slump >= 1.15 && !submittedRef.current) submitPot(true);
+        }
         else if (phase === "play") stepPhysics(s, dt);
         draw(ctx, s, canvasRef.current!.clientWidth, 470, phase);
 
@@ -445,6 +460,21 @@ export function Clay() {
       <div ref={stageRef} className="relative overflow-hidden rounded-[18px] border border-[var(--color-border)]" style={{ background: "radial-gradient(120% 90% at 50% 15%, #1b2030 0%, #0b0e16 70%)", touchAction: "none" }}>
         <canvas ref={setCanvas} className="block w-full" />
 
+        {/* A collapse must say what happened and where it's going. */}
+        {collapsed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[rgba(5,6,10,.72)] p-6 text-center backdrop-blur-sm">
+            <b className="font-[var(--font-display)] text-2xl font-bold" style={{ color: "var(--color-warm)" }}>
+              It collapsed.
+            </b>
+            <span className="max-w-[260px] text-sm text-[var(--color-text-secondary)]">
+              The wall went too thin, too fast. Slow, even pressure keeps a pot standing.
+            </span>
+            <span className="mt-1 font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+              {isSolo ? "firing what's left..." : "sending it to your opponent..."}
+            </span>
+          </div>
+        )}
+
       </div>
 
       <div className="mt-3 flex items-center gap-2">
@@ -542,17 +572,35 @@ function topRow(s: Sim) {
   for (let i = 0; i < s.ROWS; i++) if (s.prof[i] >= CLAY_MIN) return i;
   return s.ROWS - 1;
 }
+// How far the collapse has played out, 0..1.
+const slumpK = (s: Sim) => (s.collapsed ? Math.min(1, s.slump) : 0);
+
+/**
+ * Row height during a collapse. Clay that gives way falls DOWN onto the wheel —
+ * it loses height and puddles. Previously the pot kept full height while leaning
+ * a third of the canvas sideways, which read as a spike launching off the wheel.
+ */
+function rowYS(s: Sim, i: number) {
+  const y = rowY(s, i);
+  const k = slumpK(s);
+  return k ? s.yBot - (s.yBot - y) * (1 - 0.72 * k) : y;
+}
+
 function bend(s: Sim, i: number) {
   if (!s.collapsed) return 0;
   const t = i / (s.ROWS - 1);
-  return s.collapseSide * s.slump * Math.pow(1 - t, 1.6) * s.MAXR * 0.85;
+  // A lean that fades toward the base, not a launch off the wheel.
+  return s.collapseSide * slumpK(s) * Math.pow(1 - t, 1.6) * s.MAXR * 0.26;
 }
 function dispR(s: Sim, i: number) {
   const fragile = (1 - s.stability) * (s.prof[i] < THIN ? 1.7 : 0.5);
   let r = s.prof[i];
   if (s.collapsed) {
-    r = s.prof[i] * Math.max(0.15, 1 - s.slump * 0.8);
-    r += Math.sin(s.spin * 3 + i * 0.6) * s.prof[i] * 0.12 * Math.min(1, s.slump * 2);
+    const k = slumpK(s);
+    const t = i / (s.ROWS - 1);
+    // Mass drops: the wall thins near the rim and spreads into a puddle at the foot.
+    r = s.prof[i] * (1 - 0.45 * k * (1 - t)) * (1 + 0.85 * k * t);
+    r += Math.sin(s.spin * 3 + i * 0.6) * s.prof[i] * 0.05 * k;
   } else if (fragile > 0.02) {
     r += Math.sin(s.spin * 2.4 + i * 0.55) * fragile * 7;
   }
@@ -614,9 +662,9 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   const t0 = topRow(s);
   const potPath = () => {
     ctx.beginPath();
-    ctx.moveTo(colX(t0) + dispR(s, t0), rowY(s, t0));
-    for (let i = t0 + 1; i < s.ROWS; i++) ctx.lineTo(colX(i) + dispR(s, i), rowY(s, i));
-    for (let i = s.ROWS - 1; i >= t0; i--) ctx.lineTo(colX(i) - dispR(s, i), rowY(s, i));
+    ctx.moveTo(colX(t0) + dispR(s, t0), rowYS(s, t0));
+    for (let i = t0 + 1; i < s.ROWS; i++) ctx.lineTo(colX(i) + dispR(s, i), rowYS(s, i));
+    for (let i = s.ROWS - 1; i >= t0; i--) ctx.lineTo(colX(i) - dispR(s, i), rowYS(s, i));
     ctx.closePath();
   };
   ctx.save();
@@ -634,7 +682,7 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
     if (!s.glaze[i]) continue;
     ctx.globalAlpha = 0.62;
     ctx.fillStyle = s.glaze[i] as string;
-    ctx.fillRect(cx - s.MAXR - 4, rowY(s, i) - s.potH / s.ROWS / 2, s.MAXR * 2 + 8, s.potH / s.ROWS + 1.4);
+    ctx.fillRect(cx - s.MAXR - 4, rowYS(s, i) - s.potH / s.ROWS / 2, s.MAXR * 2 + 8, s.potH / s.ROWS + 1.4);
   }
   ctx.globalAlpha = 1;
   const vg = ctx.createLinearGradient(0, s.yTop, 0, s.yBot + 10);
@@ -668,7 +716,7 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   // rim
   const r0 = dispR(s, t0);
   const cxi = colX(t0);
-  const yr = rowY(s, t0);
+  const yr = rowYS(s, t0);
   const wall = Math.max(5, Math.min(17, r0 * 0.16));
   const ir = Math.max(2, r0 - wall);
   ctx.fillStyle = "#8a3620";
