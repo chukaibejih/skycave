@@ -59,7 +59,16 @@ export function Clay() {
   const target = roundData?.target ?? null;
   const roundSecs = roundData?.round_time ?? 45;
 
+  // The canvas unmounts between rounds (loading state, result screen). A plain
+  // ref isn't reactive, so effects bound to it would never re-run when a NEW
+  // canvas mounted — that's what left the wheel unresponsive after game one.
+  // A state-backed callback ref makes "the element attached" an actual dep.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
+  const setCanvas = useCallback((el: HTMLCanvasElement | null) => {
+    canvasRef.current = el;
+    setCanvasEl(el);
+  }, []);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const S = useRef<Sim | null>(null);
   const cardRef = useRef<HTMLCanvasElement | null>(null);
@@ -68,6 +77,12 @@ export function Clay() {
   const [hud, setHud] = useState({ match: 0, stability: 100, time: 0 });
   const [phase, setPhase] = useState<"play" | "fired">("play");
   const [sharing, setSharing] = useState(false);
+  // Handlers read the phase through a ref so gating never depends on when the
+  // listeners were bound (no stale closure, no rebinding needed).
+  const phaseRef = useRef(phase);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   // ---- init the sim when the target arrives ----
   useEffect(() => {
@@ -167,11 +182,11 @@ export function Clay() {
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [target?.name]);
+  }, [canvasEl]);
 
   // ---- pointer shaping ----
   useEffect(() => {
-    const c = canvasRef.current;
+    const c = canvasEl;
     if (!c) return;
     const pos = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
@@ -179,7 +194,7 @@ export function Clay() {
     };
     const down = (e: PointerEvent) => {
       const s = S.current;
-      if (!s || s.collapsed || phase !== "play") return;
+      if (!s || s.collapsed || phaseRef.current !== "play") return;
       e.preventDefault();
       // A mouse cursor is precise, so no offset; a finger shapes above itself.
       s.offset = e.pointerType === "mouse" ? 0 : OFFSET_Y;
@@ -188,7 +203,7 @@ export function Clay() {
     };
     const move = (e: PointerEvent) => {
       const s = S.current;
-      if (!s || !s.pointer || s.collapsed || phase !== "play") return;
+      if (!s || !s.pointer || s.collapsed || phaseRef.current !== "play") return;
       e.preventDefault();
       const p = pos(e);
       const now = performance.now();
@@ -210,7 +225,7 @@ export function Clay() {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
-  }, [phase]);
+  }, [canvasEl]);
 
   // ---- animation + physics loop ----
   useEffect(() => {
@@ -419,7 +434,7 @@ export function Clay() {
       </div>
 
       <div ref={stageRef} className="relative overflow-hidden rounded-[18px] border border-[var(--color-border)]" style={{ background: "radial-gradient(120% 90% at 50% 15%, #1b2030 0%, #0b0e16 70%)", touchAction: "none" }}>
-        <canvas ref={canvasRef} className="block w-full" />
+        <canvas ref={setCanvas} className="block w-full" />
 
       </div>
 
