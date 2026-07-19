@@ -43,6 +43,7 @@ const CLAY_MIN = 9;
 const THIN = 16;
 const MINWALL = 2;
 const OFFSET_Y = 44; // touch shaping happens this many px ABOVE the fingertip
+const COLLAPSE_HOLD = 4200; // ms to sit on a collapse before moving on
 
 export function Clay() {
   const roundData = useRoom((s) => s.roundData) as
@@ -79,6 +80,7 @@ export function Clay() {
   const [phase, setPhase] = useState<"play" | "fired">("play");
   const [collapsed, setCollapsed] = useState(false);
   const collapsedRef = useRef(false);
+  const collapsedAtRef = useRef(0);
   const [sharing, setSharing] = useState(false);
   // Handlers read the phase through a ref so gating never depends on when the
   // listeners were bound (no stale closure, no rebinding needed).
@@ -251,12 +253,15 @@ export function Clay() {
           // Flip React state once, not every frame.
           if (!collapsedRef.current) {
             collapsedRef.current = true;
+            collapsedAtRef.current = now;
             setCollapsed(true);
           }
-          // A collapse used to leave the player staring at a dead wheel until
-          // the clock ran out. Once the fall has played, send what's left and
-          // move on to the result.
-          if (s.slump >= 1.15 && !submittedRef.current) submitPot(true);
+          // Hold long enough for the fall to land AND the reason to be read —
+          // rushing to the result taught the player nothing. They can also tap
+          // through immediately; this is just the backstop.
+          if (now - collapsedAtRef.current >= COLLAPSE_HOLD && !submittedRef.current) {
+            submitPot(true);
+          }
         }
         else if (phase === "play") stepPhysics(s, dt);
         draw(ctx, s, canvasRef.current!.clientWidth, 470, phase);
@@ -469,9 +474,13 @@ export function Clay() {
             <span className="max-w-[260px] text-sm text-[var(--color-text-secondary)]">
               The wall went too thin, too fast. Slow, even pressure keeps a pot standing.
             </span>
-            <span className="mt-1 font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-              {isSolo ? "firing what's left..." : "sending it to your opponent..."}
-            </span>
+            <button
+              onClick={() => submitPot(true)}
+              className="mt-3 flex h-11 items-center justify-center rounded-[12px] px-5 text-sm font-semibold"
+              style={{ background: "var(--color-primary)", color: "#05060a" }}
+            >
+              {isSolo ? "See result" : "Send it in"}
+            </button>
           </div>
         )}
 
