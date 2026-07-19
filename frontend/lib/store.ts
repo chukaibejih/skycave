@@ -109,7 +109,13 @@ export const useRoom = create<RoomState>((set, get) => ({
     if (!token) return;
 
     const socket = new SkycaveSocket(roomId, token);
-    set({ socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, roomExpired: false, series: {}, rematchRequestedBy: [] });
+    // Clear the previous room's round state too, so a new room can never render
+    // (or act on) the last game's prompt/deadline before its own ROUND_START.
+    set({
+      socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null,
+      roomExpired: false, series: {}, rematchRequestedBy: [],
+      roundData: null, roundResult: null, roundEndsAt: null, locked: false, submitted: false,
+    });
 
     socket.onStatus((status) => set({ status }));
 

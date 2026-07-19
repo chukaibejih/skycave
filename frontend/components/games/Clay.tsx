@@ -44,7 +44,7 @@ const OFFSET_Y = 44; // touch shaping happens this many px ABOVE the fingertip
 
 export function Clay() {
   const roundData = useRoom((s) => s.roundData) as
-    | { target?: Target; rows?: number; max_r?: number; glazes?: string[] }
+    | { target?: Target; rows?: number; max_r?: number; glazes?: string[]; round_time?: number }
     | null;
   const roundEndsAt = useRoom((s) => s.roundEndsAt);
   const gameEnd = useRoom((s) => s.gameEnd);
@@ -54,6 +54,7 @@ export function Clay() {
 
   const isSolo = (room?.players.length ?? 1) === 1;
   const target = roundData?.target ?? null;
+  const roundSecs = roundData?.round_time ?? 45;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -101,8 +102,11 @@ export function Clay() {
     };
     submittedRef.current = false;
     setPhase("play");
+    // Keyed on the round's deadline, not just the target name: two games can
+    // draw the same pot, and keying on the name alone left the second one stuck
+    // in "fired" (dead clay) because this reset never ran.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.name, roundData?.rows]);
+  }, [target?.name, roundEndsAt, roundData?.rows]);
 
   useEffect(() => {
     if (S.current) S.current.glazeColor = glazeColor;
@@ -218,14 +222,19 @@ export function Clay() {
         else if (phase === "play") stepPhysics(s, dt);
         draw(ctx, s, canvasRef.current!.clientWidth, 470, phase);
 
-        // timer + auto-fire. roundEndsAt is a Unix-epoch time (seconds), so it
-        // must be compared to Date.now(), NOT the rAF/performance clock.
-        const left = roundEndsAt ? Math.max(0, roundEndsAt - Date.now() / 1000) : 0;
-        if (phase === "play" && left <= 0.8 && !submittedRef.current) submitPot(true);
+        // Timer + auto-fire. roundEndsAt is Unix-epoch seconds, so compare it to
+        // Date.now() (NOT the rAF clock). A null deadline means the round hasn't
+        // opened yet and must never read as "time is up" — treating it as 0 used
+        // to auto-fire an untouched pot the instant a second game started.
+        const left =
+          roundEndsAt != null ? Math.max(0, roundEndsAt - Date.now() / 1000) : null;
+        if (phase === "play" && left !== null && left <= 0.8 && !submittedRef.current) {
+          submitPot(true);
+        }
         setHud((h) => {
           const match = s.collapsed ? 0 : Math.round(shapeMatch(s) * 100);
           const stab = Math.round(s.stability * 100);
-          const time = Math.ceil(left);
+          const time = Math.ceil(left ?? roundSecs);
           return h.match === match && h.stability === stab && h.time === time ? h : { match, stability: stab, time };
         });
       }
@@ -234,7 +243,7 @@ export function Clay() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, roundEndsAt, submitPot]);
+  }, [phase, roundEndsAt, roundSecs, submitPot]);
 
   // Draw the share card (TARGET vs YOURS + score) once the game ends.
   useEffect(() => {
