@@ -12,6 +12,7 @@ import { GameShell } from "@/components/games/GameShell";
 import { GameOver } from "@/components/games/GameOver";
 import { preloadGlobe } from "@/components/games/GlobePicker";
 import { createRoom, getInvite, getRoom, joinRoom } from "@/lib/api";
+import { gameName } from "@/lib/gameNames";
 import { useAuth, useRoom } from "@/lib/store";
 
 export default function RoomPage() {
@@ -196,6 +197,16 @@ export default function RoomPage() {
   const opponent = players.find((p) => p.id !== identity?.id) ?? null;
   const me = players.find((p) => p.id === identity?.id) ?? null;
   const bothHere = players.length >= 2;
+  // Only the host gets the invite tools. Someone who arrived on a link is a
+  // guest of this room; handing them "invite someone" reads as if the room were
+  // theirs and as if nobody else were coming.
+  const iAmHost = !!identity && !!room && room.host_id === identity.id;
+  const title = room?.game_name ?? (room?.game_type ? gameName(room.game_type) : "");
+  const subline = bothHere
+    ? "Both players are here."
+    : iAmHost
+      ? "Waiting for an opponent to take the seat."
+      : `Waiting for ${room?.host_handle ? `@${room.host_handle}` : "the host"}.`;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),20px)]">
@@ -219,9 +230,23 @@ export default function RoomPage() {
         </div>
       </header>
 
-      {/* Ambient portal — a small sign of life above the slots, not the hero. */}
-      <div className="flex justify-center pb-5 pt-1">
+      {/* Until this room's own state lands there are no players to show. Two
+          blank seats plus the host's share tools made an invited player think
+          they had landed in an empty room of their own. */}
+      {!ready ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 pb-24">
+          <RoomPortal filled={false} size={92} compact />
+          <p className="text-sm text-[var(--color-text-secondary)]">Joining the room...</p>
+        </div>
+      ) : (
+        <>
+      {/* Say what is being played, then who is in the room. */}
+      <div className="flex flex-col items-center gap-2.5 pb-5 pt-1">
         <RoomPortal filled={bothHere} size={92} compact />
+        {title && (
+          <h1 className="font-[var(--font-display)] text-2xl font-bold leading-none">{title}</h1>
+        )}
+        <p className="text-center text-sm text-[var(--color-text-secondary)]">{subline}</p>
       </div>
 
       {/* The real content of this screen: who is in the room. */}
@@ -237,10 +262,10 @@ export default function RoomPage() {
 
       {/* Actions, in priority order, all reachable without scrolling. */}
       <div className="mt-5 space-y-3">
-        {!bothHere && (
+        {!bothHere && iAmHost && (
           <InvitePanel
             roomCode={id}
-            gameName={room?.game_name ?? room?.game_type ?? "this game"}
+            gameName={title || "this game"}
             inviteText={inviteText}
           />
         )}
@@ -258,6 +283,8 @@ export default function RoomPage() {
           </Button>
         )}
       </div>
+        </>
+      )}
     </main>
   );
 }
