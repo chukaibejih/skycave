@@ -110,6 +110,32 @@ function Card({
   );
 }
 
+/**
+ * A card in transit between two places on screen.
+ *
+ * The state changes instantly, so without this a played card simply appears on
+ * the pile and drawn cards materialise in your hand — you never see the move
+ * that produced them. Each flight is a ghost copy that travels the real path
+ * and lands exactly on its destination.
+ */
+interface Flight {
+  key: string;
+  card: UnoCard | null; // null renders face-down (a draw, where the face is private)
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  delay: number;
+}
+
+const HAND_W = 58;
+const HAND_H = 84;
+
+const centerOf = (el: HTMLElement | null): { x: number; y: number } | null => {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (!r.width && !r.height) return null;
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+};
+
 /** Face-down card, for the opponent's hand and the draw pile. */
 function CardBack({ w = 34, h = 50 }: { w?: number; h?: number }) {
   return (
@@ -133,11 +159,79 @@ export function Uno({ board, meId, players, onAction }: Props) {
   // cards silently appear in your hand and the colour changes under you.
   const [moment, setMoment] = useState<{ text: string; tone: string } | null>(null);
   const freshRef = useRef<HTMLDivElement | null>(null);
+  // Anchors the flight paths are measured against.
+  const discardRef = useRef<HTMLDivElement | null>(null);
+  const drawRef = useRef<HTMLDivElement | null>(null);
+  const handRef = useRef<HTMLDivElement | null>(null);
+  const oppRef = useRef<HTMLDivElement | null>(null);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const seqRef = useRef<number>(-1);
 
   const last = b?.last ?? null;
   const lastKind = last?.kind ?? "";
   const lastBy = last?.by ?? "";
   const lastColor = last?.color ?? "";
+
+  // Fire one set of flights per accepted move. `seq` is the trigger because two
+  // consecutive draws produce an identical `last` payload.
+  const seq = b?.seq ?? -1;
+  useEffect(() => {
+    if (seq < 0 || !meId || !lastKind) return;
+    if (seqRef.current === seq) return;
+    const first = seqRef.current < 0;
+    seqRef.current = seq;
+    if (first) return; // don't animate the state we joined into
+
+    const mine = lastBy === meId;
+    const discard = centerOf(discardRef.current);
+    const deck = centerOf(drawRef.current);
+    const hand = centerOf(handRef.current);
+    const opp = centerOf(oppRef.current);
+    if (!discard || !deck || !hand || !opp) return;
+
+    const out: Flight[] = [];
+    const played = last?.card ?? null;
+    const mySide = mine ? hand : opp;
+
+    // A card being played travels from its owner to the pile.
+    if (played) out.push({ key: `p-${seq}`, card: played, from: mySide, to: discard, delay: 0 });
+
+    // Cards drawn come off the deck. Faces stay hidden: the reveal is the
+    // ringed card that lands in your hand.
+    const drawn =
+      lastKind === "draw2" || lastKind === "opening_draw2"
+        ? 2
+        : lastKind === "wild4"
+          ? 4
+          : lastKind === "drew" || lastKind === "drew_playable"
+            ? 1
+            : 0;
+    if (drawn) {
+      // A played +2/+4 hits the other player; a plain draw goes to the mover.
+      const toWho =
+        lastKind === "draw2" || lastKind === "wild4"
+          ? (mine ? opp : hand)
+          : lastKind === "opening_draw2"
+            ? hand
+            : (mine ? hand : opp);
+      for (let i = 0; i < drawn; i++) {
+        out.push({
+          key: `d-${seq}-${i}`,
+          card: null,
+          from: deck,
+          to: toWho,
+          delay: (played ? 0.22 : 0) + i * 0.09,
+        });
+      }
+    }
+    if (!out.length) return;
+    setFlights((f) => [...f, ...out]);
+    const t = setTimeout(
+      () => setFlights((f) => f.filter((x) => !out.some((o) => o.key === x.key))),
+      1200
+    );
+    return () => clearTimeout(t);
+  }, [seq, lastKind, lastBy, meId, last]);
 
   useEffect(() => {
     if (!lastKind || !meId) return;
@@ -181,6 +275,9 @@ export function Uno({ board, meId, players, onAction }: Props) {
 
   // The states that used to leave people stuck with no idea what to do.
   const nothingToPlay = myTurn && !b.must_play_or_pass && playable.size === 0;
+  // A ghost is already flying onto the pile, so the card underneath shouldn't
+  // pop in as well — the flight is the animation.
+  const landing = flights.some((f) => f.card);
   const goAgain = myTurn && !!lastKind && lastBy === meId && KEEPS_TURN.includes(lastKind);
 
   const play = (card: UnoCard) => {
@@ -248,7 +345,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
             UNO!
           </motion.span>
         )}
-        <div className="flex -space-x-4">
+        <div ref={oppRef} className="flex -space-x-4">
           {Array.from({ length: Math.min(oppCount, 8) }).map((_, i) => (
             <CardBack key={i} />
           ))}
@@ -268,6 +365,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
           className="flex flex-col items-center gap-1.5 disabled:opacity-45"
         >
           <div
+            ref={drawRef}
             style={{
               borderRadius: 10,
               boxShadow: nothingToPlay
@@ -282,13 +380,13 @@ export function Uno({ board, meId, players, onAction }: Props) {
           </span>
         </motion.button>
 
-        <div className="flex flex-col items-center gap-1.5">
+        <div ref={discardRef} className="flex flex-col items-center gap-1.5">
           {/* Keyed on the card id so every new top card visibly lands, instead
               of the opponent's move teleporting into place. */}
           <AnimatePresence mode="popLayout">
             <motion.div
               key={b.top.id}
-              initial={{ scale: 0.7, rotate: -12, opacity: 0 }}
+              initial={landing ? false : { scale: 0.7, rotate: -12, opacity: 0 }}
               animate={{ scale: 1, rotate: 0, opacity: 1 }}
               transition={{ type: "spring", stiffness: 320, damping: 22 }}
             >
@@ -342,7 +440,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
 
       {/* Your hand. Playable cards lift and brighten; a freshly drawn one is
           ringed and scrolled into view so you can see what just changed. */}
-      <div className="flex min-h-[112px] items-end gap-1.5 overflow-x-auto pb-2 pt-3">
+      <div ref={handRef} className="flex min-h-[112px] items-end gap-1.5 overflow-x-auto pb-2 pt-3">
         {(hand?.hand ?? []).map((c) => {
           const can = myTurn && playable.has(c.id);
           const fresh = c.id === justDrewId;
@@ -374,6 +472,28 @@ export function Uno({ board, meId, players, onAction }: Props) {
           Keep it and pass
         </button>
       )}
+
+      {/* Cards in transit. Rendered above everything and ignoring pointer
+          events, so a flight never blocks a tap. */}
+      <AnimatePresence>
+        {flights.map((f) => (
+          <motion.div
+            key={f.key}
+            initial={{ x: f.from.x - HAND_W / 2, y: f.from.y - HAND_H / 2, scale: 0.86, opacity: 0 }}
+            animate={{ x: f.to.x - HAND_W / 2, y: f.to.y - HAND_H / 2, scale: 1, opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.42, delay: f.delay, ease: [0.22, 0.61, 0.36, 1] }}
+            className="pointer-events-none fixed left-0 top-0 z-[60]"
+            style={{ width: HAND_W, height: HAND_H }}
+          >
+            {f.card ? (
+              <Card card={f.card} />
+            ) : (
+              <CardBack w={HAND_W} h={HAND_H} />
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
       {/* Wilds: the one moment Uno asks a question. */}
       <AnimatePresence>

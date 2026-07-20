@@ -105,6 +105,7 @@ export interface UnoBoard {
   deck_left: number;
   winner: string | null;
   must_play_or_pass: boolean;
+  seq: number; // move counter, so a move animates exactly once
   last: { kind: string; by?: string; card?: UnoCard; color?: string } | null;
   scores: Record<string, number>;
 }

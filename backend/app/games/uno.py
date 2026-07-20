@@ -128,6 +128,7 @@ class Uno(BaseGame):
             "drawn": None,   # card just drawn; its owner may play it or pass
             "drew": None,    # {"by", "id"} of the last draw, so its owner can spot it
             "last": None,    # short description of the previous move, for the UI
+            "seq": 0,        # move counter, so the client can animate each move once
         }
         # An opening action card applies to the first player, as at a real table.
         if top["value"] in (SKIP, REV):
@@ -252,7 +253,7 @@ class Uno(BaseGame):
         return new
 
     @staticmethod
-    def _clone(state: dict[str, Any]) -> dict[str, Any]:
+    def _clone(state: dict[str, Any]) -> dict[str, Any]:  # noqa: D401
         """Shallow copy with the mutable containers rebuilt, so the previous
         state is never mutated (the engine compares/persists both)."""
         return {
@@ -260,6 +261,7 @@ class Uno(BaseGame):
             "hands": {p: list(h) for p, h in state["hands"].items()},
             "deck": list(state["deck"]),
             "discard": list(state["discard"]),
+            "seq": state.get("seq", 0) + 1,
         }
 
     # ---- results ----
@@ -293,6 +295,7 @@ class Uno(BaseGame):
             "winner": state["winner"],
             "must_play_or_pass": state["drawn"] is not None,
             "last": state["last"],
+            "seq": state.get("seq", 0),
             "scores": self.turn_scores(state),
         }
 
