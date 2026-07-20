@@ -12,5 +12,6 @@ export const GAME_NAME: Record<string, string> = {
   connect4: "Connect 4",
   dots_boxes: "Dots and Boxes",
   clay: "Clay",
+  uno: "Uno",
 };
 export const gameName = (t: string) => GAME_NAME[t] ?? t;

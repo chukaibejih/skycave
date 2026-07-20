@@ -87,6 +87,34 @@ export interface BoardState {
   boxes?: (string | null)[];
 }
 
+// ── Uno ──
+// Uno is the only turn game with hidden state, so its board arrives in two
+// parts: the shared table via GAME_STATE, and your own hand via GAME_PRIVATE.
+export interface UnoCard {
+  id: number;
+  color: "r" | "y" | "g" | "b" | "w";
+  value: string; // "0".."9" | "skip" | "rev" | "d2" | "wild" | "wd4"
+}
+
+export interface UnoBoard {
+  order: string[];
+  turn: string;
+  top: UnoCard;
+  color: "r" | "y" | "g" | "b";
+  counts: Record<string, number>;
+  deck_left: number;
+  winner: string | null;
+  must_play_or_pass: boolean;
+  last: { kind: string; by?: string; card?: UnoCard; color?: string } | null;
+  scores: Record<string, number>;
+}
+
+export interface UnoHand {
+  hand: UnoCard[];
+  playable: number[];
+  drawn_id: number | null;
+}
+
 // ── WebSocket event names (mirror app/websocket/events.py) ──
 export const WS = {
   // server -> client
@@ -99,6 +127,7 @@ export const WS = {
   PLAYER_DISCONNECTED: "PLAYER_DISCONNECTED",
   ROOM_STATE: "ROOM_STATE",
   GAME_STATE: "GAME_STATE",
+  GAME_PRIVATE: "GAME_PRIVATE",
   ROOM_EXPIRED: "ROOM_EXPIRED",
   ERROR: "ERROR",
   // client -> server

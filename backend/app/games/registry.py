@@ -16,6 +16,7 @@ from app.games.mad_math import MadMath
 from app.games.outline_quiz import OutlineQuiz
 from app.games.reaction_grid import ReactionGrid
 from app.games.tile_takeover import TileTakeover
+from app.games.uno import Uno
 from app.games.word_duel import WordDuel
 from app.games.word_hunt import WordHunt
 
@@ -34,6 +35,7 @@ _GAMES: dict[str, BaseGame] = {
         Connect4(),
         DotsAndBoxes(),
         Clay(),
+        Uno(),
     )
 }
 

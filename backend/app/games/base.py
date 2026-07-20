@@ -114,8 +114,23 @@ class BaseGame:
         raise NotImplementedError
 
     def turn_public(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Client-facing board (turn-based games hide nothing)."""
+        """Client-facing board, broadcast to the whole room.
+
+        Most turn-based games hide nothing and return the state as-is. A game
+        with private information (Uno hands) must keep it out of here — this
+        payload goes to everyone — and expose it through `turn_private`.
+        """
         return state
+
+    def turn_private(
+        self, state: dict[str, Any], player_id: str
+    ) -> dict[str, Any] | None:
+        """The slice of a turn-based game only this player may see.
+
+        None (the default) means the game has no hidden state and everything
+        travels in `turn_public`.
+        """
+        return None
 
     def turn_over(self, state: dict[str, Any]) -> bool:
         return False

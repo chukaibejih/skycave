@@ -16,6 +16,7 @@ GAME_END = "GAME_END"
 PLAYER_DISCONNECTED = "PLAYER_DISCONNECTED"
 ROOM_STATE = "ROOM_STATE"                # full snapshot, sent on (re)connect for recovery
 GAME_STATE = "GAME_STATE"                # turn-based board update (Tile Takeover)
+GAME_PRIVATE = "GAME_PRIVATE"            # your own hidden slice of a turn game (Uno hand)
 ROOM_EXPIRED = "ROOM_EXPIRED"            # waiting room closed (no opponent joined in time)
 ERROR = "ERROR"
 

@@ -20,6 +20,7 @@ const TileTakeover = dynamic(() => import("./TileTakeover").then((m) => m.TileTa
 const Connect4 = dynamic(() => import("./Connect4").then((m) => m.Connect4), { ssr: false });
 const DotsAndBoxes = dynamic(() => import("./DotsAndBoxes").then((m) => m.DotsAndBoxes), { ssr: false });
 const Clay = dynamic(() => import("./Clay").then((m) => m.Clay), { ssr: false });
+const Uno = dynamic(() => import("./Uno").then((m) => m.Uno), { ssr: false });
 
 export function GameShell() {
   const {
@@ -48,6 +49,7 @@ export function GameShell() {
     const boardProps = { board: boardState, meId, players: room.players, onAction: sendAction };
     if (game.game_type === "connect4") return <Connect4 {...boardProps} />;
     if (game.game_type === "dots_boxes") return <DotsAndBoxes {...boardProps} />;
+    if (game.game_type === "uno") return <Uno {...boardProps} />;
     return <TileTakeover {...boardProps} />;
   }
 

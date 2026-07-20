@@ -67,6 +67,12 @@ def _public_room(room: dict, player_id: str) -> dict:
         g = get_game(room["game_type"])
         if g is not None:
             safe["board"] = g.turn_public(game["turn_state"])
+            # Private slice (an Uno hand) goes only to the player this snapshot
+            # is being built for, so a reconnect restores their cards without
+            # ever exposing the opponent's.
+            private = g.turn_private(game["turn_state"], player_id)
+            if private is not None:
+                safe["my_board"] = private
     return safe
 
 
