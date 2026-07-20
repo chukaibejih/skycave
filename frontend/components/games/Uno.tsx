@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRoom } from "@/lib/store";
 import type { PlayerSlot, UnoBoard, UnoCard } from "@/lib/types";
@@ -18,6 +18,13 @@ const SUIT: Record<string, string> = {
   b: "#4a90ff",
 };
 
+const COLOR_NAME: Record<string, string> = {
+  r: "red",
+  y: "yellow",
+  g: "green",
+  b: "blue",
+};
+
 // Short faces. Numbers speak for themselves; actions need a glyph that reads at
 // card size, since a word would wrap.
 const FACE: Record<string, string> = {
@@ -30,17 +37,22 @@ const FACE: Record<string, string> = {
 
 const face = (c: UnoCard) => FACE[c.value] ?? c.value;
 
+// Cards that hand the turn straight back to you in a two-player game.
+const KEEPS_TURN = ["skip", "draw2", "wild4"];
+
 function Card({
   card,
   size = "hand",
   dim,
   raised,
+  fresh,
   onClick,
 }: {
   card: UnoCard;
   size?: "hand" | "table";
   dim?: boolean;
   raised?: boolean;
+  fresh?: boolean; // just drawn — the player needs to find it
   onClick?: () => void;
 }) {
   const table = size === "table";
@@ -63,11 +75,15 @@ function Card({
         background: wild
           ? "conic-gradient(#ff5a4e 0deg 90deg, #ffd166 90deg 180deg, #3fce7c 180deg 270deg, #4a90ff 270deg 360deg)"
           : SUIT[card.color],
-        borderColor: raised ? "#f5f7ff" : "rgba(5,6,10,0.35)",
+        borderColor: fresh ? "var(--color-cyan)" : raised ? "#f5f7ff" : "rgba(5,6,10,0.35)",
         color: "#05060a",
         opacity: dim ? 0.62 : 1,
         cursor: onClick ? "pointer" : "default",
-        boxShadow: raised ? "0 6px 18px rgba(139,124,255,0.45)" : "0 2px 6px rgba(0,0,0,0.4)",
+        boxShadow: fresh
+          ? "0 0 0 2px var(--color-cyan), 0 6px 18px rgba(103,232,249,0.45)"
+          : raised
+            ? "0 6px 18px rgba(139,124,255,0.45)"
+            : "0 2px 6px rgba(0,0,0,0.4)",
       }}
     >
       {wild && (
@@ -82,6 +98,14 @@ function Card({
       >
         {face(card)}
       </span>
+      {fresh && (
+        <span
+          className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
+          style={{ background: "var(--color-cyan)", color: "#05060a" }}
+        >
+          new
+        </span>
+      )}
     </motion.button>
   );
 }
@@ -104,9 +128,40 @@ function CardBack({ w = 34, h = 50 }: { w?: number; h?: number }) {
 export function Uno({ board, meId, players, onAction }: Props) {
   const b = board as UnoBoard | null;
   const hand = useRoom((s) => s.privateBoard);
-  // Which wild is waiting on a colour choice. Uno's only branching decision, so
-  // it gets an explicit step rather than a guess.
   const [pendingWild, setPendingWild] = useState<number | null>(null);
+  // A short-lived announcement for things that happen TO you. Without it, two
+  // cards silently appear in your hand and the colour changes under you.
+  const [moment, setMoment] = useState<{ text: string; tone: string } | null>(null);
+  const freshRef = useRef<HTMLDivElement | null>(null);
+
+  const last = b?.last ?? null;
+  const lastKind = last?.kind ?? "";
+  const lastBy = last?.by ?? "";
+  const lastColor = last?.color ?? "";
+
+  useEffect(() => {
+    if (!lastKind || !meId) return;
+    const theirs = !!lastBy && lastBy !== meId;
+    let next: { text: string; tone: string } | null = null;
+    if (theirs && lastKind === "draw2") next = { text: "You drew 2", tone: "var(--color-warm)" };
+    else if (theirs && lastKind === "wild4") next = { text: "You drew 4", tone: "var(--color-warm)" };
+    else if (theirs && lastKind === "wild")
+      next = { text: `Colour is now ${COLOR_NAME[lastColor] ?? "new"}`, tone: "var(--color-cyan)" };
+    else if (lastKind === "opening_draw2")
+      next = { text: "Opening card dealt two", tone: "var(--color-warm)" };
+    if (!next) return;
+    setMoment(next);
+    const t = setTimeout(() => setMoment(null), 2200);
+    return () => clearTimeout(t);
+  }, [lastKind, lastBy, lastColor, meId]);
+
+  // Bring a newly drawn card into view — it lands at the end of a hand that may
+  // already be scrolled off-screen.
+  const justDrewId = hand?.just_drew_id ?? null;
+  useEffect(() => {
+    if (justDrewId == null) return;
+    freshRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [justDrewId]);
 
   if (!b) {
     return (
@@ -117,10 +172,16 @@ export function Uno({ board, meId, players, onAction }: Props) {
   }
 
   const opp = players.find((p) => p.id !== meId) ?? null;
+  const oppName = opp?.display_name ?? "The Caver";
   const oppId = b.order.find((id) => id !== meId) ?? "ai";
   const myTurn = b.turn === meId && !b.winner;
   const playable = new Set(hand?.playable ?? []);
   const oppCount = b.counts[oppId] ?? 0;
+  const myCount = hand?.hand.length ?? 0;
+
+  // The states that used to leave people stuck with no idea what to do.
+  const nothingToPlay = myTurn && !b.must_play_or_pass && playable.size === 0;
+  const goAgain = myTurn && !!lastKind && lastBy === meId && KEEPS_TURN.includes(lastKind);
 
   const play = (card: UnoCard) => {
     if (!myTurn) return;
@@ -137,19 +198,56 @@ export function Uno({ board, meId, players, onAction }: Props) {
     setPendingWild(null);
   };
 
+  // One line that always says exactly where the player stands. The "you go
+  // again" case matters most: a skip or +2 returns the turn to you, and without
+  // saying so the screen looks identical to your tap not registering.
+  const headline = b.winner
+    ? b.winner === meId
+      ? "You went out!"
+      : `${oppName} went out.`
+    : goAgain
+      ? lastKind === "skip"
+        ? "Skipped — you go again"
+        : "You go again"
+      : b.must_play_or_pass
+        ? "Play it, or keep it"
+        : nothingToPlay
+          ? "Nothing to play — draw one"
+          : myTurn
+            ? "Your turn"
+            : `${oppName}'s turn`;
+
+  const headlineTone = b.winner
+    ? "var(--color-success)"
+    : goAgain
+      ? "var(--color-primary)"
+      : nothingToPlay
+        ? "var(--color-warm)"
+        : myTurn
+          ? "var(--color-primary)"
+          : "var(--color-text-secondary)";
+
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-      {/* Opponent: how many cards they hold is the whole story. */}
+      {/* Opponent: their card count is the whole story, and one card left is the
+          tensest moment in the game — so it gets said loudly. */}
       <div className="flex items-center gap-3 py-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">
-            {opp?.display_name ?? "The Caver"}
-          </div>
+          <div className="truncate text-sm font-semibold">{oppName}</div>
           <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
             {oppCount} {oppCount === 1 ? "card" : "cards"}
-            {oppCount === 1 && <span style={{ color: "var(--color-warm)" }}> · uno!</span>}
           </div>
         </div>
+        {oppCount === 1 && (
+          <motion.span
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 1.1, repeat: Infinity }}
+            className="rounded-full px-2.5 py-1 font-[var(--font-display)] text-xs font-bold"
+            style={{ background: "var(--color-warm)", color: "#05060a" }}
+          >
+            UNO!
+          </motion.span>
+        )}
         <div className="flex -space-x-4">
           {Array.from({ length: Math.min(oppCount, 8) }).map((_, i) => (
             <CardBack key={i} />
@@ -158,67 +256,106 @@ export function Uno({ board, meId, players, onAction }: Props) {
       </div>
 
       {/* The table: draw pile on the left, the card in play on the right. */}
-      <div className="flex flex-1 items-center justify-center gap-7">
-        <button
+      <div className="relative flex flex-1 items-center justify-center gap-7">
+        <motion.button
           type="button"
           disabled={!myTurn || b.must_play_or_pass}
           onClick={() => onAction({ action: "draw" })}
+          // With nothing playable the draw pile is the only way forward, so it
+          // asks for the tap instead of waiting to be found.
+          animate={nothingToPlay ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+          transition={nothingToPlay ? { duration: 1.2, repeat: Infinity } : { duration: 0.2 }}
           className="flex flex-col items-center gap-1.5 disabled:opacity-45"
         >
-          <CardBack w={78} h={112} />
+          <div
+            style={{
+              borderRadius: 10,
+              boxShadow: nothingToPlay
+                ? "0 0 0 2px var(--color-warm), 0 0 22px rgba(255,114,94,0.5)"
+                : "none",
+            }}
+          >
+            <CardBack w={78} h={112} />
+          </div>
           <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
             draw · {b.deck_left}
           </span>
-        </button>
+        </motion.button>
 
         <div className="flex flex-col items-center gap-1.5">
-          <Card card={b.top} size="table" />
-          {/* A wild leaves the top card the wrong colour, so the colour in play
-              is stated separately rather than inferred from the card. */}
+          {/* Keyed on the card id so every new top card visibly lands, instead
+              of the opponent's move teleporting into place. */}
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={b.top.id}
+              initial={{ scale: 0.7, rotate: -12, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+            >
+              <Card card={b.top} size="table" />
+            </motion.div>
+          </AnimatePresence>
           <span
             className="rounded-full px-2.5 py-0.5 font-[var(--font-mono)] text-[11px] uppercase tracking-wide"
             style={{ background: SUIT[b.color], color: "#05060a" }}
           >
-            {b.color === "r" ? "red" : b.color === "y" ? "yellow" : b.color === "g" ? "green" : "blue"}
+            {COLOR_NAME[b.color]}
           </span>
         </div>
+
+        {/* Things that happened to you, said out loud and briefly. */}
+        <AnimatePresence>
+          {moment && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: -6, scale: 1 }}
+              exit={{ opacity: 0, y: -18 }}
+              className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-full px-3.5 py-1.5 font-[var(--font-display)] text-sm font-bold"
+              style={{ background: moment.tone, color: "#05060a" }}
+            >
+              {moment.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Whose turn, and what just happened. */}
+      {/* Whose turn, and what to do about it. */}
       <div className="py-3 text-center">
-        <div
+        <motion.div
+          key={headline}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
           className="font-[var(--font-display)] text-lg font-bold"
-          style={{ color: myTurn ? "var(--color-primary)" : "var(--color-text-secondary)" }}
+          style={{ color: headlineTone }}
         >
-          {b.winner
-            ? b.winner === meId
-              ? "You went out!"
-              : `${opp?.display_name ?? "The Caver"} went out.`
-            : myTurn
-              ? b.must_play_or_pass
-                ? "Play it or keep it"
-                : "Your turn"
-              : `${opp?.display_name ?? "The Caver"}'s turn`}
-        </div>
-        {b.last && !b.winner && (
-          <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-            {describe(b.last, b.last.by === meId)}
+          {headline}
+        </motion.div>
+        {myCount === 1 && !b.winner && (
+          <div
+            className="mt-0.5 font-[var(--font-display)] text-sm font-bold"
+            style={{ color: "var(--color-warm)" }}
+          >
+            One card left.
           </div>
         )}
       </div>
 
-      {/* Your hand. Playable cards lift and brighten; the rest stay put. */}
-      <div className="flex min-h-[104px] items-end gap-1.5 overflow-x-auto pb-1">
+      {/* Your hand. Playable cards lift and brighten; a freshly drawn one is
+          ringed and scrolled into view so you can see what just changed. */}
+      <div className="flex min-h-[112px] items-end gap-1.5 overflow-x-auto pb-2 pt-3">
         {(hand?.hand ?? []).map((c) => {
           const can = myTurn && playable.has(c.id);
+          const fresh = c.id === justDrewId;
           return (
-            <Card
-              key={c.id}
-              card={c}
-              raised={can}
-              dim={myTurn && !can}
-              onClick={can ? () => play(c) : undefined}
-            />
+            <div key={c.id} ref={fresh ? freshRef : undefined} className="shrink-0">
+              <Card
+                card={c}
+                raised={can}
+                dim={myTurn && !can}
+                fresh={fresh}
+                onClick={can ? () => play(c) : undefined}
+              />
+            </div>
           );
         })}
       </div>
@@ -228,8 +365,11 @@ export function Uno({ board, meId, players, onAction }: Props) {
         <button
           type="button"
           onClick={() => onAction({ action: "pass" })}
-          className="mt-2 h-11 rounded-[12px] border text-sm font-semibold"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+          className="mt-1 h-11 rounded-[12px] border text-sm font-semibold"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-text-secondary) 45%, transparent)",
+            color: "var(--color-text-primary)",
+          }}
         >
           Keep it and pass
         </button>
@@ -260,10 +400,10 @@ export function Uno({ board, meId, players, onAction }: Props) {
                   <button
                     key={c}
                     onClick={() => chooseColor(c)}
-                    className="h-16 rounded-[12px] font-[var(--font-display)] font-bold"
+                    className="h-16 rounded-[12px] font-[var(--font-display)] font-bold capitalize"
                     style={{ background: SUIT[c], color: "#05060a" }}
                   >
-                    {c === "r" ? "Red" : c === "y" ? "Yellow" : c === "g" ? "Green" : "Blue"}
+                    {COLOR_NAME[c]}
                   </button>
                 ))}
               </div>
@@ -273,33 +413,4 @@ export function Uno({ board, meId, players, onAction }: Props) {
       </AnimatePresence>
     </div>
   );
-}
-
-/** One line of plain English for the previous move. */
-function describe(last: NonNullable<UnoBoard["last"]>, mine: boolean): string {
-  const who = mine ? "You" : "They";
-  switch (last.kind) {
-    case "draw2":
-      return `${who} played +2`;
-    case "wild4":
-      return `${who} played +4`;
-    case "wild":
-      return `${who} changed the colour`;
-    case "skip":
-      return `${who} played a skip`;
-    case "drew":
-      return `${who} drew a card`;
-    case "drew_playable":
-      return `${who} drew a card`;
-    case "passed":
-      return `${who} passed`;
-    case "opening_skip":
-      return "Opening card skipped the first turn";
-    case "opening_draw2":
-      return "Opening card dealt two";
-    case "deck_empty":
-      return "The deck ran out";
-    default:
-      return "";
-  }
 }

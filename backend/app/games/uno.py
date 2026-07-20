@@ -126,6 +126,7 @@ class Uno(BaseGame):
             "color": top["color"],
             "winner": None,
             "drawn": None,   # card just drawn; its owner may play it or pass
+            "drew": None,    # {"by", "id"} of the last draw, so its owner can spot it
             "last": None,    # short description of the previous move, for the UI
         }
         # An opening action card applies to the first player, as at a real table.
@@ -177,6 +178,7 @@ class Uno(BaseGame):
             return None
 
         new = self._clone(state)
+        new["drew"] = None
         new_hand = [c for c in new["hands"][pid] if c["id"] != card_id]
         new["hands"][pid] = new_hand
         new["discard"] = new["discard"] + [card]
@@ -228,6 +230,7 @@ class Uno(BaseGame):
             return new
         card = drawn[0]
         new["hands"][pid] = new["hands"][pid] + [card]
+        new["drew"] = {"by": pid, "id": card["id"]}
         if is_playable(card, new["discard"][-1], new["color"]):
             # Stay on turn so they can choose to play it or keep it.
             new["drawn"] = card
@@ -243,6 +246,7 @@ class Uno(BaseGame):
             return None
         new = self._clone(state)
         new["drawn"] = None
+        new["drew"] = None
         new["turn"] = self._opponent(new, pid)
         new["last"] = {"kind": "passed", "by": pid}
         return new
@@ -304,7 +308,15 @@ class Uno(BaseGame):
             playable = [drawn["id"]] if is_playable(drawn, top, color) else []
         else:
             playable = [c["id"] for c in hand if is_playable(c, top, color)]
-        return {"hand": hand, "playable": playable, "drawn_id": drawn["id"] if drawn else None}
+        drew = state.get("drew")
+        return {
+            "hand": hand,
+            "playable": playable,
+            "drawn_id": drawn["id"] if drawn else None,
+            # The card this player just picked up, playable or not, so the client
+            # can mark it rather than making them hunt for what changed.
+            "just_drew_id": drew["id"] if drew and drew["by"] == player_id else None,
+        }
 
     def turn_metric(self, score: int, state: dict[str, Any]) -> str:
         return f"won by {score}" if score else "lost this one"

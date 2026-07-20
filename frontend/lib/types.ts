@@ -113,6 +113,9 @@ export interface UnoHand {
   hand: UnoCard[];
   playable: number[];
   drawn_id: number | null;
+  // The card you just picked up (playable or not), so the client can mark it
+  // instead of making you hunt through your hand for what changed.
+  just_drew_id: number | null;
 }
 
 // ── WebSocket event names (mirror app/websocket/events.py) ──
