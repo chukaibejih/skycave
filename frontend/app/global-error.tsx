@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { reportClientError } from "@/lib/report";
+import { recoverFromChunkError, reportClientError } from "@/lib/report";
 
 /**
  * Last-resort boundary for errors in the root layout itself. It replaces the
@@ -15,6 +15,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // A stale-deploy chunk 404 heals itself with a reload; only report it if
+    // the reload already failed to fix it.
+    if (recoverFromChunkError(error)) return;
     reportClientError(error, "global-error.tsx");
   }, [error]);
 

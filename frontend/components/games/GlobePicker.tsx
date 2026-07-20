@@ -1,17 +1,14 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { FlatPicker } from "./FlatPicker";
+import { EARTH_TEXTURE, type Marker } from "./geo";
+
+// Re-exported so existing call sites keep importing these from here.
+export { EARTH_TEXTURE, type Marker };
 
 // react-globe.gl touches `window`/WebGL on import — load it client-only.
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false, loading: () => null });
-
-export interface Marker {
-  lat: number;
-  lng: number;
-  color: string;
-  label?: string;
-  size?: number;
-}
 
 interface Props {
   markers: Marker[];
@@ -19,7 +16,6 @@ interface Props {
   interactive?: boolean;
 }
 
-export const EARTH_TEXTURE = "/textures/earth-blue-marble.jpg";
 
 // Camera distance — lower = the globe fills more of the frame (default is 2.5,
 // which leaves a small globe floating in space).
@@ -37,11 +33,82 @@ export function preloadGlobe(): void {
   img.src = EARTH_TEXTURE;
 }
 
+/**
+ * Can this browser actually give us a live WebGL context right now?
+ *
+ * iOS Safari caps how many contexts may exist at once and silently hands back a
+ * lost one past the limit. three.js then calls getShaderPrecisionFormat() on it,
+ * gets null, and throws while reading `.precision` — which is exactly the crash
+ * seen in production. Probing for that same null up front lets us fall back to
+ * the flat map instead of dying inside the renderer.
+ *
+ * The probe releases its own context immediately, or it would consume one of
+ * the very slots it is testing for.
+ */
+function webglUsable(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    const gl = (c.getContext("webgl2") ??
+      c.getContext("webgl")) as WebGLRenderingContext | null;
+    if (!gl) return false;
+    const ok = !!gl.getShaderPrecisionFormat?.(gl.VERTEX_SHADER, gl.HIGH_FLOAT);
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Catches a throw from inside the globe (a context lost mid-render, a driver
+ * quirk) and swaps in the flat map, so one bad WebGL call can't take out the
+ * whole route via the app-level error boundary.
+ */
+class GlobeBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 export function GlobePicker({ markers, onPick, interactive = true }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const globeRef = useRef<any>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
+  // null = not probed yet; probing must happen after mount (no WebGL on the server).
+  const [usable, setUsable] = useState<boolean | null>(null);
+
+  useEffect(() => setUsable(webglUsable()), []);
+
+  /**
+   * Hand the WebGL context back on unmount.
+   *
+   * three.js does not release one when the component goes away, so every globe
+   * mount used to leak a context. Over a long session (48 solo games in 90
+   * minutes, in the report that prompted this) the browser hits its ceiling and
+   * every later globe fails to initialise until a full reload.
+   */
+  useEffect(() => {
+    return () => {
+      const g = globeRef.current;
+      if (!g) return;
+      try {
+        g.pauseAnimation?.();
+        const r = g.renderer?.();
+        r?.dispose?.();
+        r?.forceContextLoss?.();
+      } catch {
+        /* teardown must never throw */
+      }
+    };
+  }, []);
 
   // Measure the *absolute* fill box (which has a real pixel size, unlike a
   // percentage-height child). Gate rendering on a real size so the globe is
@@ -78,9 +145,16 @@ export function GlobePicker({ markers, onPick, interactive = true }: Props) {
     }
   };
 
+  const flat = (
+    <FlatPicker markers={markers} onPick={onPick} interactive={interactive} />
+  );
+
+  if (usable === false) return flat;
+
   return (
     <div ref={wrapRef} className="absolute inset-0">
-      {dims.w > 0 && dims.h > 0 && (
+      {usable && dims.w > 0 && dims.h > 0 && (
+        <GlobeBoundary fallback={flat}>
         <Globe
           ref={globeRef}
           width={dims.w}
@@ -104,6 +178,7 @@ export function GlobePicker({ markers, onPick, interactive = true }: Props) {
               : undefined
           }
         />
+        </GlobeBoundary>
       )}
     </div>
   );

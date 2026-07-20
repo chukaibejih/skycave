@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
-import { reportClientError } from "@/lib/report";
+import { recoverFromChunkError, reportClientError } from "@/lib/report";
 
 /**
  * Route-level error boundary. Catches a render/runtime error in any page subtree
@@ -17,6 +17,9 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
+    // A stale-deploy chunk 404 heals itself with a reload; only report it if
+    // the reload already failed to fix it.
+    if (recoverFromChunkError(error)) return;
     reportClientError(error, "error.tsx");
   }, [error]);
 
