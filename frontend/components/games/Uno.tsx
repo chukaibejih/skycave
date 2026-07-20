@@ -124,10 +124,12 @@ interface Flight {
   from: { x: number; y: number };
   to: { x: number; y: number };
   delay: number;
+  scaleTo: number; // the pile shows bigger cards than a hand does
 }
 
 const HAND_W = 58;
 const HAND_H = 84;
+const TABLE_W = 78;
 
 const centerOf = (el: HTMLElement | null): { x: number; y: number } | null => {
   if (!el) return null;
@@ -175,6 +177,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
   // Fire one set of flights per accepted move. `seq` is the trigger because two
   // consecutive draws produce an identical `last` payload.
   const seq = b?.seq ?? -1;
+  const playedCard = last?.card ?? null;
   useEffect(() => {
     if (seq < 0 || !meId || !lastKind) return;
     if (seqRef.current === seq) return;
@@ -190,11 +193,20 @@ export function Uno({ board, meId, players, onAction }: Props) {
     if (!discard || !deck || !hand || !opp) return;
 
     const out: Flight[] = [];
-    const played = last?.card ?? null;
+    const played = playedCard;
     const mySide = mine ? hand : opp;
 
     // A card being played travels from its owner to the pile.
-    if (played) out.push({ key: `p-${seq}`, card: played, from: mySide, to: discard, delay: 0 });
+    if (played) {
+      out.push({
+        key: `p-${seq}`,
+        card: played,
+        from: mySide,
+        to: discard,
+        delay: 0,
+        scaleTo: TABLE_W / HAND_W,
+      });
+    }
 
     // Cards drawn come off the deck. Faces stay hidden: the reveal is the
     // ringed card that lands in your hand.
@@ -221,17 +233,22 @@ export function Uno({ board, meId, players, onAction }: Props) {
           from: deck,
           to: toWho,
           delay: (played ? 0.22 : 0) + i * 0.09,
+          scaleTo: 1,
         });
       }
     }
     if (!out.length) return;
     setFlights((f) => [...f, ...out]);
-    const t = setTimeout(
-      () => setFlights((f) => f.filter((x) => !out.some((o) => o.key === x.key))),
-      1200
-    );
+  }, [seq, lastKind, lastBy, meId, playedCard]);
+
+  // Backstop. Flights retire themselves when they land, but a ghost that
+  // somehow never completes would sit on the pile forever — which is precisely
+  // what happened when the removal timer was being cancelled.
+  useEffect(() => {
+    if (!flights.length) return;
+    const t = setTimeout(() => setFlights([]), 2000);
     return () => clearTimeout(t);
-  }, [seq, lastKind, lastBy, meId, last]);
+  }, [flights]);
 
   useEffect(() => {
     if (!lastKind || !meId) return;
@@ -480,10 +497,13 @@ export function Uno({ board, meId, players, onAction }: Props) {
           <motion.div
             key={f.key}
             initial={{ x: f.from.x - HAND_W / 2, y: f.from.y - HAND_H / 2, scale: 0.86, opacity: 0 }}
-            animate={{ x: f.to.x - HAND_W / 2, y: f.to.y - HAND_H / 2, scale: 1, opacity: 1 }}
+            animate={{ x: f.to.x - HAND_W / 2, y: f.to.y - HAND_H / 2, scale: f.scaleTo, opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.42, delay: f.delay, ease: [0.22, 0.61, 0.36, 1] }}
-            className="pointer-events-none fixed left-0 top-0 z-[60]"
+            onAnimationComplete={() =>
+              setFlights((cur) => cur.filter((x) => x.key !== f.key))
+            }
+            className="pointer-events-none fixed left-0 top-0 z-40"
             style={{ width: HAND_W, height: HAND_H }}
           >
             {f.card ? (
