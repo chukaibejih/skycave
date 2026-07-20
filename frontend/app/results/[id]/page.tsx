@@ -66,9 +66,7 @@ export default function ResultsPage() {
     return (
       <Centered>
         <p className="text-[var(--color-text-secondary)]">No results found.</p>
-        <Button variant="secondary" onClick={() => router.push("/")}>
-          Back to hub
-        </Button>
+        <Button onClick={() => router.push("/")}>Back to hub</Button>
       </Centered>
     );
   }

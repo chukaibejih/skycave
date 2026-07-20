@@ -363,7 +363,18 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
     gs = room["game"]
     new = game.apply_turn(gs["turn_state"], player_id, action)
     if new is None:
-        return False  # not their turn / illegal move — ignore
+        # Not their turn, or an illegal move. Dropping it silently is right for
+        # the client (it simply doesn't happen), but a rejected move that the
+        # client believed was legal means the two have diverged — and with
+        # nothing logged, that looks exactly like the game freezing.
+        logger.info(
+            "room %s: rejected turn action from %s (turn=%s) %s",
+            room_id,
+            player_id,
+            gs["turn_state"].get("turn"),
+            action,
+        )
+        return False
     gs["turn_state"] = new
     await rooms.save_room(room)
     await _send_turn_state(room_id, game, new)

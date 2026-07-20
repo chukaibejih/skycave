@@ -12,8 +12,10 @@ interface Props extends Omit<HTMLMotionProps<"button">, "ref"> {
 const styles: Record<Variant, string> = {
   primary:
     "bg-[linear-gradient(135deg,var(--color-primary),var(--color-cyan))] text-[#05060a] shadow-[0_0_28px_var(--color-primary-glow)] hover:brightness-110 active:brightness-95",
+  // Solid fill and a border keyed off the text colour, not the (much darker)
+  // border token — at 85% over the base this read as an empty patch of page.
   secondary:
-    "bg-[var(--color-elevated)]/85 text-[var(--color-text-primary)] border border-[var(--color-border)] active:bg-[var(--color-surface)]",
+    "bg-[var(--color-elevated)] text-[var(--color-text-primary)] border border-[color-mix(in_srgb,var(--color-text-secondary)_45%,transparent)] active:bg-[var(--color-surface)]",
   ghost:
     "bg-transparent text-[var(--color-text-secondary)] active:text-[var(--color-text-primary)]",
   danger: "bg-[var(--color-warm)] text-white active:brightness-95",
