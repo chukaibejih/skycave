@@ -278,5 +278,38 @@ class Clay(BaseGame):
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
         return {}  # the target was already public; nothing hidden to reveal
 
+    def result_details(
+        self,
+        public: dict[str, Any],
+        secret: dict[str, Any],
+        actions: dict[str, dict[str, Any]],
+        points: dict[str, int],
+    ) -> dict[str, Any]:
+        """Every player's finished pot, so the result can show them side by side.
+
+        Half the fun of a pot-off is seeing what the other person made, and the
+        client only ever has its own pot. Sanitised here rather than trusted:
+        these arrays came from a client and get re-broadcast to the opponent.
+        """
+        pots: dict[str, Any] = {}
+        for pid, a in actions.items():
+            prof = a.get("profile") or []
+            if len(prof) != ROWS:
+                continue
+            try:
+                radius = [round(min(MAXR, max(0.0, float(r))), 1) for r in prof]
+            except (TypeError, ValueError):
+                continue
+            glaze = a.get("glaze") or []
+            pots[pid] = {
+                "profile": radius,
+                "glaze": [
+                    g if isinstance(g, str) and g in GLAZES else None
+                    for g in (list(glaze) + [None] * ROWS)[:ROWS]
+                ],
+                "collapsed": bool(a.get("collapsed")),
+            }
+        return {"pots": pots} if pots else {}
+
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
         return f"{score:,} pts"

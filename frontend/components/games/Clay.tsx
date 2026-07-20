@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { shareToBluesky } from "@/lib/bluesky";
@@ -55,6 +55,7 @@ export function Clay() {
   const room = useRoom((s) => s.room);
   const sendRematch = useRoom((s) => s.sendRematch);
   const rematchRequestedBy = useRoom((s) => s.rematchRequestedBy);
+  const roundResult = useRoom((s) => s.roundResult);
   const meId = useAuth((s) => s.identity?.id);
 
   const isSolo = (room?.players.length ?? 1) === 1;
@@ -289,16 +290,49 @@ export function Clay() {
     return () => cancelAnimationFrame(raf);
   }, [phase, roundEndsAt, roundSecs, submitPot]);
 
-  // Draw the share card (TARGET vs YOURS + score) once the game ends.
-  useEffect(() => {
-    if (!gameEnd || !S.current || !cardRef.current) return;
-    drawCard(cardRef.current, S.current, gameEnd.scores[meId ?? ""] ?? 0, S.current.name);
-  }, [gameEnd, meId]);
-
   const fire = () => submitPot(true);
 
   const myScore = gameEnd ? gameEnd.scores[meId ?? ""] ?? 0 : 0;
   const opp = room?.players.find((p) => p.id !== meId) ?? null;
+
+  // The opponent's finished pot, shipped by the server in the round result
+  // (clay.py::result_details). Absent on solo, and on an older round result.
+  const oppPot = useMemo(() => {
+    if (!opp) return null;
+    const pots = (roundResult?.answer as { pots?: Record<string, SubmittedPot> } | undefined)?.pots;
+    const p = pots?.[opp.id];
+    return p && Array.isArray(p.profile) && p.profile.length ? p : null;
+  }, [roundResult, opp]);
+
+  const cardHeadline = !gameEnd
+    ? ""
+    : isSolo
+      ? "Fired."
+      : gameEnd.winner_id === meId
+        ? "You win."
+        : gameEnd.winner_id == null
+          ? "Draw."
+          : `${opp?.display_name ?? "Opponent"} wins.`;
+
+  // Draw the share card once the game ends. In a pot-off it shows all three
+  // pots, since seeing what the other person made is half the point.
+  useEffect(() => {
+    if (!gameEnd || !S.current || !cardRef.current) return;
+    drawCard(
+      cardRef.current,
+      S.current,
+      gameEnd.scores[meId ?? ""] ?? 0,
+      S.current.name,
+      oppPot
+        ? {
+            pot: oppPot,
+            name: opp?.display_name ?? "Opponent",
+            score: (opp && gameEnd.scores[opp.id]) ?? 0,
+          }
+        : null,
+      cardHeadline
+    );
+  }, [gameEnd, meId, oppPot, opp, cardHeadline]);
   const oppScore = gameEnd && opp ? gameEnd.scores[opp.id] ?? 0 : null;
   // A finished room stops sending round_data, so lean on the sim's own copy.
   const potName = S.current?.name ?? target?.name ?? "your pot";
@@ -348,13 +382,7 @@ export function Clay() {
   if (gameEnd) {
     const iRequested = rematchRequestedBy.includes(meId ?? "");
     const oppRequested = !!opp && rematchRequestedBy.includes(opp.id);
-    const headline = isSolo
-      ? "Fired."
-      : gameEnd.winner_id === meId
-        ? "You win."
-        : gameEnd.winner_id == null
-          ? "Draw."
-          : `${opp?.display_name ?? "Opponent"} wins.`;
+    const headline = cardHeadline;
     return (
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
         <motion.div
@@ -373,8 +401,8 @@ export function Clay() {
           {/* The pot itself is the result — target beside yours. */}
           <canvas
             ref={cardRef}
-            width={1280}
-            height={720}
+            width={oppPot ? 1080 : 1280}
+            height={oppPot ? 1320 : 720}
             className="mt-5 w-full rounded-[14px] border border-[var(--color-border)]"
           />
 
@@ -844,8 +872,28 @@ function drawRef(ctx: CanvasRenderingContext2D, s: Sim, W: number) {
   void W;
 }
 
-// The shareable score card: TARGET vs YOURS pots side by side + the score.
-function drawCard(canvas: HTMLCanvasElement, s: Sim, score: number, name: string) {
+export interface SubmittedPot {
+  profile: number[];
+  glaze: (string | null)[];
+  collapsed?: boolean;
+}
+
+/**
+ * The shareable score card.
+ *
+ * Solo keeps the wide 16:9 strip: target beside your pot. A pot-off switches to
+ * a taller card laid out as a triangle, target on top with both attempts under
+ * it, which reads as "here's the brief, here's what each of us made" and leaves
+ * the pots far bigger than three-in-a-row ever could on a 16:9 card.
+ */
+function drawCard(
+  canvas: HTMLCanvasElement,
+  s: Sim,
+  score: number,
+  name: string,
+  rival: { pot: SubmittedPot; name: string; score: number } | null,
+  headline?: string
+) {
   const g = canvas.getContext("2d");
   if (!g) return;
   // Drawn in a 640x360 layout but rasterised at 2x, so the PNG people actually
@@ -868,30 +916,73 @@ function drawCard(canvas: HTMLCanvasElement, s: Sim, score: number, name: string
   g.fillStyle = "#9aa3ba";
   g.font = "500 17px ui-monospace, monospace";
   g.fillText(name, 30, 80);
-  g.fillStyle = "#8b7cff";
-  g.font = "800 52px system-ui, sans-serif";
   g.textAlign = "right";
-  g.fillText(String(score), CW - 30, 64);
-  g.fillStyle = "#9aa3ba";
-  g.font = "500 14px ui-monospace, monospace";
-  g.fillText("points", CW - 30, 86);
+  if (rival) {
+    // The outcome is the hero here; the per-pot scores below carry the numbers.
+    g.fillStyle = "#f5f7ff";
+    g.font = "700 26px system-ui, sans-serif";
+    g.fillText(headline ?? "", CW - 30, 58);
+  } else {
+    g.fillStyle = "#8b7cff";
+    g.font = "800 52px system-ui, sans-serif";
+    g.fillText(String(score), CW - 30, 64);
+    g.fillStyle = "#9aa3ba";
+    g.font = "500 14px ui-monospace, monospace";
+    g.fillText("points", CW - 30, 86);
+  }
   g.textAlign = "left";
-  miniPotAt(g, s, CW * 0.32, 108, 150, 208, s.target, s.tglaze, "TARGET");
-  miniPotAt(g, s, CW * 0.68, 108, 150, 208, s.prof, s.glaze, "YOURS");
+
+  if (rival) {
+    // Triangle: the target sits above the two attempts made at it.
+    const won = score >= rival.score;
+    miniPotAt(g, s, CW / 2, 92, 178, 206, s.target, s.tglaze, "TARGET");
+    miniPotAt(g, s, CW * 0.28, 350, 168, 200, s.prof, s.glaze, "YOU", score, won);
+    miniPotAt(
+      g, s, CW * 0.72, 350, 168, 200,
+      rival.pot.profile, rival.pot.glaze, shortLabel(rival.name), rival.score, !won
+    );
+  } else {
+    miniPotAt(g, s, CW * 0.32, 108, 150, 208, s.target, s.tglaze, "TARGET");
+    miniPotAt(g, s, CW * 0.68, 108, 150, 208, s.prof, s.glaze, "YOURS");
+  }
   g.fillStyle = "#5c657c";
   g.font = "500 14px ui-monospace, monospace";
   g.textAlign = "center";
-  g.fillText("skycave.space", CW / 2, CH - 16);
+  g.fillText("skycave.space", CW / 2, CH - (rival ? 22 : 16));
   g.textAlign = "left";
 }
-function miniPotAt(g: CanvasRenderingContext2D, s: Sim, cxp: number, top: number, w: number, h: number, P: number[], G: (string | null)[], label: string) {
+// Display names are user-controlled, so cap the label rather than let it run
+// off the edge of the card.
+const shortLabel = (n: string) =>
+  (n.length > 11 ? `${n.slice(0, 10)}\u2026` : n).toUpperCase();
+
+function miniPotAt(
+  g: CanvasRenderingContext2D,
+  s: Sim,
+  cxp: number,
+  top: number,
+  w: number,
+  h: number,
+  P: number[],
+  G: (string | null)[],
+  label: string,
+  score?: number,
+  lead?: boolean
+) {
   g.save();
   g.translate(0, top);
   miniPot(g, s, cxp, w, h, P, G);
   g.restore();
+  g.textAlign = "center";
   g.fillStyle = "#9aa3ba";
   g.font = "600 13px ui-monospace, monospace";
-  g.textAlign = "center";
   g.fillText(label, cxp, top + h + 18);
+  if (score != null) {
+    // The winning score carries the accent; the other stays quiet, so who won
+    // is readable at a glance without reading the numbers.
+    g.fillStyle = lead ? "#8b7cff" : "#f5f7ff";
+    g.font = "800 30px system-ui, sans-serif";
+    g.fillText(score.toLocaleString(), cxp, top + h + 50);
+  }
   g.textAlign = "left";
 }
