@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { RankModal } from "@/components/ui/RankModal";
+import { BadgeRow } from "@/components/profile/BadgeRow";
 import { getProfile, type Profile } from "@/lib/api";
 import { shareToBluesky } from "@/lib/bluesky";
 import { gameName } from "@/lib/gameNames";
@@ -146,16 +147,8 @@ export default function ProfilePage() {
           solo {p.solo_played === 1 ? "run" : "runs"}
         </p>
 
-        {/* Badges */}
-        {p.badges.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {p.badges.map((b) => (
-              <span key={b.key} title={b.detail} className="rounded-full border px-3 py-1 text-xs font-medium" style={{ borderColor: "var(--color-primary)", color: "var(--color-text-primary)", background: "color-mix(in srgb, var(--color-primary) 12%, transparent)" }}>
-                {b.label}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Badges — tap one to find out what it took to earn it. */}
+        <BadgeRow badges={p.badges} />
 
         <button onClick={share} className="mt-5 h-11 w-full rounded-[12px] text-sm font-semibold" style={{ background: "var(--color-primary)", color: "#05060a" }}>
           {isMe ? "Share my profile" : "Share profile"}
