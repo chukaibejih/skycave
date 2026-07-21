@@ -214,6 +214,7 @@ export default function ResultsPage() {
                 scores,
                 history: room.game!.history,
                 winnerId,
+                series: room.series,
               })
             }
             style={{ borderColor: "#2A2A3A", color: "#8888AA" }}
@@ -254,6 +255,7 @@ export default function ResultsPage() {
           scores={scores}
           history={room.game.history}
           winnerId={winnerId}
+          series={room.series}
         />
       </motion.div>
     </main>
