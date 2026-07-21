@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { GameCard } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
-import { CaveDoor } from "@/components/hub/CaveDoor";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { createRoom, listGames } from "@/lib/api";
@@ -186,9 +185,8 @@ export default function Home() {
         </motion.div>
       </section>
 
-      <section className="pb-10">
-        <CaveDoor />
-      </section>
+      {/* The Cave is hidden from the hub for now. The component and its /cave
+          routes are untouched, so restoring it is putting this section back. */}
 
       <section className="pb-12">
         <div className="mb-5 flex items-end justify-between gap-4">
