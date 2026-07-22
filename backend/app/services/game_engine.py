@@ -319,6 +319,28 @@ async def handle_action(
 _TURN_END_HOLD = 2.6
 
 
+async def _send_turn_state(room_id: str, game, state: dict[str, Any]) -> None:
+    """Push a turn-based board out: shared view to the room, private view to each.
+
+    Games like Connect 4 hide nothing, so this is just the broadcast. Uno deals
+    hands, and a broadcast would put every card face-up on the table - so the
+    public payload carries only counts and each connected player is sent their
+    own cards directly.
+
+    Private goes FIRST. The public board is what tells a client the turn is
+    theirs, so if it arrived first they would act on a stale hand - play a card
+    they no longer hold, have it silently rejected, and the game would sit there
+    with neither side able to move.
+    """
+    for pid in manager.connected_ids(room_id):
+        private = game.turn_private(state, pid)
+        if private is not None:
+            await manager.send(room_id, pid, events.message(events.GAME_PRIVATE, private))
+    await manager.broadcast(
+        room_id, events.message(events.GAME_STATE, game.turn_public(state))
+    )
+
+
 async def _turn_begin(room_id: str) -> None:
     """Open a turn-based game: go active and broadcast the initial board."""
     async with rooms.room_lock(room_id):
@@ -332,9 +354,14 @@ async def _turn_begin(room_id: str) -> None:
         gs["phase"] = "active"
         await rooms.save_room(room)
         state = gs["turn_state"]
-    await manager.broadcast(
-        room_id, events.message(events.GAME_STATE, game.turn_public(state))
-    )
+        ai = gs.get("turn_ai")
+    await _send_turn_state(room_id, game, state)
+    # The opening board can already belong to the AI: Uno's first card up can be
+    # a skip, reverse or draw-two, which skips the human. Every earlier turn game
+    # started with the human, so the AI was only ever kicked off by a human move
+    # and a game that opened on its turn sat frozen forever.
+    if ai is not None and state.get("turn") == ai:
+        _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
 
 
 async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict) -> bool:
@@ -343,12 +370,21 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
     gs = room["game"]
     new = game.apply_turn(gs["turn_state"], player_id, action)
     if new is None:
-        return False  # not their turn / illegal move - ignore
+        # Not their turn, or an illegal move. Dropping it silently is right for
+        # the client (it simply doesn't happen), but a rejected move that the
+        # client believed was legal means the two have diverged - and with
+        # nothing logged, that looks exactly like the game freezing.
+        logger.info(
+            "room %s: rejected turn action from %s (turn=%s) %s",
+            room_id,
+            player_id,
+            gs["turn_state"].get("turn"),
+            action,
+        )
+        return False
     gs["turn_state"] = new
     await rooms.save_room(room)
-    await manager.broadcast(
-        room_id, events.message(events.GAME_STATE, game.turn_public(new))
-    )
+    await _send_turn_state(room_id, game, new)
     if game.turn_over(new):
         # Hold on the finished board before the score screen (see _TURN_END_HOLD).
         # apply_turn already rejects further moves once there's a winner/full board.
@@ -387,9 +423,7 @@ async def _turn_ai_move(room_id: str) -> None:
             return  # AI has no legal move (shouldn't happen)
         gs["turn_state"] = new
         await rooms.save_room(room)
-        await manager.broadcast(
-            room_id, events.message(events.GAME_STATE, game.turn_public(new))
-        )
+        await _send_turn_state(room_id, game, new)
         end_after = game.turn_over(new)
         again = not end_after and new["turn"] == ai  # AI earned a bonus move
     if end_after:

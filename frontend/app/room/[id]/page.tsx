@@ -124,6 +124,26 @@ export default function RoomPage() {
     }
   }, [gameEnd, room, id, router]);
 
+  // While readied and still in the lobby, check with the server that the game
+  // has not started without us. Cheap, bounded, and only runs in that window.
+  useEffect(() => {
+    if (!iAmReady || !ready || !room || room.status !== "waiting") return;
+    let cancelled = false;
+    const iv = setInterval(async () => {
+      try {
+        const fresh = await getRoom(id);
+        if (cancelled || fresh.status === "waiting") return;
+        connect(id); // pulls a full ROOM_STATE and lands us in the game
+      } catch {
+        /* transient - the next tick tries again */
+      }
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [iAmReady, ready, room, id, connect]);
+
   // Stable so RoomCountdown does not re-subscribe every second.
   const onCountdownExpire = useCallback(() => setTimedOut(true), []);
 
@@ -309,7 +329,11 @@ export default function RoomPage() {
               sendReady();
             }}
           >
-            {iAmReady ? "waiting for opponent..." : "Ready"}
+            {!iAmReady
+              ? "Ready"
+              : me?.ready
+                ? "waiting for opponent..."
+                : "sending..."}
           </Button>
         )}
       </div>

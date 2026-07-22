@@ -68,6 +68,7 @@ interface RoomState {
   opponentSubmitted: boolean;
   soloWords: string[]; // accepted words this solo Word Duel session
   boardState: import("./types").BoardState | null; // turn-based board (Tile Takeover)
+  privateBoard: import("./types").UnoHand | null; // your own hidden slice (Uno hand)
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
   roomExpired: boolean; // waiting room auto-closed (no opponent joined)
   series: Record<string, number>; // wins per player id across rematches in this room
@@ -97,6 +98,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   opponentSubmitted: false,
   soloWords: [],
   boardState: null,
+  privateBoard: null,
   justJoined: false,
   roomExpired: false,
   series: {},
@@ -112,7 +114,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     // Clear the previous room's round state too, so a new room can never render
     // (or act on) the last game's prompt/deadline before its own ROUND_START.
     set({
-      socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null,
+      socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, privateBoard: null,
       roomExpired: false, series: {}, rematchRequestedBy: [],
       roundData: null, roundResult: null, roundEndsAt: null, locked: false, submitted: false,
     });
@@ -128,6 +130,12 @@ export const useRoom = create<RoomState>((set, get) => ({
       }));
     });
 
+    // Your own hidden cards. Sent point-to-point rather than broadcast, so an
+    // Uno hand never travels to the opponent.
+    socket.on(WS.GAME_PRIVATE, (hand: import("./types").UnoHand) => {
+      set({ privateBoard: hand });
+    });
+
     // Full snapshot on (re)connect: rehydrate everything for state recovery.
 	    socket.on(WS.ROOM_STATE, (room: Room) => {
       const lastResult = room.game?.last_result as RoundResult | null | undefined;
@@ -141,6 +149,9 @@ export const useRoom = create<RoomState>((set, get) => ({
         submitted: !!myRoundState?.submitted,
         roomExpired: room.status === "expired",
         boardState: (room as unknown as { board?: import("./types").BoardState }).board ?? get().boardState,
+        privateBoard:
+          (room as unknown as { my_board?: import("./types").UnoHand }).my_board ??
+          get().privateBoard,
         roundEndsAt: room.game?.round_ends_at ?? null,
         series: room.series ?? get().series,
         // On a finished room, ready flags mean "wants a rematch" (see backend
@@ -218,6 +229,7 @@ export const useRoom = create<RoomState>((set, get) => ({
         rematchRequestedBy: [],
         submitted: false,
         roundEndsAt: null,
+        privateBoard: null,
 	        game: {
           game_type: data.game_type,
           total_rounds: data.total_rounds,

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
 import { preloadGlobe } from "@/components/games/GlobePicker";
 import { ApiError, createRoom } from "@/lib/api";
+import { reportClientError } from "@/lib/report";
 import { gameTypeFromSlug } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
@@ -22,7 +23,7 @@ export default function PlayPage() {
 
   const [roomId, setRoomId] = useState<string | null>(null);
   const [gameName, setGameName] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [dailyDone, setDailyDone] = useState<string | null>(null);
   const startedRef = useRef(false);
   const readiedRef = useRef(false);
@@ -52,7 +53,17 @@ export default function PlayPage() {
         if (e instanceof ApiError && e.status === 409) {
           setDailyDone(e.message || "You already played today's pot.");
         } else {
-          setError(true);
+          // Say what actually failed. "Couldn't start that game" with no detail
+          // is a dead end for the player and undiagnosable for us - a stale tab
+          // pointing at a dead origin looks identical to the server refusing.
+          const detail =
+            e instanceof ApiError
+              ? `${e.status}: ${e.message || "the server refused"}`
+              : e instanceof Error && e.message
+                ? e.message
+                : "could not reach the server";
+          setError(detail);
+          reportClientError(e, `play/${gameType}`);
         }
       }
     })();
@@ -101,12 +112,26 @@ export default function PlayPage() {
   if (error) {
     return (
       <Centered>
-        <p className="text-[var(--color-text-secondary)]">
+        <h1 className="font-[var(--font-display)] text-2xl font-semibold">
           Couldn&apos;t start that game.
+        </h1>
+        <p className="max-w-sm font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+          {error}
         </p>
-        <Button variant="secondary" onClick={() => router.push("/")}>
-          Back to hub
-        </Button>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <Button
+            full
+            onClick={() => {
+              startedRef.current = false;
+              setError(null);
+            }}
+          >
+            Try again
+          </Button>
+          <Button variant="secondary" full onClick={() => router.push("/")}>
+            Back to hub
+          </Button>
+        </div>
       </Centered>
     );
   }
