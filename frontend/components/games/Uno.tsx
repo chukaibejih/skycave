@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRoom } from "@/lib/store";
 import type { PlayerSlot, UnoBoard, UnoCard } from "@/lib/types";
@@ -158,7 +158,10 @@ const TABLE_W = 78;
  * splay along an arc the way a real hand does.
  */
 function fanLayout(n: number, width: number, cardW: number, spread: number, arc: number) {
-  if (n <= 0 || width <= 0) return [];
+  if (n <= 0) return [];
+  // Never blank the hand because a measurement has not landed: fall back to a
+  // sensible width and let the ResizeObserver correct it a frame later.
+  if (width <= 0) width = cardW * Math.min(n, 6);
   // Never spread further than a card's own width; past that it stops reading as
   // one hand and becomes a row of separate cards.
   const spacing = n === 1 ? 0 : Math.min(cardW * 0.78, (width - cardW) / (n - 1));
@@ -210,6 +213,16 @@ export function Uno({ board, meId, players, onAction }: Props) {
   const oppRef = useRef<HTMLDivElement | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
   const seqRef = useRef<number>(-1);
+  const [handEl, setHandEl] = useState<HTMLDivElement | null>(null);
+  const [oppEl, setOppEl] = useState<HTMLDivElement | null>(null);
+  const setHandNode = useCallback((el: HTMLDivElement | null) => {
+    handRef.current = el;
+    setHandEl(el);
+  }, []);
+  const setOppNode = useCallback((el: HTMLDivElement | null) => {
+    oppRef.current = el;
+    setOppEl(el);
+  }, []);
   const [handW, setHandW] = useState(0);
   const [oppW, setOppW] = useState(0);
 
@@ -316,18 +329,25 @@ export function Uno({ board, meId, players, onAction }: Props) {
     return () => clearTimeout(t);
   }, [moment]);
 
-  // The fan needs a real pixel width to work out how much to overlap.
+  // The fan needs a real pixel width to work out how much to overlap. Keyed on
+  // the elements themselves so measuring starts the moment they exist.
   useEffect(() => {
-    const measure = () => {
-      if (handRef.current) setHandW(handRef.current.clientWidth);
-      if (oppRef.current) setOppW(oppRef.current.clientWidth);
-    };
+    if (!handEl) return;
+    const measure = () => setHandW(handEl.clientWidth);
     measure();
     const ro = new ResizeObserver(measure);
-    if (handRef.current) ro.observe(handRef.current);
-    if (oppRef.current) ro.observe(oppRef.current);
+    ro.observe(handEl);
     return () => ro.disconnect();
-  }, []);
+  }, [handEl]);
+
+  useEffect(() => {
+    if (!oppEl) return;
+    const measure = () => setOppW(oppEl.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(oppEl);
+    return () => ro.disconnect();
+  }, [oppEl]);
 
   // Bring a newly drawn card into view - it lands at the end of a hand that may
   // already be scrolled off-screen.
@@ -431,16 +451,20 @@ export function Uno({ board, meId, players, onAction }: Props) {
             looking at the back of a hand held across the table, so flipping it
             is what makes the two read as facing each other rather than as two
             hands held side by side. */}
-        <div ref={oppRef} className="relative h-[54px] flex-1" style={{ maxWidth: 200 }}>
-          {fanLayout(oppCount, oppW, 30, 7, 5).map((pos, i) => (
+        <div ref={setOppNode} className="relative h-[56px] flex-1" style={{ maxWidth: 200 }}>
+          {fanLayout(oppCount, oppW, 30, 10, 7).map((pos, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
+              // The fan rides Framer's own y/rotate rather than an inline
+              // transform: animating `scale` makes Framer own the transform
+              // property outright, and it silently overwrote the inline one,
+              // which is why this hand stayed dead flat while yours fanned.
+              initial={{ opacity: 0, scale: 0.8, y: 0, rotate: 0 }}
+              animate={{ opacity: 1, scale: 1, y: pos.lift, rotate: -pos.angle }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
               className="absolute top-0"
               style={{
                 left: pos.x,
-                transform: `translateY(${pos.lift}px) rotate(${-pos.angle}deg)`,
                 transformOrigin: "top center",
                 zIndex: oppCount - i,
               }}
@@ -539,7 +563,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
 
       {/* Your hand. Playable cards lift and brighten; a freshly drawn one is
           ringed and scrolled into view so you can see what just changed. */}
-      <div ref={handRef} className="relative h-[124px] w-full">
+      <div ref={setHandNode} className="relative h-[124px] w-full">
         {(() => {
           const cards = hand?.hand ?? [];
           const fan = fanLayout(cards.length, handW, HAND_W, 9, 12);
