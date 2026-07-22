@@ -426,18 +426,23 @@ export function Uno({ board, meId, players, onAction }: Props) {
             UNO!
           </motion.span>
         )}
+        {/* The Caver's fan is your own, mirrored: it hangs from the top, dips
+            in the middle instead of rising, and tilts the other way. You are
+            looking at the back of a hand held across the table, so flipping it
+            is what makes the two read as facing each other rather than as two
+            hands held side by side. */}
         <div ref={oppRef} className="relative h-[54px] flex-1" style={{ maxWidth: 200 }}>
           {fanLayout(oppCount, oppW, 30, 7, 5).map((pos, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="absolute bottom-0"
+              className="absolute top-0"
               style={{
                 left: pos.x,
-                transform: `translateY(${-pos.lift}px) rotate(${pos.angle}deg)`,
-                transformOrigin: "bottom center",
-                zIndex: i,
+                transform: `translateY(${pos.lift}px) rotate(${-pos.angle}deg)`,
+                transformOrigin: "top center",
+                zIndex: oppCount - i,
               }}
             >
               <CardBack w={30} h={44} />

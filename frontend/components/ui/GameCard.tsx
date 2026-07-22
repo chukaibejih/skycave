@@ -16,11 +16,13 @@ const ACCENT: Record<string, string> = {
   connect4: "var(--color-gold)",
   dots_boxes: "var(--color-cyan)",
   clay: "var(--color-warm)",
+  uno: "var(--color-primary)",
 };
 
 const META: Record<string, { code: string; stat: string }> = {
   geoguess: { code: "GEO", stat: "3D globe" },
   color_clash: { code: "CLR", stat: "reflex" },
+  uno: { code: "UNO", stat: "cards" },
   flag_rush: { code: "FLG", stat: "speed" },
   outline_quiz: { code: "OUT", stat: "shapes" },
   word_duel: { code: "WRD", stat: "vocab" },
@@ -126,6 +128,23 @@ function Glyph({ type, color }: { type: string; color: string }) {
           <rect x="13" y="4" width="7" height="7" rx="1.4" />
           <rect x="4" y="13" width="7" height="7" rx="1.4" />
           <rect x="13" y="13" width="7" height="7" rx="1.4" fill={color} fillOpacity="0.4" />
+        </svg>
+      );
+    case "uno":
+      // two fanned cards in Uno's own colours
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+          <g transform="rotate(-16 12 20)">
+            <rect x="4.5" y="5" width="9.5" height="14" rx="2" fill="#ff5a4e" />
+            <rect x="4.5" y="5" width="9.5" height="14" rx="2" stroke="#05060a" strokeWidth="1.1" />
+          </g>
+          <g transform="rotate(14 12 20)">
+            <rect x="10.5" y="5" width="9.5" height="14" rx="2" fill="#4a90ff" />
+            <rect x="10.5" y="5" width="9.5" height="14" rx="2" stroke="#05060a" strokeWidth="1.1" />
+            <path d="M13.2 9.4h4.2" stroke="#f5f7ff" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M13.2 12h4.2" stroke="#ffd166" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M13.2 14.6h4.2" stroke="#3fce7c" strokeWidth="1.5" strokeLinecap="round" />
+          </g>
         </svg>
       );
     case "clay":
