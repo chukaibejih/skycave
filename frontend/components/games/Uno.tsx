@@ -98,6 +98,23 @@ function Card({
       >
         {face(card)}
       </span>
+      {/* Corner index. In a fanned hand only the left sliver of each card shows,
+          so the centre glyph is hidden on everything but the last card - which
+          is the exact reason real playing cards carry their value in the
+          corner. Without it a big hand is unreadable. */}
+      {!table && (
+        <span
+          className="absolute left-[3px] top-[2px] font-[var(--font-display)] leading-none"
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            color: wild ? "#f5f7ff" : "#05060a",
+            textShadow: wild ? "0 1px 3px rgba(5,6,10,0.9)" : "none",
+          }}
+        >
+          {face(card)}
+        </span>
+      )}
       {fresh && (
         <span
           className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
@@ -130,6 +147,31 @@ interface Flight {
 const HAND_W = 58;
 const HAND_H = 84;
 const TABLE_W = 78;
+
+/**
+ * Where each card sits in a fanned hand.
+ *
+ * A flat scrolling row never read as cards being *held* - and once a hand grew
+ * past a screen width it hid cards off the edge, which in a game about what you
+ * are holding is the wrong thing to hide. Cards now overlap by exactly as much
+ * as it takes to fit, so the whole hand is always visible at once, and they
+ * splay along an arc the way a real hand does.
+ */
+function fanLayout(n: number, width: number, cardW: number, spread: number, arc: number) {
+  if (n <= 0 || width <= 0) return [];
+  // Never spread further than a card's own width; past that it stops reading as
+  // one hand and becomes a row of separate cards.
+  const spacing = n === 1 ? 0 : Math.min(cardW * 0.78, (width - cardW) / (n - 1));
+  const startX = (width - (cardW + spacing * (n - 1))) / 2;
+  return Array.from({ length: n }, (_, i) => {
+    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1; // -1 (left) .. 1 (right)
+    return {
+      x: startX + i * spacing,
+      angle: t * spread,
+      lift: (1 - t * t) * arc, // highest in the middle, like a held fan
+    };
+  });
+}
 
 const centerOf = (el: HTMLElement | null): { x: number; y: number } | null => {
   if (!el) return null;
@@ -168,6 +210,8 @@ export function Uno({ board, meId, players, onAction }: Props) {
   const oppRef = useRef<HTMLDivElement | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
   const seqRef = useRef<number>(-1);
+  const [handW, setHandW] = useState(0);
+  const [oppW, setOppW] = useState(0);
 
   const last = b?.last ?? null;
   const lastKind = last?.kind ?? "";
@@ -262,9 +306,28 @@ export function Uno({ board, meId, players, onAction }: Props) {
       next = { text: "Opening card dealt two", tone: "var(--color-warm)" };
     if (!next) return;
     setMoment(next);
+  }, [lastKind, lastBy, lastColor, meId]);
+
+  // Dismissal lives in its own effect keyed on the moment itself, so an
+  // unrelated re-render cannot cancel it.
+  useEffect(() => {
+    if (!moment) return;
     const t = setTimeout(() => setMoment(null), 2200);
     return () => clearTimeout(t);
-  }, [lastKind, lastBy, lastColor, meId]);
+  }, [moment]);
+
+  // The fan needs a real pixel width to work out how much to overlap.
+  useEffect(() => {
+    const measure = () => {
+      if (handRef.current) setHandW(handRef.current.clientWidth);
+      if (oppRef.current) setOppW(oppRef.current.clientWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (handRef.current) ro.observe(handRef.current);
+    if (oppRef.current) ro.observe(oppRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Bring a newly drawn card into view - it lands at the end of a hand that may
   // already be scrolled off-screen.
@@ -315,10 +378,11 @@ export function Uno({ board, meId, players, onAction }: Props) {
   // One line that always says exactly where the player stands. The "you go
   // again" case matters most: a skip or +2 returns the turn to you, and without
   // saying so the screen looks identical to your tap not registering.
+  const iWon = b.winner === meId;
   const headline = b.winner
-    ? b.winner === meId
-      ? "You went out!"
-      : `${oppName} went out.`
+    ? iWon
+      ? "You win!"
+      : `${oppName} wins.`
     : goAgain
       ? lastKind === "skip"
         ? "Skipped · you go again"
@@ -362,9 +426,22 @@ export function Uno({ board, meId, players, onAction }: Props) {
             UNO!
           </motion.span>
         )}
-        <div ref={oppRef} className="flex -space-x-4">
-          {Array.from({ length: Math.min(oppCount, 8) }).map((_, i) => (
-            <CardBack key={i} />
+        <div ref={oppRef} className="relative h-[54px] flex-1" style={{ maxWidth: 200 }}>
+          {fanLayout(oppCount, oppW, 30, 7, 5).map((pos, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="absolute bottom-0"
+              style={{
+                left: pos.x,
+                transform: `translateY(${-pos.lift}px) rotate(${pos.angle}deg)`,
+                transformOrigin: "bottom center",
+                zIndex: i,
+              }}
+            >
+              <CardBack w={30} h={44} />
+            </motion.div>
           ))}
         </div>
       </div>
@@ -457,22 +534,42 @@ export function Uno({ board, meId, players, onAction }: Props) {
 
       {/* Your hand. Playable cards lift and brighten; a freshly drawn one is
           ringed and scrolled into view so you can see what just changed. */}
-      <div ref={handRef} className="flex min-h-[112px] items-end gap-1.5 overflow-x-auto pb-2 pt-3">
-        {(hand?.hand ?? []).map((c) => {
-          const can = myTurn && playable.has(c.id);
-          const fresh = c.id === justDrewId;
-          return (
-            <div key={c.id} ref={fresh ? freshRef : undefined} className="shrink-0">
-              <Card
-                card={c}
-                raised={can}
-                dim={myTurn && !can}
-                fresh={fresh}
-                onClick={can ? () => play(c) : undefined}
-              />
-            </div>
-          );
-        })}
+      <div ref={handRef} className="relative h-[124px] w-full">
+        {(() => {
+          const cards = hand?.hand ?? [];
+          const fan = fanLayout(cards.length, handW, HAND_W, 9, 12);
+          return cards.map((c, i) => {
+            const can = myTurn && playable.has(c.id);
+            const fresh = c.id === justDrewId;
+            const pos = fan[i];
+            if (!pos) return null;
+            return (
+              <div
+                key={c.id}
+                ref={fresh ? freshRef : undefined}
+                className="absolute bottom-0"
+                style={{
+                  left: pos.x,
+                  // A playable card straightens and stands proud of the fan, so
+                  // what you can actually play reads instantly.
+                  transform: `translateY(${-pos.lift - (can ? 16 : 0)}px) rotate(${
+                    can ? pos.angle * 0.3 : pos.angle
+                  }deg)`,
+                  transformOrigin: "bottom center",
+                  transition: "transform 180ms cubic-bezier(.22,.61,.36,1)",
+                  zIndex: can ? 40 + i : i,
+                }}
+              >
+                <Card
+                  card={c}
+                  dim={myTurn && !can}
+                  fresh={fresh}
+                  onClick={can ? () => play(c) : undefined}
+                />
+              </div>
+            );
+          });
+        })()}
       </div>
 
       {/* Drew a card you can play: take it or leave it. */}
@@ -489,6 +586,73 @@ export function Uno({ board, meId, players, onAction }: Props) {
           Keep it and pass
         </button>
       )}
+
+      {/* The ending. "You went out" made people ask whether they had won; this
+          says which, and holds long enough to land before the results page. */}
+      <AnimatePresence>
+        {b.winner && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-8"
+            style={{ background: "rgba(5,6,10,0.88)", backdropFilter: "blur(6px)" }}
+          >
+            {/* The winner's last card bursting outward. */}
+            {iWon &&
+              Array.from({ length: 10 }).map((_, i) => {
+                const a = (i / 10) * Math.PI * 2;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ x: 0, y: 0, opacity: 0, rotate: 0, scale: 0.5 }}
+                    animate={{
+                      x: Math.cos(a) * 190,
+                      y: Math.sin(a) * 190,
+                      opacity: [0, 1, 0],
+                      rotate: (i % 2 ? 1 : -1) * 220,
+                      scale: 1,
+                    }}
+                    transition={{ duration: 1.5, delay: 0.1 + i * 0.03, ease: "easeOut" }}
+                    className="pointer-events-none absolute rounded-[7px]"
+                    style={{
+                      width: 34,
+                      height: 50,
+                      background: [SUIT.r, SUIT.y, SUIT.g, SUIT.b][i % 4],
+                    }}
+                  />
+                );
+              })}
+
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 240, damping: 16 }}
+              className="relative text-center"
+            >
+              <div
+                className="font-[var(--font-display)] text-6xl font-bold leading-none"
+                style={{ color: iWon ? "var(--color-success)" : "var(--color-warm)" }}
+              >
+                {iWon ? "You win" : "You lose"}
+              </div>
+              <div className="mt-3 font-[var(--font-body)] text-base text-[var(--color-text-secondary)]">
+                {iWon
+                  ? `${oppName} was left holding ${oppCount} ${oppCount === 1 ? "card" : "cards"}.`
+                  : `${oppName} emptied their hand first.`}
+              </div>
+              {(b.scores?.[meId ?? ""] ?? 0) > 0 && (
+                <div
+                  className="mt-4 font-[var(--font-display)] text-3xl font-bold"
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  +{b.scores[meId ?? ""]}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cards in transit. Rendered above everything and ignoring pointer
           events, so a flight never blocks a tap. */}
