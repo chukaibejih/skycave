@@ -1,7 +1,7 @@
 """Bluesky share text + compose-intent URL builders.
 
 Score-card image generation (R2/Playwright) is Phase 2. For the MVP we return
-copyable plain text plus a pre-filled bsky.app compose intent — which reads
+copyable plain text plus a pre-filled bsky.app compose intent - which reads
 naturally in a feed and works today.
 """
 from __future__ import annotations

@@ -14,14 +14,14 @@ const flags = require("../lib/data/flags.json");
 const FLAG_BASE =
   "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3";
 const OUTLINE_BASE = "https://cdn.jsdelivr.net/gh/djaiss/mapsicon@master/all";
-// Curated recognizable outlines — keep in sync with backend outline_quiz.CURATED.
+// Curated recognizable outlines - keep in sync with backend outline_quiz.CURATED.
 const OUTLINE_CODES = (
   "fr it es pt de gb ie nl be ch at pl cz se no fi dk gr tr ua is ro " +
   "us ca mx br ar cl pe co ve bo ec " +
   "cn jp kr in id th vn ph my pk sa ae ir iq il af np lk bd mm kz " +
   "eg za ng ke et ma dz ly sd gh tz ao mz na ml so td au nz"
 ).split(" ");
-// Bright day texture — legible for guessing (the night map is too dim).
+// Bright day texture - legible for guessing (the night map is too dim).
 const TEXTURE =
   "https://cdn.jsdelivr.net/npm/three-globe@2.45.2/example/img/earth-blue-marble.jpg";
 

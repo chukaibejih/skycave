@@ -1,6 +1,6 @@
 // Client-side score card image generation.
 //
-// The card is a purely client artifact (no server storage) — we draw it on a
+// The card is a purely client artifact (no server storage) - we draw it on a
 // canvas and let the user download a PNG. Matches the ScoreCard layout + the
 // "midnight arcade" palette. Uses only the Canvas API, no dependencies.
 import type { PlayerSlot } from "./types";

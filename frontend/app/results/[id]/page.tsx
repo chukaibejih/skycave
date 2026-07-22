@@ -39,7 +39,7 @@ export default function ResultsPage() {
         setRoom(r);
         if (r.mode === "solo") {
           // Reconcile personal best (server summary for users, localStorage for
-          // guests) — runs once, and persists a guest's new best.
+          // guests) - runs once, and persists a guest's new best.
           setSoloBest(
             resolveSoloBest(r.game_type, r.game?.solo_summary ?? null)
           );
@@ -164,7 +164,7 @@ export default function ResultsPage() {
   const iAmPlayer = !!meId && room.players.some((p) => p.id === meId);
 
   // Headline reads from the viewer's perspective when they played, else names
-  // the winner. The trailing period is intentional — it gives it finality.
+  // the winner. The trailing period is intentional - it gives it finality.
   let headline: string;
   let subtext: string;
   if (!winnerId) {
@@ -277,7 +277,7 @@ function Centered({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Quiet, contextual nudge for guests — shown after a game, never as a modal.
+// Quiet, contextual nudge for guests - shown after a game, never as a modal.
 // Clicking reveals a handle field (required so we resolve the right PDS) rather
 // than jumping straight to bsky.social's login.
 function GuestNudge({ show }: { show: boolean }) {

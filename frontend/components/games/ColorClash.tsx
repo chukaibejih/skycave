@@ -32,7 +32,7 @@ export function ColorClash({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-10 px-5">
-      {/* The Stroop word — drawn in the INK color, which is the answer. */}
+      {/* The Stroop word - drawn in the INK color, which is the answer. */}
       <motion.div
         variants={shakeVariants}
         animate={feedback === "wrong" ? "shake" : "idle"}
@@ -46,7 +46,7 @@ export function ColorClash({
         Tap the <b>ink color</b>, not the word.
       </p>
 
-      {/* Color buttons — 3 cols, each ≥48px touch target. */}
+      {/* Color buttons - 3 cols, each ≥48px touch target. */}
       <div className="grid w-full max-w-sm grid-cols-3 gap-3">
         {roundData.options.map((opt) => {
           const isCorrect = !active && correctLabel === opt.label;

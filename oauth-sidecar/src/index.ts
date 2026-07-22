@@ -25,7 +25,7 @@ async function main() {
     const handle = ((req.query.handle as string) || "").trim();
     // Never default to bsky.social. Without a handle we can't resolve the user's
     // PDS, and silently authorizing at bsky.social locks out anyone who migrated
-    // to another PDS (e.g. Blacksky) — they'd hit bsky.social's login for an
+    // to another PDS (e.g. Blacksky) - they'd hit bsky.social's login for an
     // account that no longer exists there. Bounce back and ask for the handle.
     if (!handle) {
       return res.redirect(`${FRONTEND_URL}/?auth_error=handle`);
@@ -43,7 +43,7 @@ async function main() {
   app.get("/oauth/callback", (req, res) => handleCallback(client, req, res));
 
   // ── Internal only: FastAPI resolves the current DID from the cookie.
-  // MUST NOT be publicly routable — nginx does not proxy this path, and we also
+  // MUST NOT be publicly routable - nginx does not proxy this path, and we also
   // require the shared internal secret as defense-in-depth. ──
   app.get("/oauth/session", (req, res) => {
     if (!INTERNAL_SECRET || req.get("x-internal-secret") !== INTERNAL_SECRET) {

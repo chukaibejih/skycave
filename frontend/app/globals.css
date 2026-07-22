@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ───────────────────────────────────────────────────────────────────────
-   Skycave design system — "midnight arcade"
+   Skycave design system - "midnight arcade"
    Tokens mirror spec §7. Tailwind v4 reads the @theme block to generate
    utilities (bg-base, text-primary, rounded-card, etc.).
    ─────────────────────────────────────────────────────────────────────── */
@@ -48,7 +48,7 @@ body {
   /* Prevent iOS rubber-band revealing white behind the dark canvas. */
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
-  /* Lock the page horizontally — `clip` (unlike `hidden`) kills the viewport
+  /* Lock the page horizontally - `clip` (unlike `hidden`) kills the viewport
      pan without creating a scroll container, even on mobile. */
   overflow-x: clip;
 }
@@ -98,7 +98,7 @@ h3,
   letter-spacing: 0;
 }
 
-/* Form controls — inputs don't inherit `color` from body by default, so mobile
+/* Form controls - inputs don't inherit `color` from body by default, so mobile
    browsers render the text near-black on our dark surfaces. Force the light
    palette and a muted placeholder. */
 input,

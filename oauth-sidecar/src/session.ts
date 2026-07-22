@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 // The browser session is a stateless signed JWT cookie carrying only the
-// verified DID. FastAPI never decodes it — it calls GET /oauth/session, which is
+// verified DID. FastAPI never decodes it - it calls GET /oauth/session, which is
 // the single place that knows the cookie's meaning.
 const COOKIE = "skycave_sid";
 const SECRET = process.env.SESSION_SECRET ?? "dev-session-secret-change-me";

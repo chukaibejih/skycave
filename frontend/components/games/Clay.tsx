@@ -65,7 +65,7 @@ export function Clay() {
 
   // The canvas unmounts between rounds (loading state, result screen). A plain
   // ref isn't reactive, so effects bound to it would never re-run when a NEW
-  // canvas mounted — that's what left the wheel unresponsive after game one.
+  // canvas mounted - that's what left the wheel unresponsive after game one.
   // A state-backed callback ref makes "the element attached" an actual dep.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
@@ -96,7 +96,7 @@ export function Clay() {
   useEffect(() => {
     // Only (re)build the clay when a round is actually OPEN. GAME_END clears the
     // deadline, and re-initialising on that wiped the finished pot before the
-    // share card was drawn — the card showed a fresh mound instead of your work.
+    // share card was drawn - the card showed a fresh mound instead of your work.
     if (!target || roundEndsAt == null) return;
     const ROWS = roundData?.rows ?? 64;
     const MAXR = roundData?.max_r ?? 132;
@@ -259,7 +259,7 @@ export function Clay() {
             collapsedAtRef.current = now;
             setCollapsed(true);
           }
-          // Hold long enough for the fall to land AND the reason to be read —
+          // Hold long enough for the fall to land AND the reason to be read -
           // rushing to the result taught the player nothing. They can also tap
           // through immediately; this is just the backstop.
           if (now - collapsedAtRef.current >= COLLAPSE_HOLD && !submittedRef.current) {
@@ -271,7 +271,7 @@ export function Clay() {
 
         // Timer + auto-fire. roundEndsAt is Unix-epoch seconds, so compare it to
         // Date.now() (NOT the rAF clock). A null deadline means the round hasn't
-        // opened yet and must never read as "time is up" — treating it as 0 used
+        // opened yet and must never read as "time is up" - treating it as 0 used
         // to auto-fire an untouched pot the instant a second game started.
         const left =
           roundEndsAt != null ? Math.max(0, roundEndsAt - Date.now() / 1000) : null;
@@ -454,7 +454,7 @@ export function Clay() {
             </div>
           )}
 
-          {/* The pot itself is the result — target beside yours. */}
+          {/* The pot itself is the result - target beside yours. */}
           <canvas
             ref={cardRef}
             width={oppPot ? 1080 : 1280}
@@ -507,7 +507,7 @@ export function Clay() {
                   Play again
                 </a>
               ) : (
-                // Same room, same opponent — the rematch keeps a 1v1 alive
+                // Same room, same opponent - the rematch keeps a 1v1 alive
                 // instead of dumping both players back to the hub.
                 <button
                   onClick={sendRematch}
@@ -536,7 +536,7 @@ export function Clay() {
     );
   }
 
-  // Only a round that hasn't opened yet shows the loader — checked AFTER the
+  // Only a round that hasn't opened yet shows the loader - checked AFTER the
   // result, so returning to a finished game never lands back on "centering".
   if (!target) {
     return (
@@ -675,7 +675,7 @@ function topRow(s: Sim) {
 const slumpK = (s: Sim) => (s.collapsed ? Math.min(1, s.slump) : 0);
 
 /**
- * Row height during a collapse. Clay that gives way falls DOWN onto the wheel —
+ * Row height during a collapse. Clay that gives way falls DOWN onto the wheel -
  * it loses height and puddles. Previously the pot kept full height while leaning
  * a third of the canvas sideways, which read as a spike launching off the wheel.
  */
@@ -739,7 +739,7 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   ctx.ellipse(cx, wy, wr, 15, 0, 0, PI2);
   ctx.fill();
 
-  // ghost target — start at the target's first real clay row so short forms
+  // ghost target - start at the target's first real clay row so short forms
   // (bowls, cups) don't trail a sliver up to the top of the wheel.
   if (!s.collapsed) {
     let g0 = 0;
@@ -836,7 +836,7 @@ function draw(ctx: CanvasRenderingContext2D, s: Sim, W: number, H: number, _phas
   ctx.stroke();
 
   // offset-touch handle: a cyan control dot ABOVE the fingertip, linked down to
-  // it — so the finger never covers the point being shaped or the ghost there.
+  // it - so the finger never covers the point being shaped or the ghost there.
   if (s.pointer && !s.collapsed && s.offset > 0) {
     const py2 = s.pointer.y - s.offset;
     ctx.strokeStyle = "rgba(103,232,249,.6)";

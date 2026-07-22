@@ -10,7 +10,7 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # Bluesky / AT Protocol — OAuth runs in the Node sidecar (oauth-sidecar/).
+    # Bluesky / AT Protocol - OAuth runs in the Node sidecar (oauth-sidecar/).
     public_api_url: str = "http://localhost:8000"
     # Internal URL FastAPI uses to reach the sidecar within the Docker network.
     oauth_sidecar_url: str = "http://oauth-sidecar:3001"
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
-    # Backoffice — admin login. Empty disables admin access entirely.
+    # Backoffice - admin login. Empty disables admin access entirely.
     admin_password: str = ""
     admin_token_expire_minutes: int = 60 * 12  # 12 hours
 

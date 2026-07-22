@@ -16,7 +16,7 @@ npm run dev                          # http://localhost:3000
 ```
 app/
   layout.tsx              fonts (Space Grotesk / Inter / JetBrains Mono), metadata
-  globals.css             design tokens (@theme) — spec §7 palette/typography/radii
+  globals.css             design tokens (@theme) - spec §7 palette/typography/radii
   page.tsx                Home / Hub
   room/[id]/page.tsx      Lobby (Room Portal) + in-game shell
   results/[id]/page.tsx   Results + score card + share/download
@@ -50,13 +50,13 @@ near-black `#0A0A0F` base, electric violet `#6C63FF`, coral `#FF6B6B`, mint
 
 - Designed at 390px; layouts use `max-w-*` and scale up.
 - Touch targets ≥ 48px (enforced on `button`/`[role=button]` in `globals.css`).
-- No hover-only states — every interactive element has an `active:`/tap response.
+- No hover-only states - every interactive element has an `active:`/tap response.
 - Landscape supported for GeoGuess (the globe takes `landscape:min-h-[60vh]`).
 - `prefers-reduced-motion` collapses the portal/spring animations.
 
 ## The Room Portal
 
-`components/lobby/RoomPortal.tsx` — a violet ring pulses while waiting; when the
+`components/lobby/RoomPortal.tsx` - a violet ring pulses while waiting; when the
 opponent joins (`filled` flips true) the ring sweeps full and "GO" punches out,
 then fires `onGo`. This is the one moment of visual drama; everything else stays
 quiet.

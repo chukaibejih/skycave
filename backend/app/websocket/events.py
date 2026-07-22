@@ -1,6 +1,6 @@
 """Canonical WebSocket event names + payload helpers.
 
-This protocol is mirrored on the frontend in lib/websocket.ts — keep the two
+This protocol is mirrored on the frontend in lib/websocket.ts - keep the two
 in sync. Every message on the wire is JSON: {"type": <EVENT>, "data": {...}}.
 """
 from typing import Any

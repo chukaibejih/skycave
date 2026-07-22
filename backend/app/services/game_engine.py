@@ -36,7 +36,7 @@ def _cancel_timer(room_id: str) -> None:
     task = _timers.get(room_id)
     if task is None:
         return
-    # Never cancel the task we're currently running inside — start_round and
+    # Never cancel the task we're currently running inside - start_round and
     # end_game execute *as* the scheduled timer task, so cancelling _timers here
     # would cancel ourselves and abort at the next await. In that case just
     # release the slot; the task is already finishing on its own.
@@ -228,7 +228,7 @@ async def handle_action(
         secret = gs["round_secret"]
 
         # Single-player continuous sessions have their own driver. It returns
-        # True when the run is over (a ladder miss) — we end *outside* the lock
+        # True when the run is over (a ladder miss) - we end *outside* the lock
         # because end_game re-acquires it (asyncio locks aren't reentrant).
         if room.get("mode") in ("solo", "daily") and gs.get("solo_kind") in (
             "timed",
@@ -343,7 +343,7 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
     gs = room["game"]
     new = game.apply_turn(gs["turn_state"], player_id, action)
     if new is None:
-        return False  # not their turn / illegal move — ignore
+        return False  # not their turn / illegal move - ignore
     gs["turn_state"] = new
     await rooms.save_room(room)
     await manager.broadcast(
@@ -463,7 +463,7 @@ async def _solo_begin(room_id: str) -> None:
             "scores": scores, "ends_at": ends_at,  # fixed session end (no ends_in)
         }))
         _schedule(room_id, timer_delay, lambda: end_game(room_id))
-    else:  # ladder — per-level countdown (resets each level via ends_in)
+    else:  # ladder - per-level countdown (resets each level via ends_in)
         await manager.broadcast(room_id, events.message(events.ROUND_START, {
             "round": 1, "total_rounds": 0, "round_data": rdata,
             "scores": scores, "ends_in": timer_delay,
@@ -803,7 +803,7 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
     Returns a summary used by results + the share post:
     ``{player_id, score, metric, is_best, prev_best}``. For guests, PB can't be
     stored (ephemeral id) so ``is_best``/``prev_best`` are None and the client
-    decides "personal best" from device-local storage. Never raises — a failure
+    decides "personal best" from device-local storage. Never raises - a failure
     here must not block GAME_END.
     """
     game = get_game(room["game_type"])

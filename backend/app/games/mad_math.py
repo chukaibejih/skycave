@@ -1,4 +1,4 @@
-"""Mad Math — rapid mental arithmetic.
+"""Mad Math - rapid mental arithmetic.
 
 A problem like "7 x 8" appears with four numeric options; first to tap the
 correct answer wins the round (race). Solo is beat-the-clock: how many can you

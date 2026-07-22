@@ -41,7 +41,7 @@ export function FlagRush({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 px-5">
-      {/* Flag — bundled SVG, no external API. */}
+      {/* Flag - bundled SVG, no external API. */}
       <motion.div
         variants={shakeVariants}
         animate={feedback === "wrong" ? "shake" : "idle"}
@@ -65,7 +65,7 @@ export function FlagRush({
         </div>
       )}
 
-      {/* Multiple choice — 2 cols on mobile, each ≥48px. */}
+      {/* Multiple choice - 2 cols on mobile, each ≥48px. */}
       <div className="grid w-full max-w-md grid-cols-2 gap-3">
         {roundData.options.map((opt) => {
           const isCorrect = !active && answer?.code === opt.code;

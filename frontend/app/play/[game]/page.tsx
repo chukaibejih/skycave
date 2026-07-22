@@ -11,7 +11,7 @@ import { ApiError, createRoom } from "@/lib/api";
 import { gameTypeFromSlug } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
-// Single-player. Unlike /room/[id] there's no lobby or portal — we create a solo
+// Single-player. Unlike /room/[id] there's no lobby or portal - we create a solo
 // room, connect, auto-ready, and drop straight into the game.
 export default function PlayPage() {
   const { game: slug } = useParams<{ game: string }>();
@@ -126,7 +126,7 @@ export default function PlayPage() {
   }
 
   // Branded loader while the room is created + the socket connects. We don't
-  // show the connection badge here — a first-connect "disconnected" flash reads
+  // show the connection badge here - a first-connect "disconnected" flash reads
   // as an error; the portal itself signals "setting up".
   return <StartingScreen gameName={gameName} />;
 }

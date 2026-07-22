@@ -6,7 +6,7 @@ Pick a game → create a room → post the invite link to Bluesky → your oppon
 taps in → play → share the score card. Fast, casual, mobile-first.
 
 This repo contains the **Phase 1 (MVP)** implementation: full project scaffold,
-WebSocket room system, AT Protocol identity + guest mode, and three games —
+WebSocket room system, AT Protocol identity + guest mode, and three games -
 **GeoGuess 1v1**, **Color Clash**, and **Flag Rush**.
 
 ```
@@ -84,11 +84,11 @@ and mirrored in [frontend/lib/types.ts](frontend/lib/types.ts).
 
 Two end-to-end tests run against a live backend (Redis + Postgres in Docker):
 
-- `backend/tests/e2e_ws.py` — two guests play a full **Color Clash** game.
+- `backend/tests/e2e_ws.py` - two guests play a full **Color Clash** game.
   Asserts `GAME_START → 10×ROUND_START → 10×ROUND_RESULT → GAME_END` and that
-  server-computed scores are consistent. **PASS** (10–0, faster player wins each
+  server-computed scores are consistent. **PASS** (10-0, faster player wins each
   race).
-- `backend/tests/e2e_reconnect.py` — a **GeoGuess** game where player 2's socket
+- `backend/tests/e2e_reconnect.py` - a **GeoGuess** game where player 2's socket
   is dropped mid-game and reconnects. Asserts the `ROOM_STATE` snapshot restores
   status + round + scores, and that the secret target never leaks. **PASS.**
 

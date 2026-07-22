@@ -1,9 +1,9 @@
-"""Flag Rush — name the country from its flag.
+"""Flag Rush - name the country from its flag.
 
 A flag appears; first player to identify the country wins the point. Players
 tap one of four multiple-choice options. Race mode. 10 rounds.
 
-Flag images are bundled on the frontend at /flags/{code}.svg — no external API
+Flag images are bundled on the frontend at /flags/{code}.svg - no external API
 at runtime. The country list (name + aliases) is bundled here in data/flags.json.
 """
 from __future__ import annotations

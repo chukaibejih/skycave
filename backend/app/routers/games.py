@@ -5,7 +5,7 @@ from app.schemas.rest import GameInfo
 
 router = APIRouter(tags=["games"])
 
-# The game catalog is static per deploy — build the payload once at import so
+# The game catalog is static per deploy - build the payload once at import so
 # each request just serializes a cached list instead of rebuilding it.
 #
 # Newest game first: the registry is maintained in launch order (new games are

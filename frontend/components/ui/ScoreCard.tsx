@@ -13,7 +13,7 @@ interface Props {
   series?: Record<string, number>;
 }
 
-// The shareable result card — clean, typographic, like a match-result printout.
+// The shareable result card - clean, typographic, like a match-result printout.
 // No gradients, no shadow, no decoration: the border + numbers do the work.
 // Renders to look correct as a standalone screenshot, matching the downloaded PNG.
 const VIOLET = "#6C63FF";

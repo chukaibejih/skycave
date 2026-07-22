@@ -1,4 +1,4 @@
-"""Word Duel — both players get the same 6 letters, longest valid word wins.
+"""Word Duel - both players get the same 6 letters, longest valid word wins.
 
 Simultaneous mode: each player submits their best word; the server validates it
 (real word + only uses the dealt letters) and scores it by length. Both players

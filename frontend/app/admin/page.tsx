@@ -690,7 +690,7 @@ function Pager({
   return (
     <div className="mt-3 flex items-center justify-between gap-3">
       <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-        {from}–{to} of {total}
+        {from}-{to} of {total}
       </span>
       <div className="flex gap-2">
         <button className={btn} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - pageSize))}>

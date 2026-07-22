@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 interface Props {
   /** Flip to true the moment the opponent joins. */
   filled: boolean;
-  /** Fires after the GO collapse completes — start the game here. */
+  /** Fires after the GO collapse completes - start the game here. */
   onGo?: () => void;
   size?: number;
   /** Ring-only ambient mode: no center "waiting…"/"GO" label. */
@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * The Room Portal — Skycave's one moment of visual drama (spec §7).
+ * The Room Portal - Skycave's one moment of visual drama (spec §7).
  *
  *   waiting  → a violet ring slowly pulses, ambient glow breathing
  *   filled   → the ring sweeps full, snaps inward, and "GO" punches out

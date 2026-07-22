@@ -7,15 +7,15 @@ trusted.
 
 Two round-resolution modes:
 
-  - ``race``         — the first player to submit a *correct* action wins the
+  - ``race``         - the first player to submit a *correct* action wins the
                        round's point; wrong actions don't end the round.
                        (Color Clash, Flag Rush)
-  - ``simultaneous`` — all players submit, then everyone is scored together;
+  - ``simultaneous`` - all players submit, then everyone is scored together;
                        the round resolves when everyone has acted or the timer
                        expires. (GeoGuess)
 
 A round is split into *public* data (broadcast to clients in ROUND_START) and
-*secret* data (the answer — held server-side, revealed only in ROUND_RESULT).
+*secret* data (the answer - held server-side, revealed only in ROUND_RESULT).
 """
 from __future__ import annotations
 
@@ -41,17 +41,17 @@ class BaseGame:
     # Whether this game supports a solo mode (all six built games do).
     solo_enabled: bool = True
     # How solo plays out:
-    #   "rounds" — same fixed-round flow as versus, just one player (GeoGuess)
-    #   "timed"  — continuous beat-the-clock; a fresh prompt after each correct
+    #   "rounds" - same fixed-round flow as versus, just one player (GeoGuess)
+    #   "timed"  - continuous beat-the-clock; a fresh prompt after each correct
     #              answer, count correct in `solo_duration`s (Color/Flag/Outline)
-    #   "words"  — one prompt for the whole session; submit many answers that
+    #   "words"  - one prompt for the whole session; submit many answers that
     #              accumulate score (Word Duel)
-    #   "ladder" — endless; each correct answer advances a level, one miss ends
+    #   "ladder" - endless; each correct answer advances a level, one miss ends
     #              the run; score = levels cleared (Reaction Grid)
     solo_kind: str = "rounds"
     solo_duration: float = 60.0  # session length for "timed" / "words"
     # "timed" only: if True a wrong answer also advances to the next prompt
-    # (one shot per prompt — no retry, no brute-forcing). If False, a miss just
+    # (one shot per prompt - no retry, no brute-forcing). If False, a miss just
     # flashes and the same prompt stays (player can retry or skip).
     solo_advance_on_miss: bool = False
 
@@ -93,7 +93,7 @@ class BaseGame:
         """Return per-player points for the round (simultaneous mode only).
 
         ``actions`` maps player_id -> their submitted action (may be missing a
-        player who timed out — score them 0).
+        player who timed out - score them 0).
         """
         raise NotImplementedError
 

@@ -11,12 +11,12 @@ class Room(Base):
 
     Live, fast-changing room state (players, current round, scores) lives in
     Redis. This table is the persistent anchor used for invite-link previews
-    (Open Graph) and history — it survives Redis eviction/restart.
+    (Open Graph) and history - it survives Redis eviction/restart.
     """
 
     __tablename__ = "rooms"
 
-    # Short, URL-friendly room code, e.g. "k7gq2" — used in the invite link.
+    # Short, URL-friendly room code, e.g. "k7gq2" - used in the invite link.
     id: Mapped[str] = mapped_column(String(16), primary_key=True)
 
     game_type: Mapped[str] = mapped_column(String(64), index=True)

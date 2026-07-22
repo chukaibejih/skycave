@@ -9,7 +9,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Reach the OAuth sidecar over the internal Docker network
       OAUTH_SIDECAR_URL: http://oauth-sidecar:3001
-    # Bound to localhost only — nginx (on the host) is the sole public entrypoint.
+    # Bound to localhost only - nginx (on the host) is the sole public entrypoint.
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -29,7 +29,7 @@ services:
       OAUTH_PRIVATE_KEY_FILE: /run/secrets/oauth-private-key.pem
     volumes:
       - ./secrets/oauth-private-key.pem:/run/secrets/oauth-private-key.pem:ro
-    # Localhost only — nginx proxies api.skycave.space/oauth/* here; the internal
+    # Localhost only - nginx proxies api.skycave.space/oauth/* here; the internal
     # /oauth/session is never routed publicly (see nginx.conf).
     ports:
       - "127.0.0.1:8001:3001"

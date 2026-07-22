@@ -10,10 +10,10 @@ interface Props {
 }
 
 /**
- * "Share to Bluesky" — opens the pre-filled composer. Also copies the text so
+ * "Share to Bluesky" - opens the pre-filled composer. Also copies the text so
  * users on the Bluesky app (where the intent may not deep-link) can paste it.
  *
- * Flat primary fill, no gradient, no emoji — the Bluesky butterfly lives only
+ * Flat primary fill, no gradient, no emoji - the Bluesky butterfly lives only
  * in the posted share text, not in UI chrome.
  */
 export function ShareButton({ text, label = "Share to Bluesky", full = true }: Props) {

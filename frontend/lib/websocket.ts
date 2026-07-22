@@ -2,7 +2,7 @@
 //
 // Mobile clients drop sockets constantly (network switches, backgrounding), so
 // this auto-reconnects with exponential backoff + jitter. On every (re)connect
-// the server replies with ROOM_STATE, which the store uses to rehydrate — so a
+// the server replies with ROOM_STATE, which the store uses to rehydrate - so a
 // reconnect transparently resumes an in-progress game. The client also forces a
 // reconnect when the tab returns to the foreground or the browser reports back
 // online, instead of waiting for the dead socket to time out.
@@ -77,7 +77,7 @@ export class SkycaveSocket {
         return;
       }
       // Terminal server rejections (unauthorized / forbidden-or-full / not
-      // found) must not be retried — reconnecting would just loop forever.
+      // found) must not be retried - reconnecting would just loop forever.
       if (TERMINAL_CLOSE_CODES.has(ev.code)) {
         this.setStatus("closed");
         return;
@@ -105,7 +105,7 @@ export class SkycaveSocket {
   }
 
   private handleOnline = () => {
-    // Network came back — don't wait for the dead socket's timeout.
+    // Network came back - don't wait for the dead socket's timeout.
     if (!this.closedByUser && this.ws?.readyState !== WebSocket.OPEN) {
       this.attempt = 0;
       this.open();

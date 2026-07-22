@@ -41,7 +41,7 @@ export function OutlineQuiz({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 px-5">
-      {/* Country silhouette — SVG used as a mask so it tints to our accent. */}
+      {/* Country silhouette - SVG used as a mask so it tints to our accent. */}
       <motion.div
         variants={shakeVariants}
         animate={feedback === "wrong" ? "shake" : "idle"}
@@ -70,7 +70,7 @@ export function OutlineQuiz({
         </div>
       )}
 
-      {/* Multiple choice — 2 cols, each ≥48px. */}
+      {/* Multiple choice - 2 cols, each ≥48px. */}
       <div className="grid w-full max-w-md grid-cols-2 gap-3">
         {roundData.options.map((opt) => {
           const isCorrect = !active && answer?.code === opt.code;

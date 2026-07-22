@@ -1,4 +1,4 @@
-"""GeoGuess 1v1 — tap a location on the globe, closest to target wins.
+"""GeoGuess 1v1 - tap a location on the globe, closest to target wins.
 
 Simultaneous mode: both players drop a pin, each is scored by great-circle
 distance from the secret target. 5 rounds. Per-round points fall off

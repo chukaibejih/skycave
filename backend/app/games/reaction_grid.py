@@ -1,11 +1,11 @@
-"""Reaction Grid — watch a sequence of tiles flash, reproduce it from memory.
+"""Reaction Grid - watch a sequence of tiles flash, reproduce it from memory.
 
 Race mode: each round a sequence flashes on a 3x3 grid (shown to both players),
 then players tap it back. First to reproduce the full sequence correctly wins
 the point. Sequence length scales up each round. Pure procedural, no data.
 
 The sequence is part of the public round data (both players must see it to play),
-so this trusts that players reproduce from memory — fine for a casual game, and
+so this trusts that players reproduce from memory - fine for a casual game, and
 the sequence space (9^len) makes blind guessing infeasible.
 """
 from __future__ import annotations

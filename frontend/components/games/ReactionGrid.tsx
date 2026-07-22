@@ -56,7 +56,7 @@ export function ReactionGrid({ roundData, phase, feedback, solo, onAction }: Pro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundData.sequence, active]);
 
-  // A wrong answer resets the input so the player can re-enter (no lockout —
+  // A wrong answer resets the input so the player can re-enter (no lockout -
   // the 9^n sequence space makes blind retries pointless anyway).
   useEffect(() => {
     if (feedback === "wrong") {

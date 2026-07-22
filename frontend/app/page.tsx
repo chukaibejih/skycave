@@ -55,7 +55,7 @@ export default function Home() {
 
   const go = async (game: GameInfo, m: "versus" | "solo" | "daily") => {
     if (m === "solo" || m === "daily") {
-      // Solo + daily skip the lobby — the /play route creates the room + drops
+      // Solo + daily skip the lobby - the /play route creates the room + drops
       // in. Daily passes ?mode=daily so /play creates a daily room.
       router.push(`/play/${gameSlug(game.type)}${m === "daily" ? "?mode=daily" : ""}`);
       return;

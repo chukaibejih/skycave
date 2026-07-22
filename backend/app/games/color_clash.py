@@ -1,4 +1,4 @@
-"""Color Clash — the Stroop game.
+"""Color Clash - the Stroop game.
 
 A color word ("RED") is rendered in a mismatched ink color (blue). The correct
 answer is always the *ink* color, not the word. First player to tap the correct
@@ -30,7 +30,7 @@ class ColorClash(BaseGame):
     result_delay = 2.4
     mode = RACE
     solo_kind = "timed"  # beat-the-clock: count correct in 60s
-    solo_advance_on_miss = True  # pure reflex — one tap per word, right or wrong
+    solo_advance_on_miss = True  # pure reflex - one tap per word, right or wrong
 
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
         return f"{score} correct · 60 seconds"
@@ -39,7 +39,7 @@ class ColorClash(BaseGame):
         word = random.choice(COLORS)
         # Ink must differ from the word to create the Stroop conflict.
         ink = random.choice([c for c in COLORS if c["label"] != word["label"]])
-        # Options are all six colors, shuffled — answer is the ink color.
+        # Options are all six colors, shuffled - answer is the ink color.
         options = COLORS[:]
         random.shuffle(options)
         public = {
