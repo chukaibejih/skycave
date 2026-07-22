@@ -1,7 +1,7 @@
 """End-to-end Uno over real WebSockets (run against a live backend).
 
 Plays a full 1v1 Uno between two guests, each client choosing moves only from
-what the *server told that client* — never from the shared state — so this also
+what the *server told that client* - never from the shared state - so this also
 proves the game is playable from a legitimate client's point of view.
 
 The assertion that matters most: Uno is the first turn-based game with hidden

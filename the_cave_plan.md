@@ -1,4 +1,4 @@
-# The Cave — Implementation Plan
+# The Cave - Implementation Plan
 
 Working plan for building The Cave (see `the_cave_spec.md` for the product spec).
 Branch: `the-cave`. This file tracks decisions and the build order. No em dashes

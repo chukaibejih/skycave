@@ -1,6 +1,6 @@
 // Client-side score card image generation.
 //
-// The card is a purely client artifact (no server storage) — we draw it on a
+// The card is a purely client artifact (no server storage) - we draw it on a
 // canvas and let the user download a PNG. Matches the ScoreCard layout + the
 // "midnight arcade" palette. Uses only the Canvas API, no dependencies.
 import type { PlayerSlot } from "./types";
@@ -11,6 +11,9 @@ interface CardData {
   scores: Record<string, number>;
   history: { round: number; points: Record<string, number> }[];
   winnerId: string | null;
+  // Wins per player across every game in this room. A series is the result
+  // worth posting; the last game's score alone discards the rest of it.
+  series?: Record<string, number>;
 }
 
 const C = {
@@ -84,26 +87,60 @@ export function renderScoreCard(data: CardData): HTMLCanvasElement {
     });
   }
 
-  // Final score
+  // The result. Once more than one game has been decided in this room, the
+  // series tally is the headline and this game's score becomes a detail line.
+  const w1 = data.series?.[p1?.id ?? ""] ?? 0;
+  const w2 = data.series?.[p2?.id ?? ""] ?? 0;
+  const isSeries = w1 + w2 > 1;
+  const gameScore1 = p1 ? data.scores[p1.id] ?? 0 : 0;
+  const gameScore2 = p2 ? data.scores[p2.id] ?? 0 : 0;
+
+  if (isSeries) {
+    ctx.textAlign = "center";
+    ctx.fillStyle = C.muted;
+    ctx.font = "500 20px ui-monospace, monospace";
+    ctx.fillText(`SERIES · ${w1 + w2} GAMES`, W / 2, 352);
+  }
+
   ctx.font = "700 96px system-ui, sans-serif";
-  const s1 = String(p1 ? data.scores[p1.id] ?? 0 : 0);
-  const s2 = String(p2 ? data.scores[p2.id] ?? 0 : 0);
+  const s1 = String(isSeries ? w1 : gameScore1);
+  const s2 = String(isSeries ? w2 : gameScore2);
   const mid = W / 2;
   ctx.textAlign = "right";
+  const scoreY = isSeries ? 452 : 470;
   ctx.fillStyle = C.primary;
-  ctx.fillText(s1, mid - 50, 470);
+  ctx.fillText(s1, mid - 50, scoreY);
   ctx.textAlign = "center";
   ctx.fillStyle = C.muted;
-  ctx.fillText("-", mid, 470);
+  ctx.fillText("-", mid, scoreY);
   ctx.textAlign = "left";
   ctx.fillStyle = C.warm;
-  ctx.fillText(s2, mid + 50, 470);
+  ctx.fillText(s2, mid + 50, scoreY);
 
-  // Winner
+  // Who is ahead, and (in a series) what this game did.
   ctx.textAlign = "center";
-  ctx.fillStyle = C.success;
-  ctx.font = "600 32px system-ui, sans-serif";
-  ctx.fillText(winner ? `${winner.display_name} wins` : "draw", W / 2, 530);
+  if (isSeries) {
+    const leader = w1 === w2 ? null : w1 > w2 ? p1 : p2;
+    ctx.fillStyle = leader ? (leader === p1 ? C.primary : C.warm) : C.success;
+    ctx.font = "600 32px system-ui, sans-serif";
+    ctx.fillText(
+      leader ? `${leader.display_name} leads the series` : "series tied",
+      W / 2,
+      508
+    );
+    ctx.fillStyle = C.muted;
+    ctx.font = "500 22px ui-monospace, monospace";
+    ctx.fillText(
+      `this game ${gameScore1}-${gameScore2}` +
+        (winner ? ` to ${winner.display_name}` : ""),
+      W / 2,
+      546
+    );
+  } else {
+    ctx.fillStyle = C.success;
+    ctx.font = "600 32px system-ui, sans-serif";
+    ctx.fillText(winner ? `${winner.display_name} wins` : "draw", W / 2, 530);
+  }
 
   // Footer
   ctx.fillStyle = C.muted;

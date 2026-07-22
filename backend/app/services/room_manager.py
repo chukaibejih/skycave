@@ -3,7 +3,7 @@
 The room document is stored as a single JSON blob under ``room:{id}``. This
 makes refresh-recovery a single GET (the frontend rehydrates from ROOM_STATE)
 and keeps the 2-player state easy to reason about. Mutations are serialized by
-an in-process per-room asyncio lock — valid because the API runs as a single
+an in-process per-room asyncio lock - valid because the API runs as a single
 worker (see Dockerfile); horizontal scaling would move this to a Redis lock.
 
 Room document shape::
@@ -99,7 +99,7 @@ async def join_room(room_id: str, identity: dict[str, Any]) -> tuple[dict | None
     """Add a player to a room.
 
     Returns ``(room, status)`` where status is one of: "joined", "rejoined"
-    (already a member — e.g. host or reconnect), "full", "not_found".
+    (already a member - e.g. host or reconnect), "full", "not_found".
     """
     async with room_lock(room_id):
         room = await get_room(room_id)

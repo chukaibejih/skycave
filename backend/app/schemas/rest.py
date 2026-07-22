@@ -89,6 +89,11 @@ class RoomResponse(BaseModel):
     invite_url: str
     # Unix seconds when a waiting versus room auto-closes; null once claimed/solo.
     expires_at: int | None = None
+    # Wins per player across every game played in this room. Already tracked on
+    # the room and sent over the socket; it has to ride the REST payload too,
+    # because the results page loads through GET /rooms/{id} and without this a
+    # series would post as just the final game's score.
+    series: dict[str, int] = {}
     game: GameSummary | None = None
 
 

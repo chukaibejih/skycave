@@ -53,6 +53,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
         players=[PlayerSlot(**p) for p in room["players"]],
         invite_url=invite_url(room["id"]),
         expires_at=room.get("expires_at"),
+        series=room.get("series", {}),
         game=summary,
     )
 

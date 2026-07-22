@@ -1,4 +1,4 @@
-"""Dots and Boxes — draw edges between dots; complete a box to claim it and move
+"""Dots and Boxes - draw edges between dots; complete a box to claim it and move
 again. Most boxes when the grid fills wins.
 
 Turn-based (same engine as Tile Takeover / Connect 4). Completing a box keeps

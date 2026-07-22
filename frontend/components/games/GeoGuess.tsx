@@ -22,7 +22,7 @@ interface Props {
   phase: string;
   result: RoundResult | null;
   onAction: (data: Record<string, unknown>) => void;
-  submitted?: boolean; // from store — survives reconnect
+  submitted?: boolean; // from store - survives reconnect
   players?: PlayerSlot[];
   meId?: string;
   solo?: boolean;
@@ -106,7 +106,7 @@ export function GeoGuess({
       {/* Bottom gradient for the action area */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-48 bg-[linear-gradient(0deg,var(--color-base),transparent)]" />
 
-      {/* Floating prompt — taps pass through to the globe */}
+      {/* Floating prompt - taps pass through to the globe */}
       <div className="pointer-events-none relative z-10 px-4 pt-3 text-center">
         <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
           find
@@ -159,7 +159,7 @@ function ResultPanel({
   const rows = players
     .map((p) => ({ player: p, guess: guesses[p.id] }))
     .filter((r) => r.guess);
-  // No per-round "winner" in solo — there's no one to beat.
+  // No per-round "winner" in solo - there's no one to beat.
   const best = solo ? Infinity : Math.max(0, ...rows.map((r) => r.guess!.points));
 
   return (

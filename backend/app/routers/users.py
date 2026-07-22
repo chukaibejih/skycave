@@ -31,7 +31,7 @@ def _profile_badges(
     solo_played: int,
     rivals: list[ProfileRival],
 ) -> list[Badge]:
-    """Milestones derived from existing stats (no badge table — recomputed live,
+    """Milestones derived from existing stats (no badge table - recomputed live,
     so a badge can also disappear if the stat behind it falls back)."""
     badges: list[Badge] = []
 
@@ -46,7 +46,7 @@ def _profile_badges(
     if user.games_won >= 50:
         badges.append(Badge(key="wins_50", label="Sharpshooter", detail="50+ 1v1 wins"))
 
-    # Form, over 1v1 games ONLY — solo runs must not dilute the rate.
+    # Form, over 1v1 games ONLY - solo runs must not dilute the rate.
     if versus_played >= 20 and (versus_won / versus_played) >= 0.6:
         badges.append(Badge(key="on_a_tear", label="On a tear", detail="60%+ 1v1 win rate"))
 

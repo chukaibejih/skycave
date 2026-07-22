@@ -1,7 +1,7 @@
-"""Word Hunt — trace words through a 4x4 letter grid.
+"""Word Hunt - trace words through a 4x4 letter grid.
 
 A word only counts if it's a real word AND can be traced through adjacent cells
-(8 directions, each cell used once) — that spatial constraint is what sets it
+(8 directions, each cell used once) - that spatial constraint is what sets it
 apart from Word Duel's loose anagram. The client enforces adjacency while you
 drag; the server re-validates the traced path independently (never trust the
 client). Solo: find as many as you can in the time limit, points accumulate.
@@ -20,7 +20,7 @@ _DATA = Path(__file__).parent / "data" / "words.txt"
 GRID_N = 4  # 4x4 board
 MIN_WORD_LEN = 3
 
-# Classic 16 Boggle dice — rolling one face each gives playable boards far more
+# Classic 16 Boggle dice - rolling one face each gives playable boards far more
 # reliably than sampling a letter bag. Q is treated as a plain letter here.
 BOGGLE_DICE = [
     "AAEEGN", "ABBJOO", "ACHOPS", "AFFKPS", "AOOTTW", "CIMOTU", "DEILRX",
@@ -82,7 +82,7 @@ def _is_valid(grid: list[str], word: str) -> bool:
 
 
 def _points(length: int) -> int:
-    """Boggle-style scoring — longer words are worth disproportionately more."""
+    """Boggle-style scoring - longer words are worth disproportionately more."""
     if length <= 4:
         return 1
     if length == 5:

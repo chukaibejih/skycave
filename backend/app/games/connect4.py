@@ -1,4 +1,4 @@
-"""Connect 4 — drop discs down a 7x6 grid, line up four to win.
+"""Connect 4 - drop discs down a 7x6 grid, line up four to win.
 
 Turn-based (same engine as Tile Takeover): one evolving board, players alternate
 until someone connects four or the board fills. Zero data, deterministic rules.

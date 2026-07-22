@@ -9,7 +9,7 @@ from app.core.database import Base
 class PersonalBest(Base):
     """A player's best single-player score for one game.
 
-    Keyed by (player_id, game_type). Only persisted for Bluesky users — guests
+    Keyed by (player_id, game_type). Only persisted for Bluesky users - guests
     have ephemeral ids, so their personal best lives in the browser (localStorage)
     instead. Higher score is always better (solo scoring is normalized that way:
     points for GeoGuess, count for the timed games, level for Reaction Grid).

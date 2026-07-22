@@ -35,7 +35,7 @@ export function recoverFromChunkError(error: unknown): boolean {
 /**
  * Fire-and-forget client-error reporter. Posts the exception to the existing
  * /feedback endpoint tagged "[app-error]" so crashes land in the back office
- * (no new backend endpoint / droplet redeploy needed). Never throws — logging
+ * (no new backend endpoint / droplet redeploy needed). Never throws - logging
  * must not cause a second failure inside an error boundary. `keepalive` lets it
  * survive an immediate navigation/reload.
  */

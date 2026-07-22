@@ -36,7 +36,7 @@ def _cancel_timer(room_id: str) -> None:
     task = _timers.get(room_id)
     if task is None:
         return
-    # Never cancel the task we're currently running inside — start_round and
+    # Never cancel the task we're currently running inside - start_round and
     # end_game execute *as* the scheduled timer task, so cancelling _timers here
     # would cancel ourselves and abort at the next await. In that case just
     # release the slot; the task is already finishing on its own.
@@ -228,7 +228,7 @@ async def handle_action(
         secret = gs["round_secret"]
 
         # Single-player continuous sessions have their own driver. It returns
-        # True when the run is over (a ladder miss) — we end *outside* the lock
+        # True when the run is over (a ladder miss) - we end *outside* the lock
         # because end_game re-acquires it (asyncio locks aren't reentrant).
         if room.get("mode") in ("solo", "daily") and gs.get("solo_kind") in (
             "timed",
@@ -323,12 +323,12 @@ async def _send_turn_state(room_id: str, game, state: dict[str, Any]) -> None:
     """Push a turn-based board out: shared view to the room, private view to each.
 
     Games like Connect 4 hide nothing, so this is just the broadcast. Uno deals
-    hands, and a broadcast would put every card face-up on the table — so the
+    hands, and a broadcast would put every card face-up on the table - so the
     public payload carries only counts and each connected player is sent their
     own cards directly.
 
     Private goes FIRST. The public board is what tells a client the turn is
-    theirs, so if it arrived first they would act on a stale hand — play a card
+    theirs, so if it arrived first they would act on a stale hand - play a card
     they no longer hold, have it silently rejected, and the game would sit there
     with neither side able to move.
     """
@@ -354,7 +354,14 @@ async def _turn_begin(room_id: str) -> None:
         gs["phase"] = "active"
         await rooms.save_room(room)
         state = gs["turn_state"]
+        ai = gs.get("turn_ai")
     await _send_turn_state(room_id, game, state)
+    # The opening board can already belong to the AI: Uno's first card up can be
+    # a skip, reverse or draw-two, which skips the human. Every earlier turn game
+    # started with the human, so the AI was only ever kicked off by a human move
+    # and a game that opened on its turn sat frozen forever.
+    if ai is not None and state.get("turn") == ai:
+        _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
 
 
 async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict) -> bool:
@@ -365,7 +372,7 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
     if new is None:
         # Not their turn, or an illegal move. Dropping it silently is right for
         # the client (it simply doesn't happen), but a rejected move that the
-        # client believed was legal means the two have diverged — and with
+        # client believed was legal means the two have diverged - and with
         # nothing logged, that looks exactly like the game freezing.
         logger.info(
             "room %s: rejected turn action from %s (turn=%s) %s",
@@ -490,7 +497,7 @@ async def _solo_begin(room_id: str) -> None:
             "scores": scores, "ends_at": ends_at,  # fixed session end (no ends_in)
         }))
         _schedule(room_id, timer_delay, lambda: end_game(room_id))
-    else:  # ladder — per-level countdown (resets each level via ends_in)
+    else:  # ladder - per-level countdown (resets each level via ends_in)
         await manager.broadcast(room_id, events.message(events.ROUND_START, {
             "round": 1, "total_rounds": 0, "round_data": rdata,
             "scores": scores, "ends_in": timer_delay,
@@ -830,7 +837,7 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
     Returns a summary used by results + the share post:
     ``{player_id, score, metric, is_best, prev_best}``. For guests, PB can't be
     stored (ephemeral id) so ``is_best``/``prev_best`` are None and the client
-    decides "personal best" from device-local storage. Never raises — a failure
+    decides "personal best" from device-local storage. Never raises - a failure
     here must not block GAME_END.
     """
     game = get_game(room["game_type"])

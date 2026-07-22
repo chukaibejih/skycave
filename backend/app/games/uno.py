@@ -1,11 +1,11 @@
-"""Uno — the first turn-based game with hidden state.
+"""Uno - the first turn-based game with hidden state.
 
 Every other turn game (Connect 4, Dots and Boxes, Tile Takeover) puts its whole
 board on the table, so `turn_public` could return the state as-is. Uno deals
 hands, so the state is split: `turn_public` carries only what everyone may see
 (the discard top, the active colour, how many cards each player holds) and
 `turn_private` hands each player their own cards. The deck order never leaves
-the server at all — otherwise a client could read the next card.
+the server at all - otherwise a client could read the next card.
 
 Two-player rules, which differ from the table game in one place: **Reverse acts
 as Skip**, since reversing direction between two people just returns the turn.
@@ -111,7 +111,7 @@ class Uno(BaseGame):
         hands = {a: [deck.pop() for _ in range(STARTING_HAND)],
                  b: [deck.pop() for _ in range(STARTING_HAND)]}
 
-        # The opening card can't be a wild — nobody has chosen a colour yet — so
+        # The opening card can't be a wild - nobody has chosen a colour yet - so
         # bury any wild back in the deck and turn the next one.
         while deck and deck[-1]["color"] == "w":
             deck.insert(0, deck.pop())

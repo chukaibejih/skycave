@@ -1,4 +1,4 @@
-"""Tile Takeover — a Filler-style flood battle.
+"""Tile Takeover - a Filler-style flood battle.
 
 A board of coloured tiles. You own one corner, your opponent the other. On your
 turn you pick a colour (not your current one, not the opponent's): your whole

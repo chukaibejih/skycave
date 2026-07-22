@@ -1,4 +1,4 @@
-"""Backoffice API — admin-password login + read-only metrics.
+"""Backoffice API - admin-password login + read-only metrics.
 
 Auth: POST /admin/login with the ADMIN_PASSWORD issues a short-lived admin JWT;
 all other endpoints require it (see core.deps.require_admin). If ADMIN_PASSWORD

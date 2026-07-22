@@ -19,9 +19,9 @@ interface Props {
  * The whole job of this screen is to get a second human into the room, so the
  * three ways out are ranked by how many people they can actually reach:
  *
- *   1. the link itself   — copy, or the OS share sheet (WhatsApp, iMessage, DM)
- *   2. Post to Bluesky   — one public post, anyone can tap in
- *   3. Invite someone    — @mention one specific person, so they get pinged
+ *   1. the link itself   - copy, or the OS share sheet (WhatsApp, iMessage, DM)
+ *   2. Post to Bluesky   - one public post, anyone can tap in
+ *   3. Invite someone    - @mention one specific person, so they get pinged
  *
  * The raw URL is shown, not hidden behind a button, so the user can see what
  * they are about to send and still read it out if the clipboard misbehaves.

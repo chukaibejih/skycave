@@ -103,7 +103,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stat tiles — the rank tile opens the overall ranking */}
+        {/* Stat tiles - the rank tile opens the overall ranking */}
         <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-3">
           {stats.map((s) => {
             const inner = (
@@ -135,7 +135,7 @@ export default function ProfilePage() {
           })}
         </div>
 
-        {/* 1v1 / solo breakdown — spells out what the tiles summarize */}
+        {/* 1v1 / solo breakdown - spells out what the tiles summarize */}
         <p className="mt-3 text-center text-xs" style={{ color: MUTED }}>
           <span style={{ color: "var(--color-text-primary)" }}>{p.versus_won}W</span>
           {" · "}
@@ -147,7 +147,7 @@ export default function ProfilePage() {
           solo {p.solo_played === 1 ? "run" : "runs"}
         </p>
 
-        {/* Badges — tap one to find out what it took to earn it. */}
+        {/* Badges - tap one to find out what it took to earn it. */}
         <BadgeRow badges={p.badges} />
 
         <button onClick={share} className="mt-5 h-11 w-full rounded-[12px] text-sm font-semibold" style={{ background: "var(--color-primary)", color: "#05060a" }}>

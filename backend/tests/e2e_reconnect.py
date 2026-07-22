@@ -1,7 +1,7 @@
 """Verify reconnection + state recovery (hard requirement).
 
 Starts a GeoGuess game (simultaneous mode), plays a round, then drops player 2's
-socket mid-game and reconnects — asserting the server replays a ROOM_STATE
+socket mid-game and reconnects - asserting the server replays a ROOM_STATE
 snapshot that lets the client resume with the correct round + scores.
 
 Usage:  API=http://127.0.0.1:8012 python tests/e2e_reconnect.py

@@ -52,7 +52,7 @@ function Card({
   size?: "hand" | "table";
   dim?: boolean;
   raised?: boolean;
-  fresh?: boolean; // just drawn — the player needs to find it
+  fresh?: boolean; // just drawn - the player needs to find it
   onClick?: () => void;
 }) {
   const table = size === "table";
@@ -114,7 +114,7 @@ function Card({
  * A card in transit between two places on screen.
  *
  * The state changes instantly, so without this a played card simply appears on
- * the pile and drawn cards materialise in your hand — you never see the move
+ * the pile and drawn cards materialise in your hand - you never see the move
  * that produced them. Each flight is a ghost copy that travels the real path
  * and lands exactly on its destination.
  */
@@ -242,7 +242,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
   }, [seq, lastKind, lastBy, meId, playedCard]);
 
   // Backstop. Flights retire themselves when they land, but a ghost that
-  // somehow never completes would sit on the pile forever — which is precisely
+  // somehow never completes would sit on the pile forever - which is precisely
   // what happened when the removal timer was being cancelled.
   useEffect(() => {
     if (!flights.length) return;
@@ -266,7 +266,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
     return () => clearTimeout(t);
   }, [lastKind, lastBy, lastColor, meId]);
 
-  // Bring a newly drawn card into view — it lands at the end of a hand that may
+  // Bring a newly drawn card into view - it lands at the end of a hand that may
   // already be scrolled off-screen.
   const justDrewId = hand?.just_drew_id ?? null;
   useEffect(() => {
@@ -293,7 +293,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
   // The states that used to leave people stuck with no idea what to do.
   const nothingToPlay = myTurn && !b.must_play_or_pass && playable.size === 0;
   // A ghost is already flying onto the pile, so the card underneath shouldn't
-  // pop in as well — the flight is the animation.
+  // pop in as well - the flight is the animation.
   const landing = flights.some((f) => f.card);
   const goAgain = myTurn && !!lastKind && lastBy === meId && KEEPS_TURN.includes(lastKind);
 
@@ -321,12 +321,12 @@ export function Uno({ board, meId, players, onAction }: Props) {
       : `${oppName} went out.`
     : goAgain
       ? lastKind === "skip"
-        ? "Skipped — you go again"
+        ? "Skipped · you go again"
         : "You go again"
       : b.must_play_or_pass
         ? "Play it, or keep it"
         : nothingToPlay
-          ? "Nothing to play — draw one"
+          ? "Nothing to play · draw one"
           : myTurn
             ? "Your turn"
             : `${oppName}'s turn`;
@@ -344,7 +344,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       {/* Opponent: their card count is the whole story, and one card left is the
-          tensest moment in the game — so it gets said loudly. */}
+          tensest moment in the game - so it gets said loudly. */}
       <div className="flex items-center gap-3 py-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{oppName}</div>

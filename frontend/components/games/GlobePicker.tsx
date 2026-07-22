@@ -7,7 +7,7 @@ import { EARTH_TEXTURE, type Marker } from "./geo";
 // Re-exported so existing call sites keep importing these from here.
 export { EARTH_TEXTURE, type Marker };
 
-// react-globe.gl touches `window`/WebGL on import — load it client-only.
+// react-globe.gl touches `window`/WebGL on import - load it client-only.
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false, loading: () => null });
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 }
 
 
-// Camera distance — lower = the globe fills more of the frame (default is 2.5,
+// Camera distance - lower = the globe fills more of the frame (default is 2.5,
 // which leaves a small globe floating in space).
 const POV_ALTITUDE = 1.85;
 
@@ -38,7 +38,7 @@ export function preloadGlobe(): void {
  *
  * iOS Safari caps how many contexts may exist at once and silently hands back a
  * lost one past the limit. three.js then calls getShaderPrecisionFormat() on it,
- * gets null, and throws while reading `.precision` — which is exactly the crash
+ * gets null, and throws while reading `.precision` - which is exactly the crash
  * seen in production. Probing for that same null up front lets us fall back to
  * the flat map instead of dying inside the renderer.
  *

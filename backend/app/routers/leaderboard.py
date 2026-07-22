@@ -1,4 +1,4 @@
-"""Public leaderboard — per game, 1v1 or solo.
+"""Public leaderboard - per game, 1v1 or solo.
 
 Scores aren't comparable across games (a GeoGuess distance score dwarfs a
 Color Clash count), so every board is scoped to a single game:
@@ -11,7 +11,7 @@ Color Clash count), so every board is scoped to a single game:
 
 Everything is denormalized (stats written at game-end) + Redis-cached per
 (mode, game, period), so reads are a single indexed query hit at most once per
-TTL — no runtime cross-game aggregation.
+TTL - no runtime cross-game aggregation.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ async def leaderboard(
     if get_game(game) is None:
         return LeaderboardResponse(entries=[])
     if mode == "solo":
-        period = "all"  # only best scores are stored — no weekly window
+        period = "all"  # only best scores are stored - no weekly window
 
     r = get_redis()
     key = f"{CACHE_PREFIX}:{mode}:{game}:{period}:{limit}"
@@ -134,7 +134,7 @@ async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> Leade
 
 
 async def _total(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
-    """Cumulative points for a game across EVERY mode — solo, daily and 1v1 all
+    """Cumulative points for a game across EVERY mode - solo, daily and 1v1 all
     add up. Used by games like Clay where each play should grow one running
     total rather than compete on a single best run or on wins."""
     conds = [GameSession.game_type == game]

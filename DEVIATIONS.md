@@ -1,11 +1,11 @@
 # Decisions & deviations from the spec
 
-Things I decided that differ from, or extend, `skycave_spec.md` — and why.
+Things I decided that differ from, or extend, `skycave_spec.md` - and why.
 
 ## 1. Score cards are client-side downloads, not R2-hosted (per your direction)
 
 The spec listed Cloudflare R2 for "score card images for sharing." Per your
-instruction during the build, **nothing is stored server-side** — the score
+instruction during the build, **nothing is stored server-side** - the score
 card is generated in the browser ([frontend/lib/scorecard-image.ts](frontend/lib/scorecard-image.ts),
 Canvas → PNG) and the user downloads it. `R2_*` env vars were removed. The
 `POST /share/scorecard` endpoint returns only copyable text + a Bluesky compose
@@ -15,7 +15,7 @@ intent URL (`image_url` is always null). The Bluesky share itself uses the
 ## 2. AT Protocol OAuth: Node sidecar (backend-for-frontend)
 
 Real OAuth is implemented as a separate **Node service** (`oauth-sidecar/`) using
-`@atproto/oauth-client-node` — the dev-login shortcut has been **removed
+`@atproto/oauth-client-node` - the dev-login shortcut has been **removed
 entirely**. Flow:
 
 1. Browser → `api.skycave.space/oauth/login` (sidecar) → PAR → user's PDS.
@@ -24,7 +24,7 @@ entirely**. Flow:
    `skycave.space/oauth`.
 3. Frontend calls `POST /auth/bluesky/complete` (cookie sent same-site). FastAPI
    reads the cookie, asks the sidecar's **internal-only** `GET /oauth/session`
-   (shared `OAUTH_INTERNAL_SECRET`, never routed publicly — nginx returns 404 for
+   (shared `OAUTH_INTERNAL_SECRET`, never routed publicly - nginx returns 404 for
    `/oauth/session`) for the DID, fetches the profile, upserts the `User`, and
    mints the Skycave JWT.
 
@@ -53,12 +53,12 @@ origin (not `*`) in prod so the credentialed `complete` call is allowed.
   backend, map the session to the frontend via a **session cookie**. More
   secure than the browser client, and yields longer-lived tokens to a
   confidential client.
-- **Recommended lib:** `@atproto/oauth-client-node` — **Node only**. ⚠️ Our
+- **Recommended lib:** `@atproto/oauth-client-node` - **Node only**. ⚠️ Our
   backend is Python/FastAPI, so first decide: (a) a small Node OAuth sidecar, or
   (b) hand-rolled atproto OAuth in Python (PAR + DPoP; no official Python OAuth
   client yet).
 - Publish `client-metadata.json` at a public `https://` URL (`client_id` IS that
-  URL — already served at `/auth/bluesky/client-metadata.json`).
+  URL - already served at `/auth/bluesky/client-metadata.json`).
 - **DPoP mandatory** (`dpop_bound_access_tokens: true`).
 - Confidential client → token auth = **`private_key_jwt`** with an **ES256** key:
   ```bash
@@ -66,8 +66,8 @@ origin (not `*`) in prod so the credentialed `complete` call is allowed.
   openssl ec -in oauth-private-key.pem -pubout > oauth-public-key.pem
   ```
 - **Scopes:** use only `atproto` for now (granular scopes are rolling out but not
-  finalized — don't use them in production yet).
-- **Delete `POST /auth/bluesky/dev-login` entirely** — it must not exist in prod.
+  finalized - don't use them in production yet).
+- **Delete `POST /auth/bluesky/dev-login` entirely** - it must not exist in prod.
 
 ## 3. Single-worker backend; horizontal scaling needs Redis pub/sub
 
@@ -89,12 +89,12 @@ to swap for fully-random or a larger set later.
 ## 5. Flag Rush data is generated offline; flag assets bundled at build
 
 - Country **names + aliases** are generated with Node's `Intl.DisplayNames`
-  (194 sovereign states) — no hand-maintained list, no runtime API.
+  (194 sovereign states) - no hand-maintained list, no runtime API.
   → `frontend/scripts/generate-flags-data.mjs` → `lib/data/flags.json`
   (a copy lives at `backend/app/games/data/flags.json` for answer validation).
 - Flag **SVGs** are downloaded once at build time from the `flag-icons` CDN into
   `frontend/public/flags/` (`scripts/fetch-assets.mjs`). At **runtime** they're
-  served locally — no external API, per the constraint. All 194 are present.
+  served locally - no external API, per the constraint. All 194 are present.
 
 Typed answers are normalized (accent/case/punctuation-insensitive) and a small
 alias table covers common names (UK, USA, South Korea, Czechia, …).
@@ -103,7 +103,7 @@ alias table covers common names (UK, USA, South Korea, Czechia, …).
 
 `GlobePicker` uses a bundled night-earth texture
 (`public/textures/earth-dark.jpg`, fetched by `fetch:assets`). If it's missing,
-the globe still renders as a tinted sphere with graticules — usable, just
+the globe still renders as a tinted sphere with graticules - usable, just
 without continents. The component probes for the texture and falls back.
 
 ## 7. Race-mode anti-cheese: lockout on wrong discrete picks
@@ -118,7 +118,7 @@ Not in the spec, but necessary for fair race scoring.
 
 `REMATCH_REQUEST` is wired in the WS handler (both players opt in → new game in
 the same room). The Results page's "Rematch" button currently creates a fresh
-room of the same game type and navigates there — the simplest reliable loop for
+room of the same game type and navigates there - the simplest reliable loop for
 the MVP. The in-room rematch handshake is implemented server-side and ready for
 a richer Phase-3 rematch UI.
 
@@ -126,7 +126,7 @@ a richer Phase-3 rematch UI.
 
 - `EXTRA` core modules (`core/config.py`, `core/database.py`, `core/redis_client.py`,
   `core/security.py`, `core/deps.py`, `core/ids.py`) were added beyond the
-  spec's tree for clean separation — the spec's named files all exist where
+  spec's tree for clean separation - the spec's named files all exist where
   expected (`services/room_manager.py`, `services/game_engine.py`,
   `services/bluesky_auth.py`, `websocket/handler.py`, `websocket/events.py`,
   `games/geoguesss.py`, `games/color_clash.py`, `games/flag_rush.py`).

@@ -40,7 +40,7 @@ export function GameShell() {
   if (!room || !game) return null;
 
   // Clay owns its whole screen (canvas + timer + result), reading the store
-  // directly — not the round-based ScoreHeader flow.
+  // directly - not the round-based ScoreHeader flow.
   if (game.game_type === "clay") return <Clay />;
 
   // Turn-based games drive their own full-screen board, not the round-based

@@ -1,4 +1,4 @@
-# Skycave — Deployment Runbook
+# Skycave - Deployment Runbook
 
 Target architecture:
 
@@ -41,7 +41,7 @@ Do the `api` record now; do the Vercel `skycave.space` record in step 5.
 
 ---
 
-## 1.5 Swap — REQUIRED on a 1 GB droplet
+## 1.5 Swap - REQUIRED on a 1 GB droplet
 
 Without swap, `docker compose build` (compiling cryptography/asyncpg + the
 sidecar's npm install) will exceed 1 GB and get OOM-killed. Add 2 GB once:
@@ -91,7 +91,7 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=10080
 
 ADMIN_PASSWORD=<paste>
-OAUTH_INTERNAL_SECRET=<paste — same value as sidecar>
+OAUTH_INTERNAL_SECRET=<paste - same value as sidecar>
 # DATABASE_URL / REDIS_URL / OAUTH_SIDECAR_URL are set by docker-compose.
 ```
 
@@ -100,7 +100,7 @@ OAUTH_INTERNAL_SECRET=<paste — same value as sidecar>
 PUBLIC_OAUTH_BASE=https://api.skycave.space/oauth
 FRONTEND_URL=https://skycave.space
 SESSION_SECRET=<paste>
-OAUTH_INTERNAL_SECRET=<paste — same value as backend>
+OAUTH_INTERNAL_SECRET=<paste - same value as backend>
 COOKIE_DOMAIN=.skycave.space
 COOKIE_SECURE=true
 # OAUTH_PRIVATE_KEY_FILE + PORT are set by docker-compose.
@@ -151,7 +151,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://api.skycave.space/oauth/session
    ```
 3. Deploy.
 4. Add the custom domain **`skycave.space`** in Vercel → follow its DNS prompt
-   (add the apex A / `cname.vercel-dns.com` record). **Required for OAuth** — the
+   (add the apex A / `cname.vercel-dns.com` record). **Required for OAuth** - the
    frontend must be on `skycave.space`, not the `*.vercel.app` URL.
 
 > Flag assets + globe texture are committed under `frontend/public/`, so no
@@ -177,7 +177,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://api.skycave.space/oauth/session
 - **Logs:** `docker compose logs -f api oauth-sidecar`
 - **Update:** `git pull && docker compose up -d --build`
 - **Rotate admin password:** edit `backend/.env` → `docker compose up -d api`
-- **Backups:** Postgres data is in the `pgdata` volume — schedule
+- **Backups:** Postgres data is in the `pgdata` volume - schedule
   `docker compose exec db pg_dump -U skycave skycave > backup.sql`.
 - **Scaling note:** the WS connection registry + round timers are in-process
   (single `api` worker). Horizontal scaling needs Redis pub/sub for broadcasts
@@ -185,5 +185,5 @@ curl -s -o /dev/null -w "%{http_code}\n" https://api.skycave.space/oauth/session
 
 ## Secrets checklist (never commit)
 
-`backend/.env`, `oauth-sidecar/.env`, `backend/secrets/oauth-private-key.pem` —
+`backend/.env`, `oauth-sidecar/.env`, `backend/secrets/oauth-private-key.pem` -
 all gitignored. `OAUTH_INTERNAL_SECRET` must be identical in both `.env` files.

@@ -1,4 +1,4 @@
-"""Game registry — single source of truth mapping game_type -> instance.
+"""Game registry - single source of truth mapping game_type -> instance.
 
 Keep the tuple below in LAUNCH ORDER (oldest first, append new games at the
 end): routers/games.py reverses it so the hub always leads with the newest game.

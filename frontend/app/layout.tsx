@@ -65,7 +65,7 @@ export default function RootLayout({
         {children}
         <FeedbackButton />
       </body>
-      {/* Heetsesh analytics — production only (async, non-blocking, every page). */}
+      {/* Heetsesh analytics - production only (async, non-blocking, every page). */}
       {analyticsEnabled && (
         <Script
           src="https://cdn.heetsesh.com/heetsesh.js"

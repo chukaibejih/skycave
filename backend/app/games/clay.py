@@ -1,4 +1,4 @@
-"""Clay — shape a spinning pot on the wheel toward a target, then it is scored.
+"""Clay - shape a spinning pot on the wheel toward a target, then it is scored.
 
 Unlike the other games the *gameplay* is a client-side canvas (see the frontend
 Clay component): the player pulls a lump of clay into shape and paints a glaze
@@ -251,7 +251,7 @@ class Clay(BaseGame):
         return self._build(self._pick(round_number), self.round_time)
 
     def new_round_seeded(self, round_number: int, seed: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Deterministic target for the Daily Pot — the same pot for everyone that
+        """Deterministic target for the Daily Pot - the same pot for everyone that
         day (that's the whole point of a daily), but walking a shuffled order so
         it never marches predictably and won't repeat until all are used.
 

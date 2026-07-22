@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 import type { GameInfo } from "@/lib/types";
 
-// "GeoGuess 1v1" reads oddly next to a Solo tab — trim the suffix for labels.
+// "GeoGuess 1v1" reads oddly next to a Solo tab - trim the suffix for labels.
 const shortName = (name: string) => name.replace(/\s*1v1$/i, "");
 
 export default function LeaderboardPage() {

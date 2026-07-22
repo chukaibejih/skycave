@@ -1,6 +1,6 @@
-"""Outline Quiz — name the country from its silhouette.
+"""Outline Quiz - name the country from its silhouette.
 
-Race mode, multiple choice — mechanically the same as Flag Rush, but the prompt
+Race mode, multiple choice - mechanically the same as Flag Rush, but the prompt
 is a country *outline* instead of a flag. Restricted to a curated set of
 recognizable shapes so the game stays fair (tiny island nations make poor
 silhouettes). Outline SVGs are bundled on the frontend at /outlines/{code}.svg.

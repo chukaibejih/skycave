@@ -28,7 +28,7 @@ const CLIENT_ORIGIN = new URL(BASE).origin;
 
 // In-memory stores. State only needs to live across the login->callback round
 // trip (same process, seconds). We discard the OAuth session right after the
-// callback — Skycave only needs to *verify* DID ownership, then issues its own
+// callback - Skycave only needs to *verify* DID ownership, then issues its own
 // signed cookie. (Swap to a Redis-backed store if the sidecar is ever scaled out.)
 const stateStore = new Map<string, NodeSavedState>();
 const sessionStore = new Map<string, NodeSavedSession>();
@@ -42,7 +42,7 @@ type NodeSavedSession = Parameters<
 >[1];
 
 export async function createClient(): Promise<NodeOAuthClient> {
-  // ES256 private key (PEM) — see DEPLOY.md for the openssl generation step.
+  // ES256 private key (PEM) - see DEPLOY.md for the openssl generation step.
   const key = await JoseKey.fromImportable(loadPrivateKeyPem(), "skycave-oauth-1");
 
   return new NodeOAuthClient({
@@ -51,7 +51,7 @@ export async function createClient(): Promise<NodeOAuthClient> {
       client_name: "Skycave",
       client_uri: CLIENT_ORIGIN,
       redirect_uris: [`${BASE}/callback`],
-      // Stick to the broad `atproto` scope — granular scopes aren't finalized.
+      // Stick to the broad `atproto` scope - granular scopes aren't finalized.
       scope: "atproto",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],

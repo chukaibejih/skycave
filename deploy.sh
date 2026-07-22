@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Skycave backend deploy — interactive one-shot setup for a DigitalOcean droplet.
+# Skycave backend deploy - interactive one-shot setup for a DigitalOcean droplet.
 #
 #   ./deploy.sh
 #
@@ -126,10 +126,10 @@ else
 fi
 echo
 
-# 4. ES256 OAuth key — generate only if absent (regenerating invalidates the client)
+# 4. ES256 OAuth key - generate only if absent (regenerating invalidates the client)
 bold "OAuth signing key"
 if [ -f "$KEY" ]; then
-  info "key already exists ($KEY) — keeping it."
+  info "key already exists ($KEY) - keeping it."
 else
   mkdir -p "$BACKEND/secrets"
   openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:named_curve \
@@ -139,7 +139,7 @@ else
 fi
 echo
 
-# 5. Swap — recommended on 1 GB droplets (the image build OOMs without it)
+# 5. Swap - recommended on 1 GB droplets (the image build OOMs without it)
 bold "Swap"
 SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 have_swap="$(free -m 2>/dev/null | awk '/^Swap:/ {print $2}')"; have_swap="${have_swap:-0}"
@@ -147,12 +147,12 @@ total_ram="$(free -m 2>/dev/null | awk '/^Mem:/ {print $2}')"; total_ram="${tota
 info "RAM: ${total_ram} MB   swap: ${have_swap} MB"
 def_swap=N
 [ "$have_swap" -lt 512 ] && [ "$total_ram" -lt 1600 ] && def_swap=Y && \
-  warn "Low memory with little/no swap — the build will likely OOM. Adding swap is recommended."
+  warn "Low memory with little/no swap - the build will likely OOM. Adding swap is recommended."
 ask DOSWAP "Add a swap file? (y/N)" "$def_swap"
 case "$DOSWAP" in [yY]*)
   ask SWAPSIZE "Swap size" "2G"
   if swapon --show=NAME --noheadings 2>/dev/null | grep -qx /swapfile || [ -e /swapfile ]; then
-    warn "/swapfile already exists — enabling it, not recreating."
+    warn "/swapfile already exists - enabling it, not recreating."
     $SUDO swapon /swapfile 2>/dev/null || true
   else
     if ! $SUDO fallocate -l "$SWAPSIZE" /swapfile 2>/dev/null; then
@@ -176,7 +176,7 @@ echo
 # 6. Build + start
 ask UP "Build and start the stack now? (Y/n)" "Y"
 case "$UP" in [nN]*) ;; *)
-  bold "Bringing up the stack (this compiles images — a few minutes on first run)"
+  bold "Bringing up the stack (this compiles images - a few minutes on first run)"
   ( cd "$BACKEND" && compose up -d --build )
   echo
   info "waiting for health..."
@@ -185,13 +185,13 @@ case "$UP" in [nN]*) ;; *)
       info "api + sidecar healthy."; break
     fi
     sleep 2
-    [ "$i" = 30 ] && warn "services not healthy yet — check: (cd backend && $(compose version >/dev/null 2>&1 && echo 'docker compose' || echo docker-compose) logs -f)"
+    [ "$i" = 30 ] && warn "services not healthy yet - check: (cd backend && $(compose version >/dev/null 2>&1 && echo 'docker compose' || echo docker-compose) logs -f)"
   done
 ;; esac
 echo
 
 # 7. Optional nginx + TLS
-bold "nginx + TLS (optional — needs root; skip if you handle nginx separately)"
+bold "nginx + TLS (optional - needs root; skip if you handle nginx separately)"
 ask DONGINX "Install the nginx site for $API_HOST and get a cert now? (y/N)" "N"
 case "$DONGINX" in [yY]*)
   command -v nginx  >/dev/null 2>&1 || die "nginx not installed (apt-get install -y nginx certbot python3-certbot-nginx)"
@@ -215,7 +215,7 @@ echo
 bold "Done."
 if [ "$WRITE_ENV" = yes ]; then
   echo
-  warn "SAVE THIS — the admin password is only shown now:"
+  warn "SAVE THIS - the admin password is only shown now:"
   printf '    ADMIN_PASSWORD = %s\n' "$ADMIN_PASSWORD"
 fi
 echo

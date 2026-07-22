@@ -9,7 +9,7 @@ from app.core.database import Base
 class User(Base):
     """A Bluesky-authenticated player.
 
-    The AT Protocol DID is the canonical identifier — never email/handle,
+    The AT Protocol DID is the canonical identifier - never email/handle,
     since handles can change while a DID is permanent. Guests are not
     persisted here; they live only in their JWT + Redis room state.
     """

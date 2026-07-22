@@ -1,4 +1,4 @@
-"""Uno rules check — pure logic, no server needed.
+"""Uno rules check - pure logic, no server needed.
 
 Usage:  python tests/uno_rules.py
 

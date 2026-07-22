@@ -101,7 +101,7 @@ function TraceGrid({
     dragging.current = false;
     const w = pathRef.current.map((i) => grid[i]).join("");
     commit([]);
-    if (w.length >= MIN) onSubmit(w); // event handler, not render — safe
+    if (w.length >= MIN) onSubmit(w); // event handler, not render - safe
   };
 
   const word = path.map((i) => grid[i]).join("");

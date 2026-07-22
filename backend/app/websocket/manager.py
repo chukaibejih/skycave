@@ -2,7 +2,7 @@
 
 Single-worker deployment (see Dockerfile) lets us keep sockets in memory.
 Authoritative state lives in Redis, so a refresh/reconnect rehydrates from
-there — this registry only tracks who is currently wired up for broadcasting.
+there - this registry only tracks who is currently wired up for broadcasting.
 """
 from __future__ import annotations
 

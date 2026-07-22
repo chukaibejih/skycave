@@ -12,7 +12,7 @@ import { reportClientError } from "@/lib/report";
 import { gameTypeFromSlug } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
-// Single-player. Unlike /room/[id] there's no lobby or portal — we create a solo
+// Single-player. Unlike /room/[id] there's no lobby or portal - we create a solo
 // room, connect, auto-ready, and drop straight into the game.
 export default function PlayPage() {
   const { game: slug } = useParams<{ game: string }>();
@@ -54,7 +54,7 @@ export default function PlayPage() {
           setDailyDone(e.message || "You already played today's pot.");
         } else {
           // Say what actually failed. "Couldn't start that game" with no detail
-          // is a dead end for the player and undiagnosable for us — a stale tab
+          // is a dead end for the player and undiagnosable for us - a stale tab
           // pointing at a dead origin looks identical to the server refusing.
           const detail =
             e instanceof ApiError
@@ -151,7 +151,7 @@ export default function PlayPage() {
   }
 
   // Branded loader while the room is created + the socket connects. We don't
-  // show the connection badge here — a first-connect "disconnected" flash reads
+  // show the connection badge here - a first-connect "disconnected" flash reads
   // as an error; the portal itself signals "setting up".
   return <StartingScreen gameName={gameName} />;
 }

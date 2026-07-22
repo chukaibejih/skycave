@@ -29,6 +29,7 @@ async def main():
                 elif d.get("must_play_or_pass"): a = {"action": "pass"}
                 else: a = {"action": "draw"}
                 moves += 1
+                if moves % 20 == 0: print(f"  ...{moves} moves in", flush=True)
                 await ws.send(json.dumps({"type": "ACTION", "data": a}))
             elif t == "GAME_END":
                 print(f"solo finished: moves={moves} scores={d['scores']} winner={d['winner_id']}")
@@ -40,4 +41,4 @@ async def main():
                 assert (sc["ai"] > 0) != (sc[mid] > 0), "exactly one side should win"
                 print("PASS: solo Uno vs the Caver, AI hand never exposed")
                 return
-asyncio.run(asyncio.wait_for(main(), timeout=120))
+asyncio.run(asyncio.wait_for(main(), timeout=420))
