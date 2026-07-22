@@ -34,6 +34,12 @@ export default function RoomPage() {
   const [landedExpired, setLandedExpired] = useState(false); // arrived after it closed
   const [timedOut, setTimedOut] = useState(false); // countdown reached zero locally
   const [inviteText, setInviteText] = useState("");
+  // Who invited you and to what, for the sign-in screen. GET /rooms/{id} is
+  // public, so this resolves before there is any identity.
+  const [preview, setPreview] = useState<{
+    hostHandle?: string | null;
+    gameName?: string | null;
+  } | null>(null);
   const [iAmReady, setIAmReady] = useState(false);
   // Guards the join+connect to run exactly once per mount. Critically it does
   // NOT depend on `room`, so the socket's `room: null` reset can't re-trigger
@@ -44,6 +50,27 @@ export default function RoomPage() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // Logged out on an invite link: name the host and the game on the sign-in
+  // screen, so it reads like an invitation rather than a wall.
+  useEffect(() => {
+    if (!loaded || identity) return;
+    let alive = true;
+    getRoom(id)
+      .then((r) => {
+        if (!alive) return;
+        setPreview({
+          // A guest host has the literal handle "guest", which would read as
+          // "@guest invited you".
+          hostHandle: r.host_handle && r.host_handle !== "guest" ? r.host_handle : null,
+          gameName: r.game_name ?? gameName(r.game_type),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [loaded, identity, id]);
 
   // Warm the heavy globe bundle + texture during the lobby, so GeoGuess round 1
   // renders instantly instead of downloading ~2MB while the timer is running.
@@ -134,6 +161,9 @@ export default function RoomPage() {
       <AuthModal
         open
         title="Join the game"
+        // Always the invite layout: reaching this page at all means someone
+        // sent the link. The names fill in once the lookup lands.
+        invite={preview ?? {}}
         onAuthed={() => {
           /* effect above will join + connect */
         }}
