@@ -55,6 +55,7 @@ export function Clay() {
   const room = useRoom((s) => s.room);
   const sendRematch = useRoom((s) => s.sendRematch);
   const rematchRequestedBy = useRoom((s) => s.rematchRequestedBy);
+  const series = useRoom((s) => s.series);
   const roundResult = useRoom((s) => s.roundResult);
   const meId = useAuth((s) => s.identity?.id);
 
@@ -83,6 +84,7 @@ export function Clay() {
   const collapsedRef = useRef(false);
   const collapsedAtRef = useRef(0);
   const [sharing, setSharing] = useState(false);
+  const [saved, setSaved] = useState(false);
   // Handlers read the phase through a ref so gating never depends on when the
   // listeners were bound (no stale closure, no rebinding needed).
   const phaseRef = useRef(phase);
@@ -314,6 +316,14 @@ export function Clay() {
           ? "Draw."
           : `${opp?.display_name ?? "Opponent"} wins.`;
 
+  // Only claim a series once more than one game has been decided in this room.
+  const cardSeriesLine = (() => {
+    if (isSolo || !opp) return null;
+    const mine = series[meId ?? ""] ?? 0;
+    const theirs = series[opp.id] ?? 0;
+    return mine + theirs > 1 ? `SERIES ${mine}-${theirs}` : null;
+  })();
+
   // Draw the share card once the game ends. In a pot-off it shows all three
   // pots, since seeing what the other person made is half the point.
   useEffect(() => {
@@ -330,18 +340,23 @@ export function Clay() {
             score: (opp && gameEnd.scores[opp.id]) ?? 0,
           }
         : null,
-      cardHeadline
+      cardHeadline,
+      cardSeriesLine
     );
-  }, [gameEnd, meId, oppPot, opp, cardHeadline]);
+  }, [gameEnd, meId, oppPot, opp, cardHeadline, cardSeriesLine]);
   const oppScore = gameEnd && opp ? gameEnd.scores[opp.id] ?? 0 : null;
   // A finished room stops sending round_data, so lean on the sim's own copy.
   const potName = S.current?.name ?? target?.name ?? "your pot";
 
+  // A series is the result worth posting once there has been one; the single
+  // game's score alone reads as if the earlier games never happened.
   const shareLine = isSolo
     ? `Shaped a ${potName} on Clay · ${myScore} pts.`
-    : gameEnd?.winner_id === meId
-      ? `Won a Clay pot-off · ${myScore} pts.`
-      : `Clay pot-off · ${myScore} pts.`;
+    : cardSeriesLine
+      ? `Clay pot-off · ${cardSeriesLine.replace("SERIES ", "series ")}.`
+      : gameEnd?.winner_id === meId
+        ? `Won a Clay pot-off · ${myScore} pts.`
+        : `Clay pot-off · ${myScore} pts.`;
 
   /**
    * Share the actual pot, not a line of text. Bluesky's web composer can't take
@@ -378,50 +393,110 @@ export function Clay() {
     }
   };
 
+  const downloadCard = () => {
+    const canvas = cardRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clay-${potName.toLowerCase().replace(/\s+/g, "-")}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    }, "image/png");
+  };
+
   // ---- result: a full screen, matching the other game-over pages ----
   if (gameEnd) {
     const iRequested = rematchRequestedBy.includes(meId ?? "");
     const oppRequested = !!opp && rematchRequestedBy.includes(opp.id);
     const headline = cardHeadline;
+    // Running set score across rematches in this room. Every other game shows
+    // this; Clay was reading the store but never this field.
+    const myWins = series[meId ?? ""] ?? 0;
+    const oppWins = opp ? series[opp.id] ?? 0 : 0;
+    const seriesGames = myWins + oppWins;
     return (
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
+      <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 26 }}
         >
-          <h1 className="font-[var(--font-display)] text-5xl font-bold leading-none">{headline}</h1>
-          <p className="mt-3 font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">
+          <h1 className="font-[var(--font-display)] text-4xl font-bold leading-none">{headline}</h1>
+          <p className="mt-2 font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">
             <span className="font-[var(--font-display)] text-base font-bold" style={{ color: "var(--color-primary)" }}>
               {myScore.toLocaleString()}
             </span>{" "}
             points · {potName}
           </p>
 
+          {!isSolo && seriesGames > 1 && (
+            <div
+              className="mt-4 flex items-center justify-between rounded-[12px] border px-4 py-2.5"
+              style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+            >
+              <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+                series · {seriesGames} games
+              </span>
+              <span className="font-[var(--font-display)] text-base font-bold">
+                <span style={{ color: myWins >= oppWins ? "var(--color-primary)" : "var(--color-text-secondary)" }}>
+                  {myWins}
+                </span>
+                <span className="mx-1.5 text-[var(--color-text-secondary)]">-</span>
+                <span style={{ color: oppWins > myWins ? "var(--color-primary)" : "var(--color-text-secondary)" }}>
+                  {oppWins}
+                </span>
+              </span>
+            </div>
+          )}
+
           {/* The pot itself is the result — target beside yours. */}
           <canvas
             ref={cardRef}
             width={oppPot ? 1080 : 1280}
             height={oppPot ? 1320 : 720}
-            className="mt-5 w-full rounded-[14px] border border-[var(--color-border)]"
+            className="mt-4 w-full rounded-[14px] border border-[var(--color-border)]"
           />
 
-          {!isSolo && oppScore != null && (
-            <div className="mt-5 flex flex-col gap-2">
-              <ScoreRow name="You" score={myScore} lead={myScore >= oppScore} />
-              <ScoreRow name={opp?.display_name ?? "Opponent"} score={oppScore} lead={oppScore > myScore} />
+          <div className="mt-5 flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                onClick={shareCard}
+                disabled={sharing}
+                className="flex h-12 flex-1 items-center justify-center rounded-[12px] text-base font-semibold transition-[filter] active:brightness-95 disabled:opacity-60"
+                style={{ background: "var(--color-primary)", color: "#05060a" }}
+              >
+                {sharing ? "Preparing..." : "Share your pot"}
+              </button>
+              <button
+                onClick={downloadCard}
+                aria-label="Download the image"
+                className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border px-4 text-sm font-semibold"
+                style={{
+                  borderColor: saved ? "var(--color-success)" : "var(--color-border)",
+                  color: saved ? "var(--color-success)" : "var(--color-text-primary)",
+                }}
+              >
+                {/* The label stays put and the icon confirms, so the button
+                    never changes width and shoves the share button sideways. */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  {saved ? (
+                    <path d="M20 6 9 17l-5-5" />
+                  ) : (
+                    <>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <path d="M7 10l5 5 5-5" />
+                      <path d="M12 15V3" />
+                    </>
+                  )}
+                </svg>
+                Download
+              </button>
             </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-2.5">
-            <button
-              onClick={shareCard}
-              disabled={sharing}
-              className="flex h-[52px] w-full items-center justify-center rounded-[12px] text-base font-semibold transition-[filter] active:brightness-95 disabled:opacity-60"
-              style={{ background: "var(--color-primary)", color: "#05060a" }}
-            >
-              {sharing ? "Preparing your pot..." : "Share your pot"}
-            </button>
             <div className="flex items-center justify-center gap-4 pt-1">
               {isSolo ? (
                 <a
@@ -447,7 +522,7 @@ export function Clay() {
                 </button>
               )}
               <Link href="/" className="flex h-12 items-center justify-center px-3 text-sm text-[var(--color-text-secondary)]">
-                hub
+                new game
               </Link>
             </div>
             {oppRequested && !iRequested && (
@@ -542,19 +617,6 @@ export function Clay() {
   );
 }
 
-function ScoreRow({ name, score, lead }: { name: string; score: number; lead: boolean }) {
-  return (
-    <div
-      className="flex items-center justify-between rounded-[10px] border px-4 py-2.5"
-      style={{ borderColor: lead ? "var(--color-primary)" : "var(--color-border)" }}
-    >
-      <span className="truncate text-sm" style={{ color: lead ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
-        {name}
-      </span>
-      <span className="font-[var(--font-mono)] text-base font-semibold">{score.toLocaleString()}</span>
-    </div>
-  );
-}
 
 function Stat({ v, l, color }: { v: string; l: string; color: string }) {
   return (
@@ -892,7 +954,10 @@ function drawCard(
   score: number,
   name: string,
   rival: { pot: SubmittedPot; name: string; score: number } | null,
-  headline?: string
+  headline?: string,
+  // Running set score across rematches. A card posted mid-series that shows
+  // only the last game throws away everything that came before it.
+  seriesLine?: string | null
 ) {
   const g = canvas.getContext("2d");
   if (!g) return;
@@ -921,7 +986,12 @@ function drawCard(
     // The outcome is the hero here; the per-pot scores below carry the numbers.
     g.fillStyle = "#f5f7ff";
     g.font = "700 26px system-ui, sans-serif";
-    g.fillText(headline ?? "", CW - 30, 58);
+    g.fillText(headline ?? "", CW - 30, 54);
+    if (seriesLine) {
+      g.fillStyle = "#8b7cff";
+      g.font = "600 15px ui-monospace, monospace";
+      g.fillText(seriesLine, CW - 30, 78);
+    }
   } else {
     g.fillStyle = "#8b7cff";
     g.font = "800 52px system-ui, sans-serif";
