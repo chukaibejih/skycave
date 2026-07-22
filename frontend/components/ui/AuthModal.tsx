@@ -131,7 +131,7 @@ export function AuthModal({
       />
       <Button
         full
-        variant={invite ? "secondary" : undefined}
+        variant="secondary"
         onClick={onGuest}
         disabled={busy || !name.trim()}
       >
@@ -184,7 +184,7 @@ export function AuthModal({
               <>
                 <h2 className="mb-1 font-[var(--font-display)] text-xl font-bold">{title}</h2>
                 <p className="mb-5 text-sm text-[var(--color-text-secondary)]">
-                  No account needed. Pick a name and jump in.
+                  Sign in to keep your scores, or jump in as a guest.
                 </p>
               </>
             )}
@@ -221,22 +221,14 @@ export function AuthModal({
               </div>
             )}
 
-            {/* Invited players were sent here from Bluesky, so that goes first.
-                On the hub, where a first-time visitor lands, guest stays first
-                so nothing blocks a quick game. */}
-            {invite ? (
-              <>
-                {blueskyBlock}
-                {divider}
-                {guestBlock}
-              </>
-            ) : (
-              <>
-                {guestBlock}
-                {divider}
-                {blueskyBlock}
-              </>
-            )}
+            {/* Bluesky first, everywhere. Signing in is what makes a game count
+                toward a profile, so it should never be the option you scroll
+                past - and it read as an afterthought when a host was setting up
+                their own room. Guest stays one tap away for anyone who
+                genuinely has no account. */}
+            {blueskyBlock}
+            {divider}
+            {guestBlock}
 
             {error && (
               <p className="mt-3 text-center text-sm text-[var(--color-warm)]">{error}</p>

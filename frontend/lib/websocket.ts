@@ -32,6 +32,11 @@ export class SkycaveSocket {
   private attempt = 0;
   private closedByUser = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Messages typed before the socket settled. send() used to drop these on the
+  // floor: tap Ready a beat too early and the server never heard it, while the
+  // button had already flipped to "waiting for opponent..." - so you waited for
+  // something that was never coming. The same hole swallowed game moves.
+  private pending: string[] = [];
 
   constructor(
     private roomId: string,
@@ -59,6 +64,16 @@ export class SkycaveSocket {
     ws.onopen = () => {
       this.attempt = 0;
       this.setStatus("open");
+      // Anything typed while we were down goes out now, in order.
+      const queued = this.pending;
+      this.pending = [];
+      for (const raw of queued) {
+        try {
+          ws.send(raw);
+        } catch {
+          /* a send that fails here will be retried by the next reconnect */
+        }
+      }
     };
 
     ws.onmessage = (ev) => {
@@ -149,9 +164,17 @@ export class SkycaveSocket {
   }
 
   send(type: string, data: Record<string, unknown> = {}) {
+    const raw = JSON.stringify({ type, data });
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type, data }));
+      this.ws.send(raw);
+      return;
     }
+    // Hold it until the socket is back rather than losing it silently. Capped
+    // so a long outage cannot grow this without bound; the oldest go first,
+    // since a stale action is worth less than a recent one.
+    if (this.closedByUser) return;
+    this.pending.push(raw);
+    if (this.pending.length > 12) this.pending.shift();
   }
 
   ready() {
