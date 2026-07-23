@@ -5,7 +5,7 @@ import { RoomPortal } from "@/components/lobby/RoomPortal";
 import { PlayerCard } from "@/components/lobby/PlayerCard";
 import { InvitePanel } from "@/components/lobby/InvitePanel";
 import { RoomCountdown } from "@/components/lobby/RoomCountdown";
-import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
+import { ConnectionPresence } from "@/components/ui/ConnectionPresence";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
@@ -196,7 +196,7 @@ export default function RoomPage() {
   if (ready && gameEnd && room!.status === "finished" && room!.mode !== "solo" && room!.game_type !== "clay") {
     return (
       <>
-        <ConnectionBadge status={status} />
+        <ConnectionPresence />
         <GameOver roomId={id} />
       </>
     );
@@ -206,7 +206,7 @@ export default function RoomPage() {
   if (ready && game && room!.status !== "waiting") {
     return (
       <>
-        <ConnectionBadge status={status} />
+        <ConnectionPresence />
         <GameShell />
       </>
     );
@@ -260,7 +260,7 @@ export default function RoomPage() {
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-      <ConnectionBadge status={status} />
+      <ConnectionPresence />
 
       <header className="flex items-center gap-2 py-4">
         <button

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
+import { ConnectionPresence } from "@/components/ui/ConnectionPresence";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
@@ -144,7 +144,7 @@ export default function PlayPage() {
   if (ready && game && room!.status !== "waiting") {
     return (
       <>
-        <ConnectionBadge status={status} />
+        <ConnectionPresence />
         <GameShell />
       </>
     );
