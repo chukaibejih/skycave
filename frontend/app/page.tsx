@@ -276,7 +276,7 @@ function AccountMenu({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 py-1 pl-4 pr-1 active:border-[var(--color-primary)]"
+        className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 py-1 pl-1 pr-1 active:border-[var(--color-primary)] sm:pl-4"
       >
         <span className="hidden max-w-[150px] truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">
           {label}
