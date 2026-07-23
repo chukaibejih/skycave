@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { createClient, FRONTEND_URL } from "./client";
 import { handleCallback } from "./callback";
 import { readDidFromCookie, clearSessionCookie } from "./session";
+import { postAnnouncement, announcerConfigured } from "./announcer";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const INTERNAL_SECRET = process.env.OAUTH_INTERNAL_SECRET ?? "";
@@ -52,6 +53,27 @@ async function main() {
     const did = readDidFromCookie(req);
     if (!did) return res.status(401).json({ error: "no_session" });
     return res.json({ did });
+  });
+
+  // ── Internal only: post as @skycave.space. Same secret guard as
+  // /oauth/session; the backend composes the text, this adds the facets and
+  // posts. express.json() is scoped to this route so other routes are unchanged.
+  app.post("/internal/announce", express.json(), async (req, res) => {
+    if (!INTERNAL_SECRET || req.get("x-internal-secret") !== INTERNAL_SECRET) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+    if (!announcerConfigured()) {
+      return res.status(503).json({ error: "announcer_not_configured" });
+    }
+    const text = String((req.body && req.body.text) || "").trim();
+    if (!text) return res.status(400).json({ error: "empty_text" });
+    try {
+      const uri = await postAnnouncement(text);
+      return res.json({ ok: true, uri });
+    } catch (err) {
+      console.error("[announce] post failed:", err);
+      return res.status(502).json({ ok: false, error: String(err) });
+    }
   });
 
   // ── Public route 3: logout. Browser-called (credentialed, cross-origin from
