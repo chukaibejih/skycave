@@ -110,7 +110,16 @@ class Fixture:
 
     @property
     def is_bye(self) -> bool:
-        return (self.p1 is None) != (self.p2 is None)
+        """A free pass into the next round.
+
+        Only round one can hand these out: the draw is padded to a power of two
+        and the spare slots are the byes. Later on, one empty seat means the
+        feeding match has not finished yet, which is a completely different
+        thing to tell a player. Without the round check a semi-finalist waiting
+        on a quarter-final was being shown "bye, straight through", reading as
+        though they were already through to the final.
+        """
+        return self.round == 1 and (self.p1 is None) != (self.p2 is None)
 
     def wins(self) -> tuple[int, int]:
         w1 = sum(1 for r in self.results if r.get("winner") == self.p1)
