@@ -63,6 +63,16 @@ export interface Room {
   invite_url?: string;
   expires_at?: number | null; // unix seconds; waiting versus room auto-close time
   series?: Record<string, number>; // wins per player id across rematches in this room
+  // Set when this room is one leg of a tournament fixture. Its presence is what
+  // tells the room and its results page to send the player back to the series
+  // rather than offering a rematch that would count for nothing.
+  tournament?: {
+    id: string;
+    round: number;
+    slot: number;
+    leg: number;
+    game_index: number;
+  } | null;
 }
 
 // Turn-based board (Tile Takeover). Sent via GAME_STATE / ROOM_STATE.

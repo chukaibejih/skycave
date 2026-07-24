@@ -133,6 +133,12 @@ class TournamentMatch(Base):
     # nobody collects a walkover while their opponent is asleep.
     checked_in: Mapped[list] = mapped_column(JSON, default=list)
 
+    # One room id per leg played, indexed by how many results existed when the
+    # room opened. A leg is a single sitting, so a replayed draw takes its own
+    # slot here even though it does not advance the series. Keeping this apart
+    # from `results` is what lets a room be open before it has an outcome.
+    rooms: Mapped[list] = mapped_column(JSON, default=list)
+
     winner_did: Mapped[str | None] = mapped_column(String(255), nullable=True)
     deadline: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

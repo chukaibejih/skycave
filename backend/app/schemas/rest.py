@@ -94,6 +94,10 @@ class RoomResponse(BaseModel):
     # because the results page loads through GET /rooms/{id} and without this a
     # series would post as just the final game's score.
     series: dict[str, int] = {}
+    # Set when this room is a leg of a tournament fixture: {id, round, slot,
+    # leg, game_index}. It's what lets the room and its results page send the
+    # player back to their series instead of dumping them at the hub.
+    tournament: dict | None = None
     game: GameSummary | None = None
 
 

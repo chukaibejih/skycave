@@ -26,6 +26,7 @@ from app.models.tournament import (
     LOCKED,
     M_BYE,
     M_DONE,
+    M_LIVE,
     M_PENDING,
     M_READY,
     REGISTERING,
@@ -190,6 +191,11 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
 
     registering -> locked   once the deadline passes (draws the bracket)
     locked      -> in_progress once the play window opens
+    in_progress -> finished  once the final is decided
+
+    Round deadlines are settled here too, so a fixture nobody turned up for
+    cannot hold the round behind it. Same reasoning as the draw: the clock does
+    the work on the next read, and a restart cannot lose it.
     """
     now = _now()
 
@@ -199,6 +205,9 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
     if t.status == LOCKED and now >= _aware(t.play_opens_at):
         t.status = IN_PROGRESS
         await db.commit()
+
+    if t.status in (LOCKED, IN_PROGRESS):
+        await apply_forfeits(db, t)
 
     return t
 
@@ -279,13 +288,20 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     return locked
 
 
-def _match_status(fx: eng.Fixture) -> str:
+def _match_status(fx: eng.Fixture, was: str | None = None) -> str:
+    """The fixture's state, without demoting one already under way.
+
+    `was` is the status on the row. A series that has started is `live`, and
+    that is not derivable from the fixture alone (an undecided fixture with two
+    players looks identical before the first game and between games), so it is
+    carried forward rather than recomputed back down to `ready`.
+    """
     if fx.is_bye:
         return M_BYE
     if fx.winner:
         return M_DONE
     if fx.p1 and fx.p2:
-        return M_READY
+        return M_LIVE if was == M_LIVE else M_READY
     return M_PENDING
 
 
@@ -318,13 +334,337 @@ async def sync_fixtures(
         m.player2_did = fx.p2
         m.results = list(fx.results)
         m.winner_did = fx.winner
-        m.status = _match_status(fx)
+        m.status = _match_status(fx, m.status)
 
     champ = eng.champion(fixtures)
     if champ and t.status != FINISHED:
         t.champion_did = champ
         t.status = FINISHED
     await db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Playing a fixture: check-in, opening a leg, recording the outcome
+# --------------------------------------------------------------------------- #
+
+class MatchError(Exception):
+    """A match action refused, with a reason a human can read."""
+
+    def __init__(self, code: str, message: str):
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
+async def find_match(
+    db: AsyncSession, tournament_id: str, round: int, slot: int
+) -> TournamentMatch | None:
+    return (
+        await db.execute(
+            select(TournamentMatch).where(
+                TournamentMatch.tournament_id == tournament_id,
+                TournamentMatch.round == round,
+                TournamentMatch.slot == slot,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def my_match(
+    db: AsyncSession, tournament_id: str, did: str
+) -> TournamentMatch | None:
+    """The fixture this player should be looking at right now.
+
+    The earliest undecided round they appear in, so a player who has already
+    won round one but whose next opponent is still playing sees the round-two
+    slot they are waiting in, not the match they have already finished.
+    Falls back to their last decided fixture once they are out or have won it
+    all, because "how did I do" is the only question left at that point.
+    """
+    rows = await matches(db, tournament_id)
+    mine = [m for m in rows if did in (m.player1_did, m.player2_did)]
+    if not mine:
+        return None
+    live = [m for m in mine if m.winner_did is None]
+    if live:
+        return min(live, key=lambda m: m.round)
+    return max(mine, key=lambda m: m.round)
+
+
+def leg_index(m: TournamentMatch) -> int:
+    """Which sitting is next (0-based). Replays count: each is its own room."""
+    return len(m.results or [])
+
+
+def current_game(m: TournamentMatch) -> str | None:
+    """The game to be played now. A replayed draw does not advance the series."""
+    games = list(m.games or [])
+    if not games:
+        return None
+    decided = sum(1 for r in (m.results or []) if not r.get("replay"))
+    return games[min(decided, len(games) - 1)]
+
+
+def host_did(m: TournamentMatch) -> str | None:
+    """Who holds the host seat for the next leg."""
+    if not m.player1_did:
+        return None
+    return eng.host_for_game(m.player1_did, m.player2_did, leg_index(m))
+
+
+async def check_in(db: AsyncSession, m: TournamentMatch, did: str) -> TournamentMatch:
+    """Mark a player present for their fixture.
+
+    Locked and re-read so two players checking in at the same instant cannot
+    each write a list that drops the other. Idempotent.
+    """
+    locked = (
+        await db.execute(
+            select(TournamentMatch)
+            .where(TournamentMatch.id == m.id)
+            .with_for_update()
+        )
+    ).scalar_one()
+    if did not in (locked.player1_did, locked.player2_did):
+        raise MatchError("not_yours", "This is not your fixture.")
+    if locked.winner_did is not None:
+        raise MatchError("decided", "This fixture is already decided.")
+    present = list(locked.checked_in or [])
+    if did not in present:
+        present.append(did)
+        locked.checked_in = present
+    if len(present) >= 2 and locked.status == M_READY:
+        locked.status = M_LIVE
+    await db.commit()
+    return locked
+
+
+async def open_leg(
+    db: AsyncSession,
+    t: Tournament,
+    m: TournamentMatch,
+    entrants_by_did: dict[str, TournamentEntrant],
+) -> str:
+    """Return the room for the leg in play, creating it if there isn't one.
+
+    This is the whole "the room appears by itself" promise: neither player ever
+    creates a room, picks the game, or sends an invite. Both are seated up
+    front, so there is no join step and no window in which one of them is
+    sitting in an empty room wondering if the other got the link.
+
+    Serialised on the match row, because both players poll this endpoint and
+    two simultaneous callers would otherwise mint two rooms and split the
+    fixture across them.
+    """
+    from app.models import Room
+    from app.services import room_manager as rm
+
+    locked = (
+        await db.execute(
+            select(TournamentMatch)
+            .where(TournamentMatch.id == m.id)
+            .with_for_update()
+        )
+    ).scalar_one()
+
+    if locked.winner_did is not None:
+        raise MatchError("decided", "This fixture is already decided.")
+    if not (locked.player1_did and locked.player2_did):
+        raise MatchError("waiting", "Your opponent has not come through yet.")
+    present = list(locked.checked_in or [])
+    if locked.player1_did not in present or locked.player2_did not in present:
+        raise MatchError("check_in", "Both players have to check in first.")
+    if t.status not in (LOCKED, IN_PROGRESS):
+        raise MatchError("closed", "The tournament is not open for play.")
+
+    leg = leg_index(locked)
+    open_rooms = list(locked.rooms or [])
+    while len(open_rooms) <= leg:
+        open_rooms.append(None)
+
+    existing = open_rooms[leg]
+    if existing:
+        live = await rm.get_room(existing)
+        # A room that finished has already produced a result, which advances the
+        # leg, so anything still sitting here either never finished or fell out
+        # of Redis. Either way it is dead and this leg deserves a fresh one.
+        if live is not None and live.get("status") != "finished":
+            return existing
+
+    game_type = current_game(locked)
+    host = entrants_by_did.get(host_did(locked) or "")
+    other_did = (
+        locked.player2_did if host and host.did == locked.player1_did else locked.player1_did
+    )
+    guest = entrants_by_did.get(other_did or "")
+    if host is None or guest is None or game_type is None:
+        raise MatchError("broken", "This fixture is missing a player.")
+
+    for _ in range(5):
+        room_id = new_room_id()
+        if await rm.get_room(room_id) is None:
+            break
+    else:
+        raise MatchError("no_room", "Could not open a room. Try again.")
+
+    await rm.create_room(room_id, game_type, _identity(host), mode="versus")
+    await rm.join_room(room_id, _identity(guest))
+    # Tag the room with the fixture it belongs to, so the result knows where to
+    # go home to and the room UI can show which leg of the series this is.
+    room = await rm.get_room(room_id)
+    room["tournament"] = {
+        "id": t.id,
+        "round": locked.round,
+        "slot": locked.slot,
+        "leg": leg,
+        "game_index": sum(1 for r in (locked.results or []) if not r.get("replay")),
+    }
+    await rm.save_room(room)
+    # Deliberately not armed with the no-opponent expiry. That timer exists for
+    # a room waiting on an invite link, and it already refuses to fire once a
+    # second player is seated. Arming it here would only stamp an `expires_at`
+    # the room UI would render as a countdown that can never run out.
+
+    open_rooms[leg] = room_id
+    locked.rooms = open_rooms
+    if locked.status == M_READY:
+        locked.status = M_LIVE
+    db.add(
+        Room(
+            id=room_id,
+            game_type=game_type,
+            status="waiting",
+            host_id=host.did,
+            host_handle=host.handle,
+        )
+    )
+    await db.commit()
+    logger.info(
+        "tournament %s r%ds%d leg %d opened as room %s (%s, host %s)",
+        t.id, locked.round, locked.slot, leg, room_id, game_type, host.handle,
+    )
+    return room_id
+
+
+def _identity(e: TournamentEntrant) -> dict:
+    """An entrant as the identity shape rooms expect."""
+    return {
+        "id": e.did,
+        "handle": e.handle,
+        "display_name": e.display_name or e.handle,
+        "avatar_url": e.avatar_url,
+        "is_guest": False,
+    }
+
+
+async def record_result(
+    db: AsyncSession,
+    tournament_id: str,
+    round: int,
+    slot: int,
+    *,
+    room_id: str,
+    winner_did: str | None,
+    scores: dict[str, int],
+) -> None:
+    """Feed a finished tournament game back into the bracket.
+
+    Called off the back of GAME_END. Everything about how a result changes a
+    series (replay a draw, 2-0 skips the third, points as the tiebreak) lives
+    in the engine; this only maps room scores onto the fixture's seats and
+    writes the outcome back.
+
+    Keyed on room id so a duplicated GAME_END cannot score the same game twice.
+    """
+    t = await db.get(Tournament, tournament_id)
+    if t is None:
+        return
+    rows = await matches(db, tournament_id)
+    fixtures = to_fixtures(rows)
+    target = next((f for f in fixtures if f.round == round and f.slot == slot), None)
+    if target is None or target.decided():
+        return
+    if any(r.get("room_id") == room_id for r in target.results):
+        return  # already counted
+
+    before = len(target.results)
+    eng.record_game(
+        target,
+        winner_did,
+        p1_score=int(scores.get(target.p1 or "", 0) or 0),
+        p2_score=int(scores.get(target.p2 or "", 0) or 0),
+    )
+    if len(target.results) > before:
+        target.results[-1]["room_id"] = room_id
+
+    eng.advance(fixtures)
+    await sync_fixtures(db, t, rows, fixtures)
+    logger.info(
+        "tournament %s r%ds%d recorded room %s: winner=%s series=%s",
+        tournament_id, round, slot, room_id, winner_did, target.wins(),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Forfeits
+# --------------------------------------------------------------------------- #
+
+async def apply_forfeits(db: AsyncSession, t: Tournament) -> bool:
+    """Past a round deadline, decide anything still open, and move the bracket.
+
+    A knockout with a fixed wall cannot wait for someone who never turned up,
+    so the deadline is the referee. In order of preference: whoever is ahead on
+    the series, then whoever actually checked in, then total points. If neither
+    player ever appeared the seat still has to go somewhere or the whole bracket
+    stalls behind an empty fixture, so it goes to the higher seed, which is at
+    least stated up front rather than decided by a coin nobody sees.
+
+    Returns True if anything changed.
+    """
+    if t.status not in (LOCKED, IN_PROGRESS):
+        return False
+    now = _now()
+    rows = await matches(db, t.id)
+    fixtures = to_fixtures(rows)
+    by_key = {(f.round, f.slot): f for f in fixtures}
+    changed = False
+
+    # Run to a fixed point. A later round's fixture has no players until the one
+    # feeding it is decided, so a single sweep can only ever settle the earliest
+    # unresolved round. If the whole weekend has gone by, every round is past its
+    # deadline and the bracket has to unwind all the way to a champion in one go.
+    for _ in range(eng.MAX_ROUNDS + 1):
+        moved = False
+        for m in rows:
+            fx = by_key.get((m.round, m.slot))
+            if fx is None or fx.decided() or not (fx.p1 and fx.p2):
+                continue
+            deadline = _aware(m.deadline)
+            if deadline is None or now < deadline:
+                continue
+
+            w1, w2 = fx.wins()
+            present = list(m.checked_in or [])
+            if w1 != w2:
+                fx.winner = fx.p1 if w1 > w2 else fx.p2
+            elif (fx.p1 in present) != (fx.p2 in present):
+                fx.winner = fx.p1 if fx.p1 in present else fx.p2
+            else:
+                s1, s2 = fx.points()
+                fx.winner = fx.p1 if s1 >= s2 else fx.p2
+            moved = True
+            logger.info(
+                "tournament %s r%ds%d timed out, awarded to %s",
+                t.id, m.round, m.slot, fx.winner,
+            )
+        if not moved:
+            break
+        eng.advance(fixtures)
+        changed = True
+
+    if changed:
+        await sync_fixtures(db, t, rows, fixtures)
+    return changed
 
 
 async def create(

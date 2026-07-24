@@ -294,3 +294,61 @@ export const getTournament = (id: string) =>
 /** Take a seat. Needs a Bluesky identity; the server refuses guests. */
 export const enterTournament = (id: string) =>
   request<Tournament>(`/tournaments/${id}/register`, { method: "POST" });
+
+/** One game already played in a series, told from the viewer's side. */
+export interface MatchLeg {
+  game_type: string;
+  game_name: string;
+  winner_did: string | null;
+  you_won: boolean;
+  drawn: boolean;
+  replay: boolean;
+  your_score: number;
+  their_score: number;
+  room_id: string | null;
+}
+
+export interface MyMatch {
+  tournament_id: string;
+  tournament_name: string;
+  tournament_status: string;
+  round: number;
+  slot: number;
+  round_name: string;
+  status: string; // pending | ready | live | done | bye
+  you: TournamentPlayer;
+  opponent: TournamentPlayer | null;
+  games: string[];
+  game_names: string[];
+  current_game: string | null;
+  current_game_name: string | null;
+  game_number: number;
+  legs: MatchLeg[];
+  your_wins: number;
+  their_wins: number;
+  you_checked_in: boolean;
+  opponent_checked_in: boolean;
+  you_host: boolean;
+  room_id: string | null;
+  is_bye: boolean;
+  eliminated: boolean;
+  won_match: boolean;
+  is_champion: boolean;
+  deadline: string | null;
+  prompt: string;
+}
+
+/** The viewer's own fixture. Null when they are not in this tournament. */
+export const getMyMatch = (id: string) =>
+  request<MyMatch | null>(`/tournaments/${id}/my-match`);
+
+/** Say you are here. The room opens by itself once both of you have. */
+export const checkInToMatch = (id: string) =>
+  request<MyMatch>(`/tournaments/${id}/check-in`, { method: "POST" });
+
+/**
+ * Open the room for the game in play, or hand back the one already open.
+ * The same call for game one and the decider, and safe to press twice.
+ */
+export const startMatchGame = (id: string) =>
+  request<MyMatch>(`/tournaments/${id}/start`, { method: "POST" });

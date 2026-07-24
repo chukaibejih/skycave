@@ -1,0 +1,506 @@
+"use client";
+import { use, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { Avatar } from "@/components/ui/Avatar";
+import { Countdown } from "@/components/tournament/Countdown";
+import {
+  ApiError,
+  checkInToMatch,
+  getMyMatch,
+  startMatchGame,
+  type MatchLeg,
+  type MyMatch,
+} from "@/lib/api";
+import { useAuth } from "@/lib/store";
+
+/**
+ * Your fixture, for the whole weekend.
+ *
+ * This is the one page a player in the tournament needs open. Everything that
+ * would otherwise send them back to the hub happens here: checking in, the room
+ * opening, the score across the series, and starting the next game.
+ *
+ * It polls fast, because half of what it shows is about someone else: whether
+ * the opponent has checked in, and whether they have opened the room. A player
+ * staring at "waiting for your opponent" should see it change without touching
+ * anything.
+ */
+const POLL_MS = 5_000;
+
+export default function MatchPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const { identity, loaded, hydrate } = useAuth();
+  const [m, setM] = useState<MyMatch | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "none">("loading");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  const load = useCallback(async () => {
+    try {
+      const next = await getMyMatch(id);
+      setM(next);
+      setState(next ? "ready" : "none");
+    } catch {
+      setState((s) => (s === "loading" ? "none" : s));
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (!identity || identity.is_guest) {
+      setState("none");
+      return;
+    }
+    load();
+    const t = setInterval(load, POLL_MS);
+    return () => clearInterval(t);
+  }, [load, loaded, identity]);
+
+  const act = async (fn: () => Promise<MyMatch>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setM(await fn());
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That did not go through. Try again.");
+      void load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await startMatchGame(id);
+      setM(next);
+      if (next.room_id) router.push(`/room/${next.room_id}`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not open the room. Try again.");
+      void load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (state === "loading" || !loaded) {
+    return <Shell id={id}><Muted>Finding your fixture...</Muted></Shell>;
+  }
+
+  if (!identity || identity.is_guest) {
+    return (
+      <Shell id={id}>
+        <Empty
+          title="Sign in to see your fixture."
+          body="The tournament runs on Bluesky accounts, so we know which fixture is yours."
+        />
+      </Shell>
+    );
+  }
+
+  if (state === "none" || !m) {
+    return (
+      <Shell id={id}>
+        <Empty
+          title="You are not in this one."
+          body="You can still follow every result on the bracket."
+        />
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell id={id}>
+      {/* ── Which fixture this is ──────────────────────────────────────── */}
+      <div className="text-center">
+        <span
+          className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em]"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-primary) 45%, transparent)",
+            color: "var(--color-primary)",
+          }}
+        >
+          {m.round_name}
+        </span>
+        <h1 className="mt-3 font-[var(--font-display)] text-2xl font-bold sm:text-3xl">
+          {m.is_bye
+            ? "You are straight through."
+            : m.opponent
+              ? `You vs ${m.opponent.display_name}`
+              : "Your next opponent is being decided"}
+        </h1>
+      </div>
+
+      {/* ── The face-off ───────────────────────────────────────────────── */}
+      <section className="mt-7">
+        <div
+          className="rounded-[20px] border p-5"
+          style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <Side p={m.you} label="You" checkedIn={m.you_checked_in} />
+            <div className="shrink-0 text-center">
+              <div className="font-[var(--font-display)] text-3xl font-bold tabular-nums">
+                {m.your_wins} <span className="text-[var(--color-text-secondary)]">-</span>{" "}
+                {m.their_wins}
+              </div>
+              <div className="mt-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
+                best of 3
+              </div>
+            </div>
+            <Side
+              p={m.opponent}
+              label={m.is_bye ? "Bye" : "Them"}
+              checkedIn={m.opponent_checked_in}
+              right
+            />
+          </div>
+
+          {/* First to two takes it, so say how close that is. */}
+          {!m.is_bye && m.opponent && !m.won_match && !m.eliminated && (
+            <p className="mt-4 border-t pt-3.5 text-center text-sm text-[var(--color-text-secondary)]"
+               style={{ borderColor: "var(--color-border)" }}>
+              {m.your_wins === 1 && m.their_wins === 1
+                ? "One game each. The next one takes it."
+                : m.your_wins === 1
+                  ? "One more win and you are through."
+                  : m.their_wins === 1
+                    ? "They need one more. You need both."
+                    : "First to two wins goes through."}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ── What to do next ────────────────────────────────────────────── */}
+      <section className="mt-5">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${m.status}-${m.you_checked_in}-${m.opponent_checked_in}-${m.room_id ?? ""}`}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <Action m={m} busy={busy} onCheckIn={() => act(() => checkInToMatch(id))} onStart={start} />
+          </motion.div>
+        </AnimatePresence>
+
+        <p className="mt-2.5 text-center text-xs text-[var(--color-text-secondary)]">{m.prompt}</p>
+        {error && (
+          <p className="mt-2 text-center text-sm" style={{ color: "var(--color-warm)" }}>
+            {error}
+          </p>
+        )}
+
+        {m.deadline && !m.won_match && !m.eliminated && !m.is_bye && (
+          <p className="mt-4 text-center text-xs text-[var(--color-text-secondary)]">
+            This round closes in <Countdown to={m.deadline} compact />. Miss it and the fixture
+            goes to whoever showed up.
+          </p>
+        )}
+      </section>
+
+      {/* ── The three games ────────────────────────────────────────────── */}
+      {!m.is_bye && (
+        <section className="mt-9">
+          <h2 className="font-[var(--font-display)] text-lg font-bold">Your series</h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Three games, drawn when the bracket went up. Same three for both of you.
+          </p>
+          <div className="mt-4 space-y-2.5">
+            {m.games.map((slug, i) => (
+              <GameRow
+                key={`${slug}-${i}`}
+                name={m.game_names[i] ?? slug}
+                index={i}
+                legs={m.legs.filter((lg) => lg.game_type === slug)}
+                current={!m.won_match && !m.eliminated && m.current_game === slug}
+                hostSwap={m.you_host}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="mt-10 text-center">
+        <Link
+          href={`/tournament/${id}`}
+          className="inline-flex h-11 items-center rounded-[14px] border px-5 text-sm font-semibold"
+          style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+        >
+          See the full bracket
+        </Link>
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The single most important thing on the page: one button that is always the
+ * right next move. Which one it is comes off the server state, never off a
+ * local guess, so both players cannot end up looking at contradictory buttons.
+ */
+function Action({
+  m,
+  busy,
+  onCheckIn,
+  onStart,
+}: {
+  m: MyMatch;
+  busy: boolean;
+  onCheckIn: () => void;
+  onStart: () => void;
+}) {
+  if (m.is_champion) {
+    return <Done tone="gold">You won the whole thing.</Done>;
+  }
+  if (m.is_bye) {
+    return <Done tone="cyan">Nothing to play. You are in the next round.</Done>;
+  }
+  if (m.won_match) {
+    return <Done tone="cyan">You are through. Next opponent still to be decided.</Done>;
+  }
+  if (m.eliminated) {
+    return <Done tone="muted">You are out. Good run.</Done>;
+  }
+  if (!m.opponent) {
+    return <Waiting>Waiting on the match that feeds yours</Waiting>;
+  }
+  if (!m.you_checked_in) {
+    return (
+      <Big onClick={onCheckIn} disabled={busy} tone="primary">
+        {busy ? "Checking you in..." : "Check in, I am ready"}
+      </Big>
+    );
+  }
+  if (!m.opponent_checked_in) {
+    return <Waiting>Waiting for {m.opponent.display_name} to check in</Waiting>;
+  }
+  if (m.room_id) {
+    return (
+      <Link href={`/room/${m.room_id}`} className="block">
+        <Big tone="cyan">Go to your room</Big>
+      </Link>
+    );
+  }
+  return (
+    <Big onClick={onStart} disabled={busy} tone="primary">
+      {busy
+        ? "Opening the room..."
+        : `Start game ${m.game_number}: ${m.current_game_name ?? ""}`}
+    </Big>
+  );
+}
+
+function Big({
+  children,
+  onClick,
+  disabled,
+  tone,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  tone: "primary" | "cyan";
+}) {
+  const bg = tone === "cyan" ? "var(--color-cyan)" : "var(--color-primary)";
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-base font-bold transition-[filter] active:brightness-95 disabled:opacity-70"
+      style={{ background: bg, color: "#05060a" }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A wait is not a dead end: the pulse says the page is still watching for them. */
+function Waiting({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="flex h-[56px] w-full items-center justify-center gap-2.5 rounded-[16px] border text-sm font-semibold text-[var(--color-text-secondary)]"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+    >
+      <motion.span
+        className="h-2 w-2 rounded-full"
+        style={{ background: "var(--color-primary)" }}
+        animate={{ opacity: [1, 0.25, 1], scale: [1, 0.8, 1] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {children}
+    </div>
+  );
+}
+
+function Done({ children, tone }: { children: React.ReactNode; tone: "gold" | "cyan" | "muted" }) {
+  const color =
+    tone === "gold" ? "var(--color-gold)" : tone === "cyan" ? "var(--color-cyan)" : "var(--color-border)";
+  return (
+    <div
+      className="flex min-h-[56px] w-full items-center justify-center rounded-[16px] border px-4 text-center text-sm font-semibold"
+      style={{
+        borderColor: `color-mix(in srgb, ${color} 55%, transparent)`,
+        background: `color-mix(in srgb, ${color} 10%, var(--color-surface))`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Side({
+  p,
+  label,
+  checkedIn,
+  right = false,
+}: {
+  p: { did: string; display_name: string; handle: string; avatar_url: string | null } | null;
+  label: string;
+  checkedIn: boolean;
+  right?: boolean;
+}) {
+  return (
+    <div className={`flex min-w-0 flex-1 flex-col ${right ? "items-end text-right" : "items-start"}`}>
+      {p ? (
+        <>
+          <Avatar id={p.did} name={p.display_name} avatarUrl={p.avatar_url} size={44} />
+          <div className="mt-2 w-full truncate text-sm font-semibold">{p.display_name}</div>
+          <div className="w-full truncate font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+            @{p.handle}
+          </div>
+        </>
+      ) : (
+        <>
+          <div
+            className="grid h-11 w-11 place-items-center rounded-full border border-dashed text-[var(--color-text-secondary)]"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            ?
+          </div>
+          <div className="mt-2 text-sm font-semibold text-[var(--color-text-secondary)]">{label}</div>
+        </>
+      )}
+      {p && (
+        <div
+          className="mt-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]"
+          style={{ color: checkedIn ? "var(--color-success)" : "var(--color-text-secondary)" }}
+        >
+          {checkedIn ? "checked in" : "not in yet"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One game of the series. A drawn game is replayed, so a game can hold more
+ * than one result; showing them all is what makes a replay legible instead of
+ * looking like the score changed by itself.
+ */
+function GameRow({
+  name,
+  index,
+  legs,
+  current,
+  hostSwap,
+}: {
+  name: string;
+  index: number;
+  legs: MatchLeg[];
+  current: boolean;
+  hostSwap: boolean;
+}) {
+  const decided = legs.find((lg) => !lg.replay && lg.winner_did);
+  const played = decided ?? legs[legs.length - 1];
+  const tone = decided
+    ? decided.you_won
+      ? "var(--color-success)"
+      : "var(--color-warm)"
+    : current
+      ? "var(--color-cyan)"
+      : "var(--color-border)";
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-[14px] border px-4 py-3"
+      style={{
+        borderColor: `color-mix(in srgb, ${tone} ${decided || current ? "60%" : "100%"}, transparent)`,
+        background: current
+          ? "color-mix(in srgb, var(--color-cyan) 8%, var(--color-surface))"
+          : "var(--color-surface)",
+        opacity: !decided && !current ? 0.62 : 1,
+      }}
+    >
+      <span className="font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
+        {index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">{name}</div>
+        <div className="truncate font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
+          {decided
+            ? decided.you_won
+              ? "you won"
+              : "they won"
+            : current
+              ? `up next · ${hostSwap ? "you host" : "they host"}`
+              : "not played yet"}
+          {legs.some((lg) => lg.replay) && " · replayed after a draw"}
+        </div>
+      </div>
+      {played && (played.your_score || played.their_score) ? (
+        <span className="shrink-0 font-[var(--font-display)] text-sm font-bold tabular-nums">
+          {played.your_score} - {played.their_score}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function Shell({ id, children }: { id: string; children: React.ReactNode }) {
+  return (
+    <main className="mx-auto min-h-[100dvh] w-full max-w-lg px-5 pb-16 pt-8">
+      <div className="mb-6 flex items-center gap-2">
+        <Link
+          href="/"
+          className="inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          hub
+        </Link>
+        <Link
+          href={`/tournament/${id}`}
+          className="inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          bracket
+        </Link>
+      </div>
+      {children}
+    </main>
+  );
+}
+
+function Muted({ children }: { children: React.ReactNode }) {
+  return <p className="text-center text-[var(--color-text-secondary)]">{children}</p>;
+}
+
+function Empty({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="text-center">
+      <h1 className="font-[var(--font-display)] text-2xl font-bold">{title}</h1>
+      <p className="mt-3 text-[var(--color-text-secondary)]">{body}</p>
+    </div>
+  );
+}

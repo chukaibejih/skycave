@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import AdminAuth, CurrentIdentity, OptionalIdentity
 from app.games.registry import get_game
-from app.models.tournament import REGISTERING, Tournament
+from app.models.tournament import M_BYE, REGISTERING, Tournament
 from app.services import tournament as svc
 from app.services import tournament_engine as eng
 
@@ -191,6 +191,240 @@ async def register(
 
     await db.refresh(t)
     return await _serialise(db, t, identity.id)
+
+
+# --------------------------------------------------------------------------- #
+# Playing your fixture
+# --------------------------------------------------------------------------- #
+
+class LegOut(BaseModel):
+    """One game already played in this series, from the viewer's side."""
+
+    game_type: str
+    game_name: str
+    winner_did: str | None = None
+    you_won: bool = False
+    drawn: bool = False
+    replay: bool = False
+    your_score: int = 0
+    their_score: int = 0
+    room_id: str | None = None
+
+
+class MyMatchOut(BaseModel):
+    tournament_id: str
+    tournament_name: str
+    tournament_status: str
+    round: int
+    slot: int
+    round_name: str
+    status: str
+    you: PlayerOut
+    opponent: PlayerOut | None = None
+    games: list[str] = []
+    game_names: list[str] = []
+    current_game: str | None = None
+    current_game_name: str | None = None
+    # Which game of the best-of-three is next (1-based), ignoring replays.
+    game_number: int = 1
+    legs: list[LegOut] = []
+    your_wins: int = 0
+    their_wins: int = 0
+    you_checked_in: bool = False
+    opponent_checked_in: bool = False
+    you_host: bool = False
+    room_id: str | None = None
+    is_bye: bool = False
+    eliminated: bool = False
+    won_match: bool = False
+    is_champion: bool = False
+    deadline: datetime | None = None
+    # One line describing what the player should do or wait for next.
+    prompt: str = ""
+
+
+def _round_name(round: int, rounds: int) -> str:
+    """Rounds get their real names: nobody says "round 3 of 3" about a final."""
+    left = rounds - round
+    if left == 0:
+        return "Final"
+    if left == 1:
+        return "Semi-final"
+    if left == 2:
+        return "Quarter-final"
+    return f"Round {round}"
+
+
+async def _my_match(
+    db: AsyncSession, t: Tournament, did: str
+) -> MyMatchOut | None:
+    m = await svc.my_match(db, t.id, did)
+    if m is None:
+        return None
+    people = {e.did: e for e in await svc.entrants(db, t.id)}
+
+    def person(d: str | None) -> PlayerOut | None:
+        e = people.get(d or "")
+        if e is None:
+            return None
+        return PlayerOut(
+            did=e.did, handle=e.handle, display_name=e.display_name, avatar_url=e.avatar_url
+        )
+
+    you = person(did)
+    if you is None:
+        return None
+    other_did = m.player2_did if m.player1_did == did else m.player1_did
+    first = m.player1_did == did
+
+    legs: list[LegOut] = []
+    for r in list(m.results or []):
+        w = r.get("winner")
+        legs.append(
+            LegOut(
+                game_type=r.get("game_type", ""),
+                game_name=_game_name(r.get("game_type", "")),
+                winner_did=w,
+                you_won=bool(w) and w == did,
+                drawn=w is None,
+                replay=bool(r.get("replay")),
+                your_score=int(r.get("p1_score" if first else "p2_score") or 0),
+                their_score=int(r.get("p2_score" if first else "p1_score") or 0),
+                room_id=r.get("room_id"),
+            )
+        )
+    wins = sum(1 for lg in legs if lg.you_won)
+    theirs = sum(1 for lg in legs if lg.winner_did and not lg.you_won)
+
+    leg = svc.leg_index(m)
+    open_room = None
+    all_rooms = list(m.rooms or [])
+    if leg < len(all_rooms):
+        open_room = all_rooms[leg]
+
+    game = svc.current_game(m)
+    is_bye = m.status == M_BYE
+    checked = list(m.checked_in or [])
+    won = m.winner_did == did
+    is_final = m.round == t.rounds
+
+    if is_bye:
+        prompt = "You have a bye. You are through to the next round with nothing to play."
+    elif m.winner_did and won and is_final:
+        prompt = "You won the tournament."
+    elif m.winner_did and won:
+        prompt = "You are through. Your next opponent is being decided."
+    elif m.winner_did:
+        prompt = "You are out. Thanks for playing."
+    elif other_did is None:
+        prompt = "Waiting on the match below yours to finish."
+    elif did not in checked:
+        prompt = "Check in when you are ready to play."
+    elif other_did not in checked:
+        prompt = "You are checked in. Waiting for your opponent."
+    elif open_room:
+        prompt = "Your room is open."
+    else:
+        prompt = "Both of you are here. Start the game."
+
+    return MyMatchOut(
+        tournament_id=t.id,
+        tournament_name=t.name,
+        tournament_status=t.status,
+        round=m.round,
+        slot=m.slot,
+        round_name=_round_name(m.round, t.rounds),
+        status=m.status,
+        you=you,
+        opponent=person(other_did),
+        games=list(m.games or []),
+        game_names=[_game_name(g) for g in (m.games or [])],
+        current_game=game,
+        current_game_name=_game_name(game) if game else None,
+        game_number=min(
+            len([lg for lg in legs if not lg.replay]) + 1, max(1, len(m.games or [])),
+        ),
+        legs=legs,
+        your_wins=wins,
+        their_wins=theirs,
+        you_checked_in=did in checked,
+        opponent_checked_in=bool(other_did) and other_did in checked,
+        you_host=svc.host_did(m) == did,
+        room_id=open_room,
+        is_bye=is_bye,
+        eliminated=bool(m.winner_did) and not won,
+        won_match=won,
+        is_champion=t.champion_did == did,
+        deadline=m.deadline,
+        prompt=prompt,
+    )
+
+
+async def _live(db: AsyncSession, tournament_id: str) -> Tournament:
+    t = await db.get(Tournament, tournament_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="No tournament with that id")
+    return await svc.ensure_fresh(db, t)
+
+
+@router.get("/{tournament_id}/my-match", response_model=MyMatchOut | None)
+async def my_match(
+    tournament_id: str,
+    identity: CurrentIdentity,
+    db: AsyncSession = Depends(get_db),
+) -> MyMatchOut | None:
+    """The viewer's own fixture: opponent, series so far, and what to do next."""
+    t = await _live(db, tournament_id)
+    return await _my_match(db, t, identity.id)
+
+
+@router.post("/{tournament_id}/check-in", response_model=MyMatchOut)
+async def check_in(
+    tournament_id: str,
+    identity: CurrentIdentity,
+    db: AsyncSession = Depends(get_db),
+) -> MyMatchOut:
+    """Say you are here. The room opens once both of you have."""
+    t = await _live(db, tournament_id)
+    m = await svc.my_match(db, t.id, identity.id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="You have no fixture to play")
+    try:
+        await svc.check_in(db, m, identity.id)
+    except svc.MatchError as e:
+        raise HTTPException(status_code=409, detail=e.message)
+    out = await _my_match(db, t, identity.id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="You have no fixture to play")
+    return out
+
+
+@router.post("/{tournament_id}/start", response_model=MyMatchOut)
+async def start(
+    tournament_id: str,
+    identity: CurrentIdentity,
+    db: AsyncSession = Depends(get_db),
+) -> MyMatchOut:
+    """Open (or rejoin) the room for the game in play.
+
+    The same call whether it is game one or the decider, and safe to press
+    twice: whoever gets there first mints the room and the other is handed the
+    same id. Hosting alternates leg to leg inside `open_leg`, so pressing this
+    is never what decides who holds the host seat.
+    """
+    t = await _live(db, tournament_id)
+    m = await svc.my_match(db, t.id, identity.id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="You have no fixture to play")
+    people = {e.did: e for e in await svc.entrants(db, t.id)}
+    try:
+        await svc.open_leg(db, t, m, people)
+    except svc.MatchError as e:
+        raise HTTPException(status_code=409, detail=e.message)
+    out = await _my_match(db, t, identity.id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="You have no fixture to play")
+    return out
 
 
 # --------------------------------------------------------------------------- #

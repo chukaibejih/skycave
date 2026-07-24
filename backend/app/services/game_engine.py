@@ -758,10 +758,48 @@ async def end_game(room_id: str) -> None:
     # Every finished game is persisted as a GameSession so the back office counts
     # all play. Solo also updates the player's personal best (via _persist_solo
     # above) for the solo leaderboard; that's separate from history/stats here.
+    # A tournament leg is an ordinary versus room in every way that matters to
+    # gameplay, so it is only the recorded mode that marks it as tournament play.
+    fixture = room.get("tournament")
+    persist_mode = "tournament" if fixture else room.get("mode", "versus")
     try:
-        await _persist_game(room, winner_id, room.get("mode", "versus"))
+        await _persist_game(room, winner_id, persist_mode)
     except Exception:  # noqa: BLE001 - persistence must never break the game
         logger.exception("failed to persist game session for room %s", room_id)
+
+    if fixture:
+        try:
+            await _record_tournament_leg(room, fixture, winner_id, scores)
+        except Exception:  # noqa: BLE001 - the bracket must not break the game
+            logger.exception("failed to record tournament leg for room %s", room_id)
+
+
+async def _record_tournament_leg(
+    room: dict[str, Any],
+    fixture: dict[str, Any],
+    winner_id: str | None,
+    scores: dict[str, int],
+) -> None:
+    """Push a finished tournament leg into its bracket slot.
+
+    Deliberately after the broadcast and after _persist_game: the players have
+    already seen their result, so nothing here can delay or block it. If this
+    fails the game still counted, and the next read of the fixture simply has
+    not caught up yet.
+    """
+    from app.core.database import AsyncSessionLocal
+    from app.services import tournament as tsvc
+
+    async with AsyncSessionLocal() as db:
+        await tsvc.record_result(
+            db,
+            fixture["id"],
+            int(fixture["round"]),
+            int(fixture["slot"]),
+            room_id=room["id"],
+            winner_did=winner_id,
+            scores=scores,
+        )
 
 
 def _decide_winner(scores: dict[str, int]) -> str | None:

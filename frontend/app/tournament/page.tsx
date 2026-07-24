@@ -311,13 +311,26 @@ function YouAreIn({ t }: { t: Tournament }) {
         </div>
       </div>
 
-      <p className="mt-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-        Your bracket and your opponent go up when entries close. Until then, go warm up in the{" "}
-        <Link href="/" className="font-semibold underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
-          game hub
+      {t.status === "registering" ? (
+        <p className="mt-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+          Your bracket and your opponent go up when entries close. Until then, go warm up in the{" "}
+          <Link href="/" className="font-semibold underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
+            game hub
+          </Link>
+          .
+        </p>
+      ) : (
+        // Once the draw has happened this panel has exactly one job: get them to
+        // their fixture. Everything they need to play is on that page.
+        <Link href={`/tournament/${t.id}/match`} className="mt-4 block">
+          <span
+            className="flex h-[52px] w-full items-center justify-center rounded-[14px] text-base font-bold"
+            style={{ background: "var(--color-primary)", color: "#05060a" }}
+          >
+            Go to your fixture
+          </span>
         </Link>
-        .
-      </p>
+      )}
 
       <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
         <Row label="Bracket goes up in">

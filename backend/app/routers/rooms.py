@@ -54,6 +54,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
         invite_url=invite_url(room["id"]),
         expires_at=room.get("expires_at"),
         series=room.get("series", {}),
+        tournament=room.get("tournament"),
         game=summary,
     )
 
