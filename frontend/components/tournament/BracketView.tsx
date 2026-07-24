@@ -11,7 +11,8 @@ const POLL_MS = 30_000;
 // Bracket geometry. Each round-1 match owns one grid row; a match in round r
 // spans 2^(r-1) rows, which centres it exactly between the two matches feeding
 // it. That is what makes this read as a bracket rather than three lists.
-const ROW_H = 96; // px per round-1 match
+const ROW_H = 172; // px per round-1 match: tallest card (two players + game
+                   // pills) plus breathing room, so nothing crowds or spills
 const COL_W = 216;
 const GUTTER = 26;
 
@@ -141,8 +142,11 @@ export function BracketView({ id }: { id: string }) {
                     className="relative flex items-center"
                     style={{ gridColumn: r, gridRow: `${m.slot * span + 1} / span ${span}` }}
                   >
+                    {r > 1 && <InThread lit={!!(m.player1 || m.player2)} />}
                     <MatchCard m={m} />
-                    {r < rounds && <Elbow evenSlot={m.slot % 2 === 0} />}
+                    {r < rounds && (
+                      <Elbow evenSlot={m.slot % 2 === 0} lit={!!m.winner_did} />
+                    )}
                   </div>
                 );
               })
@@ -167,25 +171,57 @@ export function BracketView({ id }: { id: string }) {
  * (downward from the top match, upward from the bottom one) makes the two
  * halves meet precisely where the next card is.
  */
-function Elbow({ evenSlot }: { evenSlot: boolean }) {
-  const line = "color-mix(in srgb, var(--color-border) 90%, transparent)";
+function Elbow({ evenSlot, lit }: { evenSlot: boolean; lit: boolean }) {
+  const line = lit
+    ? "var(--color-cyan)"
+    : "color-mix(in srgb, var(--color-border) 90%, transparent)";
+  const glow = lit ? "0 0 7px var(--color-cyan)" : "none";
+  const thickness = lit ? 2 : 1;
   return (
     <>
       <span
         aria-hidden
-        className="pointer-events-none absolute top-1/2 h-px"
-        style={{ right: -GUTTER / 2, width: GUTTER / 2, background: line }}
+        className="pointer-events-none absolute top-1/2"
+        style={{
+          right: -GUTTER / 2,
+          width: GUTTER / 2,
+          height: thickness,
+          background: line,
+          boxShadow: glow,
+        }}
       />
       <span
         aria-hidden
-        className="pointer-events-none absolute w-px"
+        className="pointer-events-none absolute"
         style={{
           right: -GUTTER / 2,
+          width: thickness,
           background: line,
+          boxShadow: glow,
           ...(evenSlot ? { top: "50%", bottom: 0 } : { top: 0, bottom: "50%" }),
         }}
       />
     </>
+  );
+}
+
+/** The thread arriving into a match, so the run reads as one continuous line. */
+function InThread({ lit }: { lit: boolean }) {
+  const line = lit
+    ? "var(--color-cyan)"
+    : "color-mix(in srgb, var(--color-border) 90%, transparent)";
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute top-1/2"
+      style={{
+        left: -GUTTER / 2,
+        width: GUTTER / 2,
+        height: lit ? 2 : 1,
+        background: line,
+        boxShadow: lit ? "0 0 7px var(--color-cyan)" : "none",
+      }}
+    />
   );
 }
 
@@ -264,29 +300,48 @@ function Slot({
 }) {
   if (!player) {
     return (
-      <div className="flex h-[30px] items-center gap-2 px-0.5">
+      <div className="flex h-[30px] items-center gap-2 py-0.5 pl-2.5 pr-0.5">
         <div className="h-[22px] w-[22px] rounded-full border border-dashed" style={{ borderColor: "var(--color-border)" }} />
         <span className="text-xs text-[var(--color-text-secondary)]">waiting</span>
       </div>
     );
   }
   return (
-    <div className="flex h-[30px] items-center gap-2 px-0.5" style={{ opacity: dim ? 0.42 : 1 }}>
+    // The thread runs through the player who advanced: a lit rail down their
+    // side of the card, picking up the same neon as the connectors, so a run
+    // through the bracket reads as one continuous line rather than a row of
+    // ticks you have to decode.
+    <div
+      className="relative flex h-[30px] items-center gap-2 rounded-r-[6px] py-0.5 pl-2.5 pr-0.5"
+      style={{ opacity: dim ? 0.4 : 1 }}
+    >
+      {winner && (
+        <>
+          <span
+            aria-hidden
+            className="absolute left-0 top-0.5 bottom-0.5 w-[2px] rounded-full"
+            style={{ background: "var(--color-cyan)", boxShadow: "0 0 7px var(--color-cyan)" }}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 rounded-r-[6px]"
+            style={{
+              background:
+                "linear-gradient(90deg, color-mix(in srgb, var(--color-cyan) 13%, transparent), transparent)",
+            }}
+          />
+        </>
+      )}
       <Avatar id={player.did} name={player.display_name} avatarUrl={player.avatar_url} size={22} />
       <span
-        className="min-w-0 flex-1 truncate text-xs"
+        className="relative min-w-0 flex-1 truncate text-xs"
         style={{
-          color: winner ? "var(--color-text-primary)" : "var(--color-text-primary)",
+          color: "var(--color-text-primary)",
           fontWeight: winner ? 700 : 500,
         }}
       >
         {player.display_name}
       </span>
-      {winner && (
-        <span className="shrink-0 text-[10px]" style={{ color: "var(--color-success)" }}>
-          ✓
-        </span>
-      )}
     </div>
   );
 }
