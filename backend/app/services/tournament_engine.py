@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # The pool for tournament fixtures. GeoGuess, Flag Rush and Outline Quiz are out
 # for the first event; Reaction Grid and Mad Math are out until they have been
@@ -294,3 +294,44 @@ def champion(fixtures: list[Fixture]) -> str | None:
     last = max(f.round for f in fixtures)
     final = [f for f in fixtures if f.round == last]
     return final[0].winner if len(final) == 1 else None
+
+
+# --------------------------------------------------------------------------- #
+# Weekend anchors
+# --------------------------------------------------------------------------- #
+
+from zoneinfo import ZoneInfo  # noqa: E402
+
+# Registration closes (and fixtures reveal) Thursday morning Pacific. Stored and
+# compared in UTC, but computed in the wall-clock zone so the hour a player sees
+# is the same in July and December. Pacific shifts by an hour across DST, so
+# deriving this from a fixed UTC offset would silently drift.
+PACIFIC = ZoneInfo("America/Los_Angeles")
+CLOSE_WEEKDAY = 3   # Monday=0, so Thursday
+CLOSE_HOUR = 8      # 08:00 local
+
+
+def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
+    """(registration_closes, play_opens, play_closes) for the coming weekend.
+
+    Returns UTC. Play opens Friday 00:00 UTC and the hard wall is Sunday 23:59
+    UTC, so the tournament can never reach Monday.
+    """
+    local = now.astimezone(PACIFIC)
+    # The next Thursday 08:00 Pacific strictly after `now`.
+    ahead = (CLOSE_WEEKDAY - local.weekday()) % 7
+    close_local = (local + timedelta(days=ahead)).replace(
+        hour=CLOSE_HOUR, minute=0, second=0, microsecond=0
+    )
+    if close_local <= local:
+        close_local += timedelta(days=7)
+    closes = close_local.astimezone(timezone.utc)
+
+    # The Friday that follows that Thursday, 00:00 UTC.
+    opens = (closes + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+    )
+    while opens <= closes:
+        opens += timedelta(days=1)
+    play_closes = (opens + timedelta(days=2)).replace(hour=23, minute=59)
+    return closes, opens, play_closes

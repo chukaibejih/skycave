@@ -3,6 +3,11 @@ from app.models.room import Room
 from app.models.game_session import GameSession
 from app.models.personal_best import PersonalBest
 from app.models.feedback import Feedback
+from app.models.tournament import (
+    Tournament,
+    TournamentEntrant,
+    TournamentMatch,
+)
 from app.models.cave import (
     CaveCase,
     CaveEvidence,
@@ -17,6 +22,9 @@ __all__ = [
     "GameSession",
     "PersonalBest",
     "Feedback",
+    "Tournament",
+    "TournamentEntrant",
+    "TournamentMatch",
     "CaveCase",
     "CaveEvidence",
     "CaveNotepad",
