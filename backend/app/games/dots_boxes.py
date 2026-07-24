@@ -16,7 +16,12 @@ from typing import Any
 
 from app.games.base import TURN_BASED, BaseGame
 
-COLS = 4  # boxes across
+# The box count must be ODD so a majority always exists. At 4x5 = 20 boxes a
+# 10-10 split was a natural result and the game drew half the time, which is
+# fatal in a best-of-3 series (replay-on-draw would loop). 5x5 = 25 boxes makes
+# a tie arithmetically impossible. The client renders from board.cols/rows, so
+# this is a server-side change only.
+COLS = 5  # boxes across
 ROWS = 5  # boxes down
 
 

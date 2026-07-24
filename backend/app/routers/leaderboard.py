@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.core.redis_client import get_redis
 from app.games.registry import get_game
 from app.models import GameSession, PersonalBest, User
+from app.models.game_session import HEAD_TO_HEAD_MODES
 from app.schemas.rest import LeaderboardEntry, LeaderboardResponse
 
 router = APIRouter(tags=["leaderboard"])
@@ -126,7 +127,7 @@ async def _aggregate(
 
 
 async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
-    conds = [GameSession.game_type == game, GameSession.mode == "versus"]
+    conds = [GameSession.game_type == game, GameSession.mode.in_(HEAD_TO_HEAD_MODES)]
     if period == "week":
         conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
     # wins first, cumulative score breaks ties
