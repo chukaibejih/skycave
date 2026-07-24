@@ -225,11 +225,65 @@ function InThread({ lit }: { lit: boolean }) {
   );
 }
 
+/** One game played inside a fixture, as the API records it. */
+interface Leg {
+  game_type: string;
+  winner: string | null;
+  p1_score: number;
+  p2_score: number;
+  replay?: boolean;
+}
+
+/**
+ * Fold a fixture's played games onto its three drawn ones.
+ *
+ * A drawn game is replayed rather than moving the series on, so results and
+ * games are not one to one: two rows of `results` can belong to the same game.
+ * Walking them in order and only advancing on a decisive leg is what keeps a
+ * replay attached to the game it belongs to instead of shunting every later
+ * score one slot down.
+ */
+function gameLines(m: TournamentMatch) {
+  const legs = (m.results ?? []) as unknown as Leg[];
+  const rows = m.games.map((g, i) => ({
+    name: m.game_names[i] ?? g,
+    score: null as string | null,
+    replayed: false,
+    p1Won: false,
+    current: false,
+  }));
+  let at = 0;
+  for (const leg of legs) {
+    const row = rows[Math.min(at, rows.length - 1)];
+    if (!row) break;
+    if (leg.replay) {
+      row.replayed = true;
+      continue;
+    }
+    row.score = `${leg.p1_score}-${leg.p2_score}`;
+    row.p1Won = !!leg.winner && leg.winner === m.player1?.did;
+    at++;
+  }
+  if (!m.winner_did && rows[at]) rows[at].current = true;
+  return rows;
+}
+
+function seriesWins(m: TournamentMatch): [number, number] {
+  const legs = (m.results ?? []) as unknown as Leg[];
+  return [
+    legs.filter((l) => l.winner && l.winner === m.player1?.did).length,
+    legs.filter((l) => l.winner && l.winner === m.player2?.did).length,
+  ];
+}
+
 function MatchCard({ m }: { m: TournamentMatch }) {
   const live = m.status === "live";
   const done = m.status === "done";
   const bye = m.status === "bye";
   const lone = m.player1 ?? m.player2;
+  const [w1, w2] = seriesWins(m);
+  const started = w1 + w2 > 0 || (m.results?.length ?? 0) > 0;
+  const lines = gameLines(m);
 
   return (
     <motion.div
@@ -263,23 +317,66 @@ function MatchCard({ m }: { m: TournamentMatch }) {
         </div>
       ) : (
         <div className="p-2.5">
-          <Slot player={m.player1} winner={done && m.winner_did === m.player1?.did} dim={done && m.winner_did !== m.player1?.did} />
+          <Slot
+            player={m.player1}
+            winner={done && m.winner_did === m.player1?.did}
+            dim={done && m.winner_did !== m.player1?.did}
+            wins={started ? w1 : null}
+            leading={w1 > w2}
+          />
           <div className="my-1 h-px" style={{ background: "var(--color-border)" }} />
-          <Slot player={m.player2} winner={done && m.winner_did === m.player2?.did} dim={done && m.winner_did !== m.player2?.did} />
+          <Slot
+            player={m.player2}
+            winner={done && m.winner_did === m.player2?.did}
+            dim={done && m.winner_did !== m.player2?.did}
+            wins={started ? w2 : null}
+            leading={w2 > w1}
+          />
 
-          {m.game_names.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {m.game_names.map((g, i) => (
-                <span
+          {/* The games, with their scorelines. Before this the card showed the
+              three names and nothing else, so a fixture two games deep looked
+              identical to one that had not started. Scores read in the same
+              order as the two players above them. */}
+          {lines.length > 0 && (
+            <div className="mt-2 flex flex-col gap-0.5">
+              {lines.map((g, i) => (
+                <div
                   key={i}
-                  className="rounded-full border px-1.5 py-px font-[var(--font-mono)] text-[9px]"
+                  className="flex items-center gap-1.5 rounded-[5px] px-1 py-[3px]"
                   style={{
-                    borderColor: "var(--color-border)",
-                    color: "var(--color-text-secondary)",
+                    background: g.current
+                      ? "color-mix(in srgb, var(--color-cyan) 10%, transparent)"
+                      : "transparent",
+                    opacity: g.score || g.current ? 1 : 0.45,
                   }}
                 >
-                  {g}
-                </span>
+                  <span
+                    className="min-w-0 flex-1 truncate font-[var(--font-mono)] text-[9px]"
+                    style={{
+                      color: g.current ? "var(--color-cyan)" : "var(--color-text-secondary)",
+                    }}
+                  >
+                    {g.name}
+                    {/* A game that was drawn and played again. The glyph is a
+                        replay arrow rather than a word: at 9px in a 216px column
+                        there is no room for "replayed", and an abbreviation is
+                        just a word nobody can read. */}
+                    {g.replayed && <span title="drawn, then replayed"> &#8635;</span>}
+                  </span>
+                  <span
+                    className="shrink-0 font-[var(--font-mono)] text-[9px] tabular-nums"
+                    style={{
+                      color: g.score
+                        ? "var(--color-text-primary)"
+                        : g.current
+                          ? "var(--color-cyan)"
+                          : "var(--color-text-secondary)",
+                      fontWeight: g.score ? 700 : 400,
+                    }}
+                  >
+                    {g.score ?? (g.current ? "now" : "-")}
+                  </span>
+                </div>
               ))}
             </div>
           )}
@@ -293,10 +390,15 @@ function Slot({
   player,
   winner,
   dim,
+  wins,
+  leading,
 }: {
   player: TournamentPlayer | null | undefined;
   winner?: boolean;
   dim?: boolean;
+  /** Games won in this series, or null before a ball is kicked. */
+  wins?: number | null;
+  leading?: boolean;
 }) {
   if (!player) {
     return (
@@ -342,6 +444,16 @@ function Slot({
       >
         {player.display_name}
       </span>
+      {wins !== null && wins !== undefined && (
+        <span
+          className="relative shrink-0 pr-1.5 font-[var(--font-display)] text-[13px] font-bold tabular-nums"
+          style={{
+            color: leading ? "var(--color-cyan)" : "var(--color-text-secondary)",
+          }}
+        >
+          {wins}
+        </span>
+      )}
     </div>
   );
 }

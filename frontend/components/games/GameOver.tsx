@@ -1,6 +1,8 @@
 "use client";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { getMyMatch, startMatchGame, type MyMatch } from "@/lib/api";
 import { useAuth, useRoom } from "@/lib/store";
 
 const INK = "#F0F0FF";
@@ -42,6 +44,23 @@ export function GameOver({ roomId }: { roomId: string }) {
     : oppRequested
     ? "Accept rematch"
     : "Rematch";
+
+  // A tournament leg ends differently to a friendly. There is nothing to
+  // rematch and no reason to go back to the hub: the next thing that happens is
+  // the next game of the series, so that is the only thing this screen should
+  // offer. Everything else here stays exactly as it was for ordinary rooms.
+  if (room.tournament) {
+    return (
+      <TournamentGameOver
+        roomId={roomId}
+        tournamentId={room.tournament.id}
+        headline={headline}
+        players={room.players}
+        scores={gameEnd.scores}
+        myId={myId}
+      />
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
@@ -123,6 +142,205 @@ export function GameOver({ roomId }: { roomId: string }) {
             rematch will still connect.
           </p>
         )}
+      </motion.div>
+    </main>
+  );
+}
+
+/**
+ * The end of a tournament leg.
+ *
+ * The result is recorded server-side just after GAME_END is broadcast, so this
+ * screen can arrive a beat before the bracket knows about it. Rather than show
+ * a stale series and hope, it waits until the fixture actually lists this room
+ * among its played games, then shows the real state. That wait is short, and it
+ * is the difference between "1-0" being the truth and being a guess.
+ */
+function TournamentGameOver({
+  roomId,
+  tournamentId,
+  headline,
+  players,
+  scores,
+  myId,
+}: {
+  roomId: string;
+  tournamentId: string;
+  headline: string;
+  players: { id: string; display_name: string }[];
+  scores: Record<string, number>;
+  myId: string;
+}) {
+  const router = useRouter();
+  const [m, setM] = useState<MyMatch | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Settled once the fixture has counted this room. Until then the numbers on
+  // screen would be from before this game.
+  const counted = !!m && m.legs.some((l) => l.room_id === roomId);
+
+  const load = useCallback(async () => {
+    try {
+      setM(await getMyMatch(tournamentId));
+    } catch {
+      /* keep polling; a blip must not strand the player here */
+    }
+  }, [tournamentId]);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 1500);
+    return () => clearInterval(iv);
+  }, [load]);
+
+  const next = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const fresh = await startMatchGame(tournamentId);
+      if (fresh.room_id && fresh.room_id !== roomId) {
+        router.push(`/room/${fresh.room_id}`);
+        return;
+      }
+      router.push(`/tournament/${tournamentId}/match`);
+    } catch {
+      setError("Could not open the next game. Try your fixture page.");
+      setBusy(false);
+    }
+  };
+
+  const decided = !!m && (m.won_match || m.eliminated || m.is_champion);
+
+  return (
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 26 }}
+      >
+        <span
+          className="inline-flex items-center rounded-full border px-3 py-1 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em]"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-cyan) 45%, transparent)",
+            color: "var(--color-cyan)",
+          }}
+        >
+          {m ? `${m.round_name} · best of 3` : "Tournament"}
+        </span>
+
+        <h1
+          className="mt-3 font-[var(--font-display)] text-5xl font-bold leading-none"
+          style={{ color: INK }}
+        >
+          {headline}
+        </h1>
+
+        {/* This game's scoreline. */}
+        <div className="mt-5 flex flex-col gap-2">
+          {players.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between rounded-[10px] border px-4 py-2.5"
+              style={{ borderColor: LINE }}
+            >
+              <span className="text-sm" style={{ color: p.id === myId ? INK : MUTED }}>
+                {p.id === myId ? "You" : p.display_name}
+              </span>
+              <span
+                className="font-[var(--font-mono)] text-base font-semibold"
+                style={{ color: INK }}
+              >
+                {scores[p.id] ?? 0}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Where the series now stands, and what it takes to win it. */}
+        <div
+          className="mt-5 rounded-[12px] border px-4 py-3.5"
+          style={{ borderColor: LINE, background: "#0f1018" }}
+        >
+          {!counted ? (
+            <p className="text-sm" style={{ color: MUTED }}>
+              Putting this on the bracket...
+            </p>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm" style={{ color: MUTED }}>
+                  Series vs {m!.opponent?.display_name ?? "your opponent"}
+                </span>
+                <span
+                  className="font-[var(--font-display)] text-2xl font-bold tabular-nums"
+                  style={{ color: INK }}
+                >
+                  {m!.your_wins} - {m!.their_wins}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[13px] leading-5" style={{ color: MUTED }}>
+                {m!.is_champion
+                  ? "You won the whole tournament."
+                  : m!.won_match
+                    ? "That takes the series. You are through."
+                    : m!.eliminated
+                      ? "That is the series. You are out."
+                      : m!.your_wins === 1 && m!.their_wins === 1
+                        ? "One game each. The next one decides it."
+                        : m!.your_wins > m!.their_wins
+                          ? "One more win and you are through."
+                          : "They need one more. You need both."}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-2.5">
+          <button
+            onClick={decided ? () => router.push(`/tournament/${tournamentId}/match`) : next}
+            disabled={!counted || busy}
+            className="flex h-[52px] w-full items-center justify-center rounded-[12px] text-base font-bold transition-[filter] active:brightness-95 disabled:opacity-60"
+            style={{
+              background: counted ? "var(--color-primary)" : "transparent",
+              border: counted ? "none" : `1px solid ${LINE}`,
+              color: counted ? "#05060a" : MUTED,
+            }}
+          >
+            {!counted
+              ? "One moment..."
+              : busy
+                ? "Opening the room..."
+                : m!.is_champion
+                  ? "See your trophy"
+                  : decided
+                    ? "Back to your fixture"
+                    : `Start game ${m!.game_number}: ${m!.current_game_name ?? ""}`}
+          </button>
+
+          {error && (
+            <p className="text-center text-sm" style={{ color: "var(--color-warm)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="flex items-center justify-center gap-4 pt-1">
+            <button
+              onClick={() => router.push(`/results/${roomId}`)}
+              className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base"
+              style={{ borderColor: LINE, color: INK }}
+            >
+              Post result
+            </button>
+            <button
+              onClick={() => router.push(`/tournament/${tournamentId}`)}
+              className="flex h-12 items-center justify-center px-3 text-sm"
+              style={{ color: MUTED }}
+            >
+              bracket
+            </button>
+          </div>
+        </div>
       </motion.div>
     </main>
   );

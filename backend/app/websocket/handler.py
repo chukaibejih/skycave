@@ -34,6 +34,11 @@ def _public_room(room: dict, player_id: str) -> dict:
         "players": room["players"],
         "expires_at": room.get("expires_at"),
         "series": room.get("series", {}),
+        # Which fixture this room belongs to, if any. The room page hydrates
+        # from this snapshot rather than REST, so without it the end-of-game
+        # screen has no idea it just played a tournament leg and offers a
+        # rematch that counts for nothing.
+        "tournament": room.get("tournament"),
         "game": None,
     }
     game = room.get("game")
