@@ -239,3 +239,58 @@ export const getScorecard = (roomId: string) =>
   );
 
 export { API };
+
+// ── Weekend tournament ──
+export interface TournamentPlayer {
+  did: string;
+  handle: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+export interface TournamentMatch {
+  round: number;
+  slot: number;
+  status: string;
+  player1: TournamentPlayer | null;
+  player2: TournamentPlayer | null;
+  games: string[];
+  game_names: string[];
+  results: Record<string, unknown>[];
+  winner_did: string | null;
+  deadline: string | null;
+  checked_in: string[];
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  status: string; // registering | locked | in_progress | finished
+  max_players: number;
+  entrants: number;
+  spots_left: number;
+  registration_closes_at: string;
+  play_opens_at: string;
+  play_closes_at: string;
+  bracket_size: number;
+  rounds: number;
+  round_deadlines: { round: number; deadline: string }[];
+  champion: TournamentPlayer | null;
+  game_pool: string[];
+  game_pool_names: string[];
+  you: TournamentPlayer | null;
+  you_registered: boolean;
+  players: TournamentPlayer[];
+  matches: TournamentMatch[];
+}
+
+/** The live event, or null when none is running. Public: no auth needed. */
+export const getCurrentTournament = () =>
+  request<Tournament | null>("/tournaments/current");
+
+export const getTournament = (id: string) =>
+  request<Tournament>(`/tournaments/${id}`);
+
+/** Take a seat. Needs a Bluesky identity; the server refuses guests. */
+export const enterTournament = (id: string) =>
+  request<Tournament>(`/tournaments/${id}/register`, { method: "POST" });
