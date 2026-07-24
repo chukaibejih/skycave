@@ -35,6 +35,7 @@ from app.models.tournament import (
     TournamentMatch,
 )
 from app.services import tournament_engine as eng
+from app.services import tournament_posts as posts
 
 logger = logging.getLogger("skycave.tournament")
 
@@ -280,6 +281,33 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
                 deadline=deadlines[fx.round - 1],
             )
         )
+
+    # The draw is news, and it is the moment every entrant most wants to be
+    # tagged. Queued inside the same transaction as the bracket itself, so a
+    # drawn tournament can never exist without its announcement owed.
+    handles = {e.did: e.handle for e in people}
+    r1 = [fx for fx in fixtures if fx.round == 1]
+    await posts.enqueue(
+        db,
+        kind=posts.KIND_DRAW,
+        dedupe_key=f"{locked.id}:draw",
+        text=posts.compose_draw(
+            name=locked.name,
+            tournament_id=locked.id,
+            entrants=len(people),
+            rounds=rounds,
+            first_round=[
+                (handles.get(fx.p1 or ""), handles.get(fx.p2 or ""))
+                for fx in r1
+                if not fx.is_bye
+            ],
+            byes=[
+                handles.get(fx.p1 or fx.p2 or "", "")
+                for fx in r1
+                if fx.is_bye
+            ],
+        ),
+    )
     await db.commit()
     logger.info(
         "tournament %s drawn: %d entrants, bracket %d, %d rounds",
@@ -340,7 +368,82 @@ async def sync_fixtures(
     if champ and t.status != FINISHED:
         t.champion_did = champ
         t.status = FINISHED
+
+    await _queue_progress(db, t, fixtures, champ)
     await db.commit()
+
+
+async def _queue_progress(
+    db: AsyncSession, t: Tournament, fixtures: list[eng.Fixture], champ: str | None
+) -> None:
+    """Owe a post for anything that just became true.
+
+    Runs on every sync, and is safe to: the dedupe key is derived from the event
+    (round N is done, this tournament has a champion), so the hundredth call
+    after a round resolves queues nothing. That is what lets this live on a
+    comparison-on-read path with no scheduler anywhere.
+    """
+    handles = {e.did: e.handle for e in await entrants(db, t.id)}
+    rounds = max((f.round for f in fixtures), default=0)
+    if not rounds:
+        return
+
+    for rnd in range(1, rounds + 1):
+        in_round = [f for f in fixtures if f.round == rnd]
+        if not in_round or not all(f.decided() for f in in_round):
+            continue
+        # The final round is the champion's post, not a round summary. Two posts
+        # a minute apart saying nearly the same thing reads like a broken bot.
+        if rnd == rounds:
+            continue
+        results = []
+        for f in in_round:
+            if not f.winner:
+                continue
+            loser = f.p2 if f.winner == f.p1 else f.p1
+            w1, w2 = f.wins()
+            wins, losses = (w1, w2) if f.winner == f.p1 else (w2, w1)
+            results.append(
+                (handles.get(f.winner), handles.get(loser or "") if loser else None,
+                 wins, losses)
+            )
+        await posts.enqueue(
+            db,
+            kind=posts.KIND_ROUND,
+            dedupe_key=f"{t.id}:round:{rnd}",
+            text=posts.compose_round(
+                tournament_id=t.id, round=rnd, rounds=rounds, results=results
+            ),
+        )
+
+    if not champ:
+        return
+
+    final = next((f for f in fixtures if f.round == rounds), None)
+    score = None
+    if final and final.winner:
+        w1, w2 = final.wins()
+        score = (w1, w2) if final.winner == final.p1 else (w2, w1)
+    # Only opponents actually beaten: a bye is not a scalp, and listing one as
+    # though it were would be the kind of small lie that makes a bot untrusted.
+    beaten = []
+    for f in sorted((f for f in fixtures if f.winner == champ), key=lambda f: f.round):
+        other = f.p2 if champ == f.p1 else f.p1
+        if other and handles.get(other):
+            beaten.append(handles[other])
+    await posts.enqueue(
+        db,
+        kind=posts.KIND_CHAMPION,
+        dedupe_key=f"{t.id}:champion",
+        text=posts.compose_champion(
+            name=t.name,
+            tournament_id=t.id,
+            champion=handles.get(champ),
+            entrants=len(handles),
+            beaten=beaten,
+            final_score=score,
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- #

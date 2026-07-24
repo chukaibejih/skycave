@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { Countdown } from "@/components/tournament/Countdown";
+import { ChampionMoment } from "@/components/tournament/ChampionMoment";
 import {
   ApiError,
   checkInToMatch,
@@ -113,6 +114,25 @@ export default function MatchPage({ params }: { params: Promise<{ id: string }> 
           title="You are not in this one."
           body="You can still follow every result on the bracket."
         />
+      </Shell>
+    );
+  }
+
+  // Winning the whole thing takes the page over. Everything else here is about
+  // what to do next, and for a champion there is nothing next.
+  if (m.is_champion) {
+    return (
+      <Shell id={id}>
+        <ChampionMoment m={m} />
+        <div className="mt-8 text-center">
+          <Link
+            href={`/tournament/${id}`}
+            className="inline-flex h-11 items-center rounded-[14px] border px-5 text-sm font-semibold"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+          >
+            See the full bracket
+          </Link>
+        </div>
       </Shell>
     );
   }

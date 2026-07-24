@@ -17,6 +17,7 @@ sys.path.insert(0, ".")
 from sqlalchemy import delete, select
 
 from app.core.database import AsyncSessionLocal as async_session
+from app.models.announcement import AnnouncementOutbox
 from app.models.tournament import Tournament, TournamentEntrant, TournamentMatch
 from app.services import tournament as svc
 
@@ -44,6 +45,10 @@ async def _fresh(session, *, cap: int, closes_in: timedelta) -> Tournament:
 
 
 async def _cleanup(session, tid: str) -> None:
+    # Drawing a bracket queues its announcement, so the outbox goes too.
+    await session.execute(
+        delete(AnnouncementOutbox).where(AnnouncementOutbox.dedupe_key.like(f"{tid}:%"))
+    )
     await session.execute(delete(TournamentMatch).where(TournamentMatch.tournament_id == tid))
     await session.execute(delete(TournamentEntrant).where(TournamentEntrant.tournament_id == tid))
     await session.execute(delete(Tournament).where(Tournament.id == tid))

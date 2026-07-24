@@ -23,6 +23,7 @@ from sqlalchemy import delete
 
 from app.core.database import AsyncSessionLocal as async_session
 from app.models import Room
+from app.models.announcement import AnnouncementOutbox
 from app.models.tournament import (
     IN_PROGRESS,
     Tournament,
@@ -77,6 +78,10 @@ async def _cleanup(session, t: Tournament) -> None:
             if rid:
                 await get_redis().delete(rm._key(rid))
                 await session.execute(delete(Room).where(Room.id == rid))
+    # Drawing a bracket queues its announcement, so the outbox goes too.
+    await session.execute(
+        delete(AnnouncementOutbox).where(AnnouncementOutbox.dedupe_key.like(f"{t.id}:%"))
+    )
     await session.execute(delete(TournamentMatch).where(TournamentMatch.tournament_id == t.id))
     await session.execute(delete(TournamentEntrant).where(TournamentEntrant.tournament_id == t.id))
     await session.execute(delete(Tournament).where(Tournament.id == t.id))

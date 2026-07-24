@@ -211,6 +211,18 @@ class LegOut(BaseModel):
     room_id: str | None = None
 
 
+class RunStep(BaseModel):
+    """One rung of the ladder the viewer climbed."""
+
+    round: int
+    round_name: str
+    opponent: PlayerOut | None = None
+    your_wins: int = 0
+    their_wins: int = 0
+    bye: bool = False
+    won: bool = False
+
+
 class MyMatchOut(BaseModel):
     tournament_id: str
     tournament_name: str
@@ -239,6 +251,10 @@ class MyMatchOut(BaseModel):
     won_match: bool = False
     is_champion: bool = False
     deadline: datetime | None = None
+    # Every fixture the viewer has played in this event, earliest first. It is
+    # what makes winning feel earned: a champion sees the whole climb, not just
+    # the last game.
+    run: list[RunStep] = []
     # One line describing what the player should do or wait for next.
     prompt: str = ""
 
@@ -327,6 +343,27 @@ async def _my_match(
     else:
         prompt = "Both of you are here. Start the game."
 
+    # The climb so far: every fixture they have appeared in that is settled.
+    run: list[RunStep] = []
+    for row in sorted(await svc.matches(db, t.id), key=lambda r: r.round):
+        if did not in (row.player1_did, row.player2_did) or row.winner_did is None:
+            continue
+        mine_first = row.player1_did == did
+        foe = row.player2_did if mine_first else row.player1_did
+        w1 = sum(1 for r in (row.results or []) if r.get("winner") == row.player1_did)
+        w2 = sum(1 for r in (row.results or []) if r.get("winner") == row.player2_did)
+        run.append(
+            RunStep(
+                round=row.round,
+                round_name=_round_name(row.round, t.rounds),
+                opponent=person(foe),
+                your_wins=w1 if mine_first else w2,
+                their_wins=w2 if mine_first else w1,
+                bye=row.status == M_BYE,
+                won=row.winner_did == did,
+            )
+        )
+
     return MyMatchOut(
         tournament_id=t.id,
         tournament_name=t.name,
@@ -356,6 +393,7 @@ async def _my_match(
         won_match=won,
         is_champion=t.champion_did == did,
         deadline=m.deadline,
+        run=run,
         prompt=prompt,
     )
 

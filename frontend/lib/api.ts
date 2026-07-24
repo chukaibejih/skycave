@@ -308,6 +308,17 @@ export interface MatchLeg {
   room_id: string | null;
 }
 
+/** One fixture the viewer has already settled, for showing their climb. */
+export interface RunStep {
+  round: number;
+  round_name: string;
+  opponent: TournamentPlayer | null;
+  your_wins: number;
+  their_wins: number;
+  bye: boolean;
+  won: boolean;
+}
+
 export interface MyMatch {
   tournament_id: string;
   tournament_name: string;
@@ -335,6 +346,7 @@ export interface MyMatch {
   won_match: boolean;
   is_champion: boolean;
   deadline: string | null;
+  run: RunStep[];
   prompt: string;
 }
 
