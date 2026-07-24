@@ -11,6 +11,7 @@ nothing is remembered in process.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.ids import new_room_id
+from app.services.bluesky_auth import fetch_profile
 from app.models.tournament import (
     FINISHED,
     IN_PROGRESS,
@@ -213,6 +215,50 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
     return t
 
 
+# The draw waits this long, in total, for every entrant's profile to come back.
+# Past it the stored snapshot is used, which is only ever as wrong as it was a
+# moment ago. A slow appview must never be able to hold up a bracket.
+REFRESH_BUDGET_SECONDS = 6.0
+
+
+async def refresh_entrants(people: list[TournamentEntrant]) -> None:
+    """Re-resolve every entrant's public profile by DID, just before the draw.
+
+    Identity is snapshotted at registration, which is Thursday at the latest and
+    can be days before anyone plays. People rename themselves. A real Skycave
+    player went from raythevirgo.latinsky.app to raythediva.latinsky.app, and
+    once that happens the stored handle is not merely out of date: an @mention
+    of it resolves to nothing, so the announcement post that was supposed to tag
+    them silently does not, and their seat on the bracket carries a name they no
+    longer use. The DID never moves, so re-resolving by DID fixes handle,
+    display name and avatar together.
+
+    Once per tournament, in parallel, best effort. Every failure mode - timeout,
+    appview down, a deleted account - falls back to what was already stored.
+    """
+    async def one(e: TournamentEntrant) -> None:
+        profile = await fetch_profile(e.did)
+        if not profile:
+            return
+        if profile["handle"] != e.handle:
+            logger.info(
+                "entrant %s renamed %s -> %s", e.did, e.handle, profile["handle"]
+            )
+        e.handle = profile["handle"]
+        e.display_name = profile["display_name"]
+        e.avatar_url = profile["avatar_url"]
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*(one(e) for e in people), return_exceptions=True),
+            timeout=REFRESH_BUDGET_SECONDS,
+        )
+    except (asyncio.TimeoutError, Exception):  # noqa: BLE001
+        # Deliberately swallowed. A refresh is an improvement, never a
+        # precondition; the draw has to happen on time regardless.
+        logger.warning("entrant refresh did not finish; using stored profiles")
+
+
 async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     """Close registration and draw the whole bracket, once.
 
@@ -236,6 +282,8 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
         await db.commit()
         logger.info("tournament %s closed with %d entrants, no bracket", locked.id, len(people))
         return locked
+
+    await refresh_entrants(people)
 
     rng = random.Random()  # a real draw; nothing reproducible about it
     fixtures = eng.build_bracket([e.did for e in people], rng)
