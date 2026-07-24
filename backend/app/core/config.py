@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     public_api_url: str = "http://localhost:8000"
     # Internal URL FastAPI uses to reach the sidecar within the Docker network.
     oauth_sidecar_url: str = "http://oauth-sidecar:3001"
-    # Shared secret sent to the sidecar's internal /oauth/session endpoint.
+    # Shared secret sent to the sidecar's internal endpoints (/oauth/session and
+    # the new /internal/announce). One secret guards all sidecar internals.
     oauth_internal_secret: str = ""
 
     # Datastores
