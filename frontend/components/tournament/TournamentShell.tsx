@@ -1,23 +1,22 @@
 "use client";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BackButton } from "@/components/nav/BackButton";
 import { TOURNEY } from "@/lib/tournamentStatus";
 
 /**
  * The frame every page in the Tournament world sits inside.
  *
- * It carries the world switch (Tournament lit) and the sub-navigation between
- * the world's four rooms, so a player always knows they are inside the
- * tournament and can move between its parts without going back to the hub. The
- * live event is the hero the sub-nav opens on; the rest of the world is one tap
- * away and no further.
+ * A single header row: a light "back to Hub" on the left and the world's four
+ * rooms as an underline tab bar sharing one baseline, so the header reads as one
+ * thing rather than a heavy pill stacked over a row of tabs. The active tab is
+ * scrolled into view, so on a narrow screen the rightmost tab is never stranded
+ * off-edge.
  */
 export type TournamentTab = "now" | "past" | "rules" | "record";
 
-// Short labels so all four fit across a 390px screen without the last one
-// being clipped at the edge. In the tournament world the context is clear:
-// "Past" is past weeks, "Record" is your record.
+// Short labels so the back link and all four tabs share one 390px line. In the
+// tournament world the context is clear: "Past" is past weeks, "Record" yours.
 const TABS: { key: TournamentTab; label: string; href: string }[] = [
   { key: "now", label: "This weekend", href: "/tournament" },
   { key: "past", label: "Past", href: "/tournament/past" },
@@ -34,45 +33,61 @@ export function TournamentShell({
   children: React.ReactNode;
   wide?: boolean;
 }) {
+  const activeRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    // Bring the current tab into the scroll viewport without nudging the page.
+    activeRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [active]);
+
   return (
     <main
-      className={`mx-auto min-h-[100dvh] w-full px-5 pb-16 pt-6 ${wide ? "max-w-5xl" : "max-w-lg"}`}
+      className={`mx-auto min-h-[100dvh] w-full px-4 pb-16 pt-5 ${wide ? "max-w-5xl" : "max-w-lg"}`}
     >
-      <BackButton href="/" label="Hub" />
-
-      {/* The world's own rooms, as an underline tab bar: text tabs on a shared
-          baseline, the active one carrying a warm underline. The bar stays at
-          content width so its baseline lines up with the back button and the
-          page below on both edges; it scrolls within that width rather than
-          bleeding past the content. */}
-      <nav
-        className="mt-4 overflow-x-auto border-b"
+      {/* One header row: back on the left, tabs sharing the same baseline and
+          bottom border. The back link never scrolls; the tabs scroll past it if
+          the screen is too narrow to hold all four. */}
+      <div
+        className="flex items-end gap-3 border-b"
         style={{ borderColor: "var(--color-border)" }}
       >
-        <div className="flex w-max gap-7">
-          {TABS.map((t) => {
-            const on = t.key === active;
-            return (
-              <Link
-                key={t.key}
-                href={t.href}
-                className="relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors"
-                style={{ color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
-              >
-                {t.label}
-                {on && (
-                  <motion.span
-                    layoutId="tournament-tab"
-                    className="absolute inset-x-0 -bottom-px h-[3px] rounded-full"
-                    style={{ background: TOURNEY.accent }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-1 pb-3 text-[13px] text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Hub
+        </Link>
+
+        <nav className="min-w-0 flex-1 overflow-x-auto">
+          <div className="flex w-max gap-5 pl-1">
+            {TABS.map((t) => {
+              const on = t.key === active;
+              return (
+                <Link
+                  key={t.key}
+                  ref={on ? activeRef : undefined}
+                  href={t.href}
+                  className="relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors"
+                  style={{ color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
+                >
+                  {t.label}
+                  {on && (
+                    <motion.span
+                      layoutId="tournament-tab"
+                      className="absolute inset-x-0 -bottom-px h-[3px] rounded-full"
+                      style={{ background: TOURNEY.accent }}
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
 
       <div className="mt-7">{children}</div>
     </main>
