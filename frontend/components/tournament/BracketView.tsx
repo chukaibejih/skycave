@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
+import { BackButton } from "@/components/nav/BackButton";
 import { Countdown } from "@/components/tournament/Countdown";
 import { getTournament, type Tournament, type TournamentMatch, type TournamentPlayer } from "@/lib/api";
 
@@ -248,6 +249,7 @@ function gameLines(m: TournamentMatch) {
   const rows = m.games.map((g, i) => ({
     name: m.game_names[i] ?? g,
     score: null as string | null,
+    played: false,
     replayed: false,
     p1Won: false,
     current: false,
@@ -260,7 +262,16 @@ function gameLines(m: TournamentMatch) {
       row.replayed = true;
       continue;
     }
-    row.score = `${leg.p1_score}-${leg.p2_score}`;
+    // A score only when both sides are real numbers. Some games are decided by
+    // a winner with no running tally (and older results predate scores being
+    // stored at all), where "undefined-undefined" is worse than no score.
+    const p1 = leg.p1_score;
+    const p2 = leg.p2_score;
+    row.score =
+      Number.isFinite(p1) && Number.isFinite(p2) && (p1 || p2)
+        ? `${p1}-${p2}`
+        : null;
+    row.played = true;
     row.p1Won = !!leg.winner && leg.winner === m.player1?.did;
     at++;
   }
@@ -347,7 +358,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
                     background: g.current
                       ? "color-mix(in srgb, var(--color-cyan) 10%, transparent)"
                       : "transparent",
-                    opacity: g.score || g.current ? 1 : 0.45,
+                    opacity: g.score || g.played || g.current ? 1 : 0.45,
                   }}
                 >
                   <span
@@ -368,13 +379,17 @@ function MatchCard({ m }: { m: TournamentMatch }) {
                     style={{
                       color: g.score
                         ? "var(--color-text-primary)"
-                        : g.current
-                          ? "var(--color-cyan)"
-                          : "var(--color-text-secondary)",
+                        : g.played
+                          ? "var(--color-success)"
+                          : g.current
+                            ? "var(--color-cyan)"
+                            : "var(--color-text-secondary)",
                       fontWeight: g.score ? 700 : 400,
                     }}
                   >
-                    {g.score ?? (g.current ? "now" : "-")}
+                    {/* A played leg with no stored score still reads as played
+                        (a check), never as a blank that looks unstarted. */}
+                    {g.score ?? (g.played ? "✓" : g.current ? "now" : "-")}
                   </span>
                 </div>
               ))}
@@ -525,13 +540,9 @@ function roundName(r: number, total: number): string {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl px-4 pb-16 pt-8">
-      <Link
-        href="/"
-        className="mb-6 inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
-        style={{ borderColor: "var(--color-border)" }}
-      >
-        hub
-      </Link>
+      <div className="mb-6">
+        <BackButton href="/tournament" label="Tournament" />
+      </div>
       {children}
     </main>
   );

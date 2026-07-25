@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { Countdown } from "@/components/tournament/Countdown";
 import { ChampionMoment } from "@/components/tournament/ChampionMoment";
+import { BackButton } from "@/components/nav/BackButton";
 import {
   ApiError,
   checkInToMatch,
@@ -491,21 +492,8 @@ function GameRow({
 function Shell({ id, children }: { id: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-lg px-5 pb-16 pt-8">
-      <div className="mb-6 flex items-center gap-2">
-        <Link
-          href="/"
-          className="inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          hub
-        </Link>
-        <Link
-          href={`/tournament/${id}`}
-          className="inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          bracket
-        </Link>
+      <div className="mb-6">
+        <BackButton href={`/tournament/${id}`} label="Bracket" />
       </div>
       {children}
     </main>
