@@ -10,6 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import bindparam, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -486,3 +487,108 @@ async def resolve_feedback(
     fb.resolved = body.resolved
     await db.commit()
     return {"id": fid, "resolved": body.resolved}
+
+
+# --------------------------------------------------------------------------- #
+# Tournaments (insight)
+# --------------------------------------------------------------------------- #
+
+class AdminTournamentRow(BaseModel):
+    id: str
+    name: str
+    status: str
+    entrants: int
+    max_players: int
+    rounds: int
+    champion: str | None = None
+    created_at: datetime
+    registration_closes_at: datetime
+    matches_done: int
+    matches_total: int
+
+
+class AdminTournamentsSummary(BaseModel):
+    total: int
+    registering: int
+    live: int          # locked or in_progress
+    finished: int
+    unique_entrants: int   # distinct Bluesky accounts that have ever entered
+    series_played: int     # decided, non-bye fixtures across all events
+
+
+class AdminTournamentsResponse(BaseModel):
+    summary: AdminTournamentsSummary
+    tournaments: list[AdminTournamentRow]
+
+
+@router.get("/tournaments", response_model=AdminTournamentsResponse)
+async def admin_tournaments(
+    _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> AdminTournamentsResponse:
+    """Every tournament, newest first, plus a roll-up. Entrants and matches are
+    each fetched once and grouped in memory rather than per-tournament."""
+    from app.models.tournament import (
+        Tournament,
+        TournamentEntrant,
+        TournamentMatch,
+    )
+
+    ts = (
+        await db.execute(select(Tournament).order_by(desc(Tournament.created_at)))
+    ).scalars().all()
+    ents = (await db.execute(select(TournamentEntrant))).scalars().all()
+    matches = (await db.execute(select(TournamentMatch))).scalars().all()
+
+    ent_by_t: dict[str, list] = {}
+    handle_of: dict[tuple[str, str], str] = {}  # (tid, did) -> handle
+    for e in ents:
+        ent_by_t.setdefault(e.tournament_id, []).append(e)
+        handle_of[(e.tournament_id, e.did)] = e.handle
+
+    match_by_t: dict[str, list] = {}
+    for m in matches:
+        match_by_t.setdefault(m.tournament_id, []).append(m)
+
+    rows: list[AdminTournamentRow] = []
+    live = finished = registering = 0
+    series_played = 0
+    for t in ts:
+        if t.status == "registering":
+            registering += 1
+        elif t.status == "finished":
+            finished += 1
+        else:
+            live += 1
+        tm = match_by_t.get(t.id, [])
+        # A "played" series is a decided fixture that was actually contested (has
+        # two players), i.e. not a walkover bye.
+        contested = [m for m in tm if m.status != "bye" and m.player1_did and m.player2_did]
+        done = [m for m in contested if m.winner_did]
+        series_played += len(done)
+        rows.append(
+            AdminTournamentRow(
+                id=t.id,
+                name=t.name,
+                status=t.status,
+                entrants=len(ent_by_t.get(t.id, [])),
+                max_players=t.max_players,
+                rounds=t.rounds,
+                champion=handle_of.get((t.id, t.champion_did or "")),
+                created_at=t.created_at,
+                registration_closes_at=t.registration_closes_at,
+                matches_done=len([m for m in tm if m.status in ("done", "bye")]),
+                matches_total=len(tm),
+            )
+        )
+
+    return AdminTournamentsResponse(
+        summary=AdminTournamentsSummary(
+            total=len(ts),
+            registering=registering,
+            live=live,
+            finished=finished,
+            unique_entrants=len({e.did for e in ents}),
+            series_played=series_played,
+        ),
+        tournaments=rows,
+    )

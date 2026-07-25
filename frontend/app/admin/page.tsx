@@ -14,12 +14,14 @@ import {
   getOverview,
   getTimeseries,
   getUsers,
+  getTournamentsAdmin,
   type FeedbackRow,
   type GameRow,
   type Insights,
   type Overview,
   type Timeseries,
   type UserRow,
+  type TournamentsAdmin,
 } from "@/lib/admin";
 import { BarList, Legend, SplitBar, TimeChart } from "@/components/admin/AdminCharts";
 import { Avatar } from "@/components/ui/Avatar";
@@ -40,10 +42,12 @@ const GAME_NAME: Record<string, string> = {
   connect4: "Connect 4",
   dots_boxes: "Dots and Boxes",
   clay: "Clay",
+  uno: "Uno",
+  mancala: "Mancala",
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 
-type Section = "overview" | "users" | "games" | "feedback";
+type Section = "overview" | "users" | "games" | "tournaments" | "feedback";
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -54,6 +58,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<{ total: number; users: UserRow[] } | null>(null);
   const [games, setGames] = useState<{ total: number; games: GameRow[] } | null>(null);
   const [feedback, setFeedback] = useState<{ total: number; feedback: FeedbackRow[] } | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentsAdmin | null>(null);
   const [usersOff, setUsersOff] = useState(0);
   const [gamesOff, setGamesOff] = useState(0);
   const [fbOff, setFbOff] = useState(0);
@@ -96,6 +101,11 @@ export default function AdminPage() {
     getFeedback(FB_PAGE, fbOff).then(setFeedback).catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, authed, fbOff]);
+  useEffect(() => {
+    if (!authed || section !== "tournaments") return;
+    getTournamentsAdmin().then(setTournaments).catch(handleErr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, authed]);
 
   function handleErr(e: unknown) {
     if (e instanceof AdminAuthError) {
@@ -138,6 +148,7 @@ export default function AdminPage() {
     setUsers(null);
     setGames(null);
     setFeedback(null);
+    setTournaments(null);
   };
 
   if (checking) {
@@ -197,7 +208,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="mb-6 flex gap-2">
-        {(["overview", "users", "games", "feedback"] as Section[]).map((s) => (
+        {(["overview", "users", "games", "tournaments", "feedback"] as Section[]).map((s) => (
           <button
             key={s}
             onClick={() => setSection(s)}
@@ -226,6 +237,7 @@ export default function AdminPage() {
           <Pager loaded={!!games} offset={gamesOff} pageSize={PAGE} total={games?.total ?? 0} onChange={setGamesOff} />
         </>
       )}
+      {section === "tournaments" && <TournamentsView data={tournaments} />}
       {section === "feedback" && (
         <>
           <FeedbackView feedback={feedback?.feedback ?? null} onResolve={toggleFeedback} />
@@ -655,6 +667,82 @@ function GamesView({ games }: { games: GameRow[] | null }) {
         );
       })}
     </Table>
+  );
+}
+
+// Warm for live, mint for finished, violet for open sign-ups, grey otherwise.
+const TSTATUS: Record<string, { label: string; color: string }> = {
+  registering: { label: "sign-ups open", color: "#8b7cff" },
+  locked: { label: "drawn", color: "#ffd166" },
+  in_progress: { label: "live", color: "#ff8a3d" },
+  finished: { label: "finished", color: "#56f0aa" },
+};
+
+function TournamentsView({ data }: { data: TournamentsAdmin | null }) {
+  if (!data) return <Loading />;
+  const { summary: s, tournaments } = data;
+  const cards = [
+    { label: "Tournaments", value: s.total },
+    { label: "Sign-ups open", value: s.registering },
+    { label: "Live now", value: s.live },
+    { label: "Finished", value: s.finished },
+    { label: "Unique entrants", value: s.unique_entrants },
+    { label: "Series played", value: s.series_played },
+  ];
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+            <div className="font-[var(--font-display)] text-3xl font-bold">{c.value.toLocaleString()}</div>
+            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="mt-8 mb-4 font-[var(--font-display)] text-lg font-semibold">All tournaments</h2>
+      {tournaments.length === 0 ? (
+        <Empty label="No tournaments have run yet." />
+      ) : (
+        <Table head={["Created", "Name", "Status", "Entrants", "Series", "Champion"]}>
+          {tournaments.map((t) => {
+            const st = TSTATUS[t.status] ?? { label: t.status, color: "var(--color-text-secondary)" };
+            return (
+              <tr key={t.id} className="border-t border-[var(--color-border)]">
+                <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
+                  {new Date(t.created_at).toLocaleDateString()}
+                </Td>
+                <Td>
+                  <div className="font-medium">{t.name}</div>
+                  <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{t.id}</div>
+                </Td>
+                <Td>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                    style={{ background: `${st.color}22`, color: st.color }}
+                  >
+                    {t.status === "in_progress" && (
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
+                    )}
+                    {st.label}
+                  </span>
+                </Td>
+                <Td className="font-[var(--font-mono)] whitespace-nowrap">
+                  {t.entrants}
+                  <span className="text-[var(--color-text-secondary)]">/{t.max_players}</span>
+                </Td>
+                <Td className="font-[var(--font-mono)] whitespace-nowrap text-[var(--color-text-secondary)]">
+                  {t.matches_total ? `${t.matches_done}/${t.matches_total}` : "·"}
+                </Td>
+                <Td className={t.champion ? "text-[var(--color-success)]" : "text-[var(--color-text-secondary)]"}>
+                  {t.champion ? `@${t.champion}` : "·"}
+                </Td>
+              </tr>
+            );
+          })}
+        </Table>
+      )}
+    </motion.div>
   );
 }
 

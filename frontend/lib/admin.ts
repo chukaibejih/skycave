@@ -158,3 +158,30 @@ export const getFeedback = (limit = 15, offset = 0) =>
   adminGet<{ total: number; feedback: FeedbackRow[] }>(
     `/admin/feedback?limit=${limit}&offset=${offset}`
   );
+
+export interface TournamentAdminRow {
+  id: string;
+  name: string;
+  status: string;
+  entrants: number;
+  max_players: number;
+  rounds: number;
+  champion: string | null;
+  created_at: string;
+  registration_closes_at: string;
+  matches_done: number;
+  matches_total: number;
+}
+export interface TournamentsAdmin {
+  summary: {
+    total: number;
+    registering: number;
+    live: number;
+    finished: number;
+    unique_entrants: number;
+    series_played: number;
+  };
+  tournaments: TournamentAdminRow[];
+}
+export const getTournamentsAdmin = () =>
+  adminGet<TournamentsAdmin>("/admin/tournaments");
