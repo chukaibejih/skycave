@@ -105,3 +105,72 @@ export function LocalTime({ iso }: { iso: string }) {
   }, [iso]);
   return <>{text}</>;
 }
+
+/**
+ * A stadium scoreboard, not a website widget. Big tabular numerals in slabs, a
+ * driving colon, and a colour that carries the state of the event. This is the
+ * "how much time do I have" answer, made impossible to miss.
+ *
+ * Days drop off once the event is inside a day, so the closing hours read as
+ * hours:minutes:seconds rather than a lonely "0" days slab.
+ */
+export function Scoreboard({ to, accent = "var(--color-primary)" }: { to: string; accent?: string }) {
+  const target = new Date(to).getTime();
+  const [left, setLeft] = useState(() => Math.max(0, target - Date.now()));
+
+  useEffect(() => {
+    setLeft(Math.max(0, target - Date.now()));
+    const id = setInterval(() => setLeft(Math.max(0, target - Date.now())), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+
+  const s = Math.floor(left / 1000);
+  const d = Math.floor(s / 86400);
+  const all = [
+    { v: d, label: "days" },
+    { v: Math.floor((s % 86400) / 3600), label: "hrs" },
+    { v: Math.floor((s % 3600) / 60), label: "min" },
+    { v: s % 60, label: "sec" },
+  ];
+  const parts = d > 0 ? all : all.slice(1);
+
+  return (
+    <div className="flex items-start justify-center gap-1.5 sm:gap-2">
+      {parts.map((p, i) => (
+        <div key={p.label} className="flex items-start gap-1.5 sm:gap-2">
+          <div className="flex flex-col items-center">
+            <div
+              className="grid min-w-[58px] place-items-center rounded-[14px] border px-1 py-2 sm:min-w-[68px]"
+              style={{
+                borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+                background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 14%, var(--color-elevated)), var(--color-surface))`,
+                boxShadow: `0 0 24px color-mix(in srgb, ${accent} 18%, transparent)`,
+              }}
+            >
+              <span
+                className="font-[var(--font-display)] text-4xl font-bold tabular-nums leading-none sm:text-5xl"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {String(p.v).padStart(2, "0")}
+              </span>
+            </div>
+            <span
+              className="mt-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em]"
+              style={{ color: `color-mix(in srgb, ${accent} 70%, var(--color-text-secondary))` }}
+            >
+              {p.label}
+            </span>
+          </div>
+          {i < parts.length - 1 && (
+            <span
+              className="pt-1.5 font-[var(--font-display)] text-3xl font-bold sm:text-4xl"
+              style={{ color: `color-mix(in srgb, ${accent} 60%, transparent)` }}
+            >
+              :
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

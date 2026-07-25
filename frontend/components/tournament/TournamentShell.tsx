@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { WorldSwitch } from "@/components/nav/WorldSwitch";
+import { motion } from "framer-motion";
+import { BackButton } from "@/components/nav/BackButton";
 
 /**
  * The frame every page in the Tournament world sits inside.
@@ -33,12 +34,11 @@ export function TournamentShell({
     <main
       className={`mx-auto min-h-[100dvh] w-full px-5 pb-16 pt-6 ${wide ? "max-w-5xl" : "max-w-lg"}`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <WorldSwitch active="tournament" />
-      </div>
+      <BackButton href="/" label="Hub" />
 
-      {/* The world's own rooms. Scrolls on its own on a narrow screen rather
-          than wrapping into a second line that pushes the content down. */}
+      {/* The world's own rooms. The active tab is a solid pill that clearly reads
+          as selected, not a slightly-brighter word. Scrolls on its own on a
+          narrow screen rather than wrapping and pushing the content down. */}
       <nav className="mt-5 -mx-5 overflow-x-auto px-5">
         <div className="flex w-max gap-2">
           {TABS.map((t) => {
@@ -47,18 +47,18 @@ export function TournamentShell({
               <Link
                 key={t.key}
                 href={t.href}
-                className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors"
-                style={{
-                  borderColor: on
-                    ? "color-mix(in srgb, var(--color-primary) 55%, transparent)"
-                    : "var(--color-border)",
-                  background: on
-                    ? "color-mix(in srgb, var(--color-primary) 14%, transparent)"
-                    : "transparent",
-                  color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                }}
+                className="relative whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors"
+                style={{ color: on ? "#05060a" : "var(--color-text-secondary)" }}
               >
-                {t.label}
+                {on && (
+                  <motion.span
+                    layoutId="tournament-tab"
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: "var(--color-primary)", zIndex: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative">{t.label}</span>
               </Link>
             );
           })}
