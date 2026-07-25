@@ -12,6 +12,7 @@ const NEW_SINCE: Record<string, string> = {
   dots_boxes: "2026-07-15",
   clay: "2026-07-18",  // launch day
   uno: "2026-07-22",   // launch day - move this if the merge slips
+  mancala: "2026-07-25",  // launch day - move this if the merge slips
 };
 export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];
