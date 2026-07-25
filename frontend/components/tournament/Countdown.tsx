@@ -174,3 +174,21 @@ export function Scoreboard({ to, accent = "var(--color-warm)" }: { to: string; a
     </div>
   );
 }
+
+/** The close day in words, formatted after mount so it matches the viewer's
+ * timezone without tripping hydration. "Thursday". */
+export function Weekday({ iso }: { iso: string }) {
+  const [text, setText] = useState("");
+  useEffect(() => {
+    setText(new Date(iso).toLocaleDateString(undefined, { weekday: "long" }));
+  }, [iso]);
+  return <>{text}</>;
+}
+
+/** Whether the live clock has earned its place yet: true once the viewer is
+ * inside the final stretch (from `from`), false while the close is still days
+ * away. Callers fall back to a calm "Closes <day>" before it turns true. */
+export function clockIsLive(from: string | null): boolean {
+  if (!from) return false;
+  return Date.now() >= new Date(from).getTime();
+}

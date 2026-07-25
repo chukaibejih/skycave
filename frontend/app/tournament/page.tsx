@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BlueskyLogo } from "@/components/ui/BlueskyLogo";
-import { Countdown, LocalTime, Scoreboard } from "@/components/tournament/Countdown";
+import { Countdown, LocalTime, Scoreboard, Weekday, clockIsLive } from "@/components/tournament/Countdown";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
 import { GameGlyph, GAME_ACCENT } from "@/components/games/gameVisual";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
@@ -230,7 +230,7 @@ function Hero({ t }: { t: Tournament }) {
           </span>
         </div>
 
-        {s.countdownTo ? (
+        {s.countdownTo && clockIsLive(s.countdownFrom) ? (
           <div className="mt-7">
             {s.countdownCaption && (
               <p className="mb-3 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
@@ -240,6 +240,16 @@ function Hero({ t }: { t: Tournament }) {
             <Scoreboard to={s.countdownTo} accent={s.color} />
             <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
               Closes <LocalTime iso={t.registration_closes_at} />, when the bracket goes up.
+            </p>
+          </div>
+        ) : s.countdownTo ? (
+          // Days out yet: name the day, calmly. The clock starts Wednesday.
+          <div className="mt-6">
+            <p className="font-[var(--font-display)] text-xl font-bold">
+              Entries close <Weekday iso={s.countdownTo} />
+            </p>
+            <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+              <LocalTime iso={t.registration_closes_at} /> your time, when the bracket goes up.
             </p>
           </div>
         ) : (

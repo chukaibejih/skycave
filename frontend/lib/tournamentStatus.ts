@@ -31,6 +31,19 @@ export interface StatusMeta {
   cta: string; // the single action
   countdownTo: string | null; // an instant worth counting down to, or null
   countdownCaption: string | null;
+  // The clock only starts ticking once it means something. Before this instant
+  // the banner reads calmly ("Closes Thursday"); from it, the live countdown
+  // runs. Set to the Wednesday 00:00 before the close, in the viewer's own week,
+  // so a five-day-out "4d 3h 2m 1s" never sits nagging on the hub all week.
+  countdownFrom: string | null;
+}
+
+/** Wednesday 00:00 (viewer-local) before a Thursday close. */
+function clockStart(closeIso: string): string {
+  const from = new Date(closeIso);
+  from.setDate(from.getDate() - 1); // Thursday -> Wednesday
+  from.setHours(0, 0, 0, 0); // local midnight
+  return from.toISOString();
 }
 
 /** The earliest round still holding an undecided, real match. */
@@ -50,6 +63,7 @@ export function statusMeta(t: Tournament): StatusMeta {
       cta: "Enter",
       countdownTo: t.registration_closes_at,
       countdownCaption: "Entries close in",
+      countdownFrom: clockStart(t.registration_closes_at),
     };
   }
   if (t.status === "finished") {
@@ -60,6 +74,7 @@ export function statusMeta(t: Tournament): StatusMeta {
       cta: "See how it went",
       countdownTo: null,
       countdownCaption: null,
+      countdownFrom: null,
     };
   }
   // locked or in_progress: the bracket exists and is being played.
@@ -72,5 +87,6 @@ export function statusMeta(t: Tournament): StatusMeta {
     cta: "Follow the bracket",
     countdownTo: null,
     countdownCaption: null,
+    countdownFrom: null,
   };
 }

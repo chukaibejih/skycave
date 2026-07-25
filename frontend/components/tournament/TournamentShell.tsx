@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { TOURNEY } from "@/lib/tournamentStatus";
@@ -9,9 +8,9 @@ import { TOURNEY } from "@/lib/tournamentStatus";
  *
  * A single header row: a light "back to Hub" on the left and the world's four
  * rooms as an underline tab bar sharing one baseline, so the header reads as one
- * thing rather than a heavy pill stacked over a row of tabs. The active tab is
- * scrolled into view, so on a narrow screen the rightmost tab is never stranded
- * off-edge.
+ * thing rather than a heavy pill stacked over a row of tabs. The row is spread
+ * edge to edge, so it is balanced by construction with no dead gutter on either
+ * side.
  */
 export type TournamentTab = "now" | "past" | "rules" | "record";
 
@@ -33,26 +32,22 @@ export function TournamentShell({
   children: React.ReactNode;
   wide?: boolean;
 }) {
-  const activeRef = useRef<HTMLAnchorElement>(null);
-  useEffect(() => {
-    // Bring the current tab into the scroll viewport without nudging the page.
-    activeRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
-  }, [active]);
-
   return (
     <main
       className={`mx-auto min-h-[100dvh] w-full px-4 pb-16 pt-5 ${wide ? "max-w-5xl" : "max-w-lg"}`}
     >
-      {/* One header row: back on the left, tabs sharing the same baseline and
-          bottom border. The back link never scrolls; the tabs scroll past it if
-          the screen is too narrow to hold all four. */}
+      {/* One header row, distributed edge to edge: "Hub" flush at the left
+          margin, "Record" flush at the right, the rest spread evenly between.
+          Both sides are balanced by construction, and there is no dead gutter
+          or scrollbar on the right. The four short labels plus the back link fit
+          a 390px line with room to breathe. */}
       <div
-        className="flex items-end gap-3 border-b"
+        className="flex items-end justify-between border-b"
         style={{ borderColor: "var(--color-border)" }}
       >
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-1 pb-3 text-[13px] text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
+          className="flex items-center gap-1 pb-3 text-[13px] text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -61,32 +56,27 @@ export function TournamentShell({
           Hub
         </Link>
 
-        <nav className="min-w-0 flex-1 overflow-x-auto">
-          <div className="flex w-max gap-5 pl-1">
-            {TABS.map((t) => {
-              const on = t.key === active;
-              return (
-                <Link
-                  key={t.key}
-                  ref={on ? activeRef : undefined}
-                  href={t.href}
-                  className="relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors"
-                  style={{ color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
-                >
-                  {t.label}
-                  {on && (
-                    <motion.span
-                      layoutId="tournament-tab"
-                      className="absolute inset-x-0 -bottom-px h-[3px] rounded-full"
-                      style={{ background: TOURNEY.accent }}
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+        {TABS.map((t) => {
+          const on = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              href={t.href}
+              className="relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors"
+              style={{ color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
+            >
+              {t.label}
+              {on && (
+                <motion.span
+                  layoutId="tournament-tab"
+                  className="absolute inset-x-0 -bottom-px h-[3px] rounded-full"
+                  style={{ background: TOURNEY.accent }}
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+            </Link>
+          );
+        })}
       </div>
 
       <div className="mt-7">{children}</div>

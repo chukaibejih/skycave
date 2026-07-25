@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Countdown } from "@/components/tournament/Countdown";
+import { Countdown, Weekday, clockIsLive } from "@/components/tournament/Countdown";
 import { statusMeta } from "@/lib/tournamentStatus";
 import { useTournamentSignal } from "@/lib/useTournamentSignal";
 
@@ -78,11 +78,18 @@ export function TournamentBanner() {
             <p className="mt-1 text-sm font-semibold" style={{ color: "rgba(42,20,0,0.78)" }}>
               {s.label}
               {spots && ` · ${spots}`}
+              {/* Calm until the final stretch: a day, not a ticking clock. */}
+              {s.countdownTo && !clockIsLive(s.countdownFrom) && (
+                <>
+                  {" · closes "}
+                  <Weekday iso={s.countdownTo} />
+                </>
+              )}
             </p>
 
-            {/* When time is the point, make it loud - dark scoreboard chips that
-                pop against the amber rather than a line of small text. */}
-            {s.countdownTo && (
+            {/* Only once the countdown means something (from Wednesday) does the
+                loud clock appear - dark scoreboard chips that pop on the amber. */}
+            {s.countdownTo && clockIsLive(s.countdownFrom) && (
               <div className="mt-4">
                 <div
                   className="inline-flex rounded-[14px] px-3 py-2"
