@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useAnimate } from "framer-motion";
+import { AnimatePresence, motion, useAnimate } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
 
 interface Props {
@@ -15,8 +15,10 @@ interface Props {
 // distinct from the gold rim on your side, which otherwise washed together.
 const SEED = "#f2e8d0";
 const SEED_DARK = "#cbb98f";
-const YOU = "#ffd166"; // your side rim (gold - Mancala's hub accent)
-const OPP = "#8b7cff"; // opponent side rim (violet)
+// Your side is cyan and the Caver's is violet - both clearly apart from the pale
+// ivory seeds, so the beads never wash into your own colour.
+const YOU = "#67e8f9"; // your side (cyan)
+const OPP = "#8b7cff"; // opponent side (violet)
 const STORE_A = 6;
 const STORE_B = 13;
 const HOP_MS = 210; // per-seed travel time - slow enough to follow by eye
@@ -72,6 +74,7 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const pitRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [flyer, animate] = useAnimate();
   const [flyOn, setFlyOn] = useState(false);
+  const [help, setHelp] = useState(false);
 
   const paint = (pits: number[]) => {
     displayRef.current = pits;
@@ -188,7 +191,16 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
              style={{ color: over ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {banner}
         </div>
-        <div className="w-[72px]" />
+        <div className="flex w-[72px] justify-end">
+          <button
+            onClick={() => setHelp(true)}
+            aria-label="How to play"
+            className="grid h-8 w-8 place-items-center rounded-full border font-[var(--font-display)] text-sm font-bold text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+          >
+            ?
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col justify-center">
@@ -277,7 +289,87 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
         </div>
         <div className="w-[72px]" />
       </footer>
+
+      <AnimatePresence>{help && <HowToPlay onClose={() => setHelp(false)} />}</AnimatePresence>
     </main>
+  );
+}
+
+/** The rules, one tap away from the board. */
+function HowToPlay({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{ background: "rgba(0,0,0,0.6)" }}
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 24, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        className="w-full max-w-md rounded-t-[22px] border p-5 sm:rounded-[22px]"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-elevated)" }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="font-[var(--font-display)] text-xl font-bold">How to play Mancala</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 place-items-center rounded-full border text-[var(--color-text-secondary)]"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3.5">
+          <Rule n="Goal">
+            Bank the most seeds in your store, the big bowl on your right.
+          </Rule>
+          <Rule n="Your move">
+            Tap one of your pits. Its seeds drop one by one into the pits after it,
+            going counterclockwise, into your own store as you pass it but skipping
+            the Caver&apos;s.
+          </Rule>
+          <Rule n="Go again">
+            If your last seed lands in your own store, you take another turn. Chain
+            these and you can play several times in a row.
+          </Rule>
+          <Rule n="Capture">
+            If your last seed lands in an empty pit on your side, you grab that seed
+            and everything in the pit directly across from it, into your store.
+          </Rule>
+          <Rule n="The end">
+            When either side&apos;s pits are all empty, the other player banks
+            whatever is left on their side. Most seeds wins.
+          </Rule>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-5 flex h-12 w-full items-center justify-center rounded-[14px] text-base font-bold"
+          style={{ background: YOU, color: "#05060a" }}
+        >
+          Got it
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Rule({ n, children }: { n: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="font-[var(--font-display)] text-sm font-bold" style={{ color: YOU }}>
+        {n}
+      </div>
+      <p className="mt-0.5 text-sm leading-relaxed text-[var(--color-text-secondary)]">{children}</p>
+    </div>
   );
 }
 
