@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Countdown } from "@/components/tournament/Countdown";
 import { ChampionMoment } from "@/components/tournament/ChampionMoment";
 import { BackButton } from "@/components/nav/BackButton";
+import { TOURNEY } from "@/lib/tournamentStatus";
 import {
   ApiError,
   checkInToMatch,
@@ -145,8 +146,8 @@ export default function MatchPage({ params }: { params: Promise<{ id: string }> 
         <span
           className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em]"
           style={{
-            borderColor: "color-mix(in srgb, var(--color-primary) 45%, transparent)",
-            color: "var(--color-primary)",
+            borderColor: "color-mix(in srgb, var(--color-warm) 50%, transparent)",
+            color: "var(--color-warm)",
           }}
         >
           {m.round_name}
@@ -334,13 +335,18 @@ function Big({
   disabled?: boolean;
   tone: "primary" | "cyan";
 }) {
-  const bg = tone === "cyan" ? "var(--color-cyan)" : "var(--color-primary)";
+  // Primary actions wear the tournament world's warm gradient; "go to your room"
+  // keeps cyan, the colour the neon thread uses for a live edge of the bracket.
+  const style =
+    tone === "cyan"
+      ? { background: "var(--color-cyan)", color: "#05060a" }
+      : { background: TOURNEY.gradient, color: TOURNEY.ink, boxShadow: "0 10px 30px rgba(255,110,60,0.28)" };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-base font-bold transition-[filter] active:brightness-95 disabled:opacity-70"
-      style={{ background: bg, color: "#05060a" }}
+      style={style}
     >
       {children}
     </button>
@@ -356,7 +362,7 @@ function Waiting({ children }: { children: React.ReactNode }) {
     >
       <motion.span
         className="h-2 w-2 rounded-full"
-        style={{ background: "var(--color-primary)" }}
+        style={{ background: "var(--color-warm)" }}
         animate={{ opacity: [1, 0.25, 1], scale: [1, 0.8, 1] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       />

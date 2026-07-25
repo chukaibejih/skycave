@@ -9,6 +9,19 @@ import type { Tournament } from "@/lib/api";
  * entries are open, mint once the bracket is live, coral when it comes down to
  * the final, gold once it is won.
  */
+/**
+ * The tournament world's own warmth. Everywhere else in Skycave is cool and
+ * violet; the tournament is amber into coral, so stepping into it feels like
+ * stepping somewhere else. The chrome (tabs, buttons, hero glow) always wears
+ * this; only the status label shifts colour to carry the state of the event.
+ */
+export const TOURNEY = {
+  accent: "#ff8a3d", // the world's signature warm orange
+  accentSoft: "#ffab5c", // a lighter tone for text on dark
+  gradient: "linear-gradient(135deg, #ffb64d 0%, #ff7a3c 52%, #ff5b5b 100%)",
+  ink: "#2a1400", // dark text that holds contrast on the warm gradient
+} as const;
+
 export type TournamentPhase = "open" | "live" | "finals" | "finished";
 
 export interface StatusMeta {
@@ -33,7 +46,7 @@ export function statusMeta(t: Tournament): StatusMeta {
     return {
       phase: "open",
       label: "Registration open",
-      color: "var(--color-primary)",
+      color: TOURNEY.accentSoft, // warm, not violet: this is the tournament world
       cta: "Enter",
       countdownTo: t.registration_closes_at,
       countdownCaption: "Entries close in",

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { BackButton } from "@/components/nav/BackButton";
+import { TOURNEY } from "@/lib/tournamentStatus";
 
 /**
  * The frame every page in the Tournament world sits inside.
@@ -36,29 +37,32 @@ export function TournamentShell({
     >
       <BackButton href="/" label="Hub" />
 
-      {/* The world's own rooms. The active tab is a solid pill that clearly reads
-          as selected, not a slightly-brighter word. Scrolls on its own on a
-          narrow screen rather than wrapping and pushing the content down. */}
-      <nav className="mt-5 -mx-5 overflow-x-auto px-5">
-        <div className="flex w-max gap-2">
+      {/* The world's own rooms, as an underline tab bar: text tabs on a shared
+          baseline, the active one carrying a warm underline. Scrolls on its own
+          on a narrow screen rather than wrapping and pushing content down. */}
+      <nav
+        className="mt-5 -mx-5 overflow-x-auto border-b px-5"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        <div className="flex w-max gap-6">
           {TABS.map((t) => {
             const on = t.key === active;
             return (
               <Link
                 key={t.key}
                 href={t.href}
-                className="relative whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors"
-                style={{ color: on ? "#05060a" : "var(--color-text-secondary)" }}
+                className="relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors"
+                style={{ color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
               >
+                {t.label}
                 {on && (
                   <motion.span
                     layoutId="tournament-tab"
-                    className="absolute inset-0 rounded-full"
-                    style={{ background: "var(--color-primary)", zIndex: 0 }}
+                    className="absolute inset-x-0 -bottom-px h-[3px] rounded-full"
+                    style={{ background: TOURNEY.accent }}
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
-                <span className="relative">{t.label}</span>
               </Link>
             );
           })}

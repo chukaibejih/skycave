@@ -73,7 +73,7 @@ export function BracketView({ id }: { id: string }) {
           <Link
             href="/tournament"
             className="mt-6 inline-flex h-12 items-center justify-center rounded-[14px] px-6 font-semibold"
-            style={{ background: "var(--color-primary)", color: "#05060a" }}
+            style={{ background: "var(--color-warm)", color: "#05060a" }}
           >
             Take a spot
           </Link>
@@ -111,7 +111,7 @@ export function BracketView({ id }: { id: string }) {
                 <div key={r} className="px-1">
                   <div
                     className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em]"
-                    style={{ color: live ? "var(--color-primary)" : "var(--color-text-secondary)" }}
+                    style={{ color: live ? "var(--color-warm)" : "var(--color-text-secondary)" }}
                   >
                     {roundName(r, rounds)}
                   </div>
@@ -302,16 +302,16 @@ function MatchCard({ m }: { m: TournamentMatch }) {
       className="relative w-full rounded-[12px] border"
       style={{
         borderColor: live
-          ? "color-mix(in srgb, var(--color-primary) 60%, transparent)"
+          ? "color-mix(in srgb, var(--color-warm) 60%, transparent)"
           : "var(--color-border)",
         background: "var(--color-surface)",
-        boxShadow: live ? "0 0 18px color-mix(in srgb, var(--color-primary) 22%, transparent)" : "none",
+        boxShadow: live ? "0 0 18px color-mix(in srgb, var(--color-warm) 22%, transparent)" : "none",
       }}
     >
       {live && (
         <motion.span
           className="absolute -top-1.5 right-3 rounded-full px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
-          style={{ background: "var(--color-primary)", color: "#05060a" }}
+          style={{ background: "var(--color-warm)", color: "#05060a" }}
           animate={{ opacity: [1, 0.55, 1] }}
           transition={{ duration: 1.4, repeat: Infinity }}
         >
@@ -515,11 +515,11 @@ function Header({ t }: { t: Tournament }) {
       <span
         className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em]"
         style={{
-          borderColor: "color-mix(in srgb, var(--color-primary) 45%, transparent)",
-          color: "var(--color-primary)",
+          borderColor: "color-mix(in srgb, var(--color-warm) 45%, transparent)",
+          color: "var(--color-warm)",
         }}
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warm)]" />
         {label}
       </span>
       <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold leading-tight">{t.name}</h1>
