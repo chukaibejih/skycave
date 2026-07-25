@@ -95,6 +95,14 @@ export interface BoardState {
   h?: (string | null)[];
   v?: (string | null)[];
   boxes?: (string | null)[];
+  // Mancala only (present on mancala boards). 14 pits: 0-5 order[0]'s, 6 their
+  // store, 7-12 order[1]'s, 13 their store.
+  pits?: number[];
+  done?: boolean;
+  last?: number | null;
+  last_pit?: number | null;
+  captured?: number[];
+  extra?: boolean;
 }
 
 // ── Uno ──

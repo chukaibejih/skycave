@@ -17,6 +17,7 @@ export const GAME_ACCENT: Record<string, string> = {
   dots_boxes: "var(--color-cyan)",
   clay: "var(--color-warm)",
   uno: "var(--color-primary)",
+  mancala: "var(--color-gold)",
 };
 
 export const GAME_META: Record<string, { code: string; stat: string }> = {
@@ -33,6 +34,7 @@ export const GAME_META: Record<string, { code: string; stat: string }> = {
   connect4: { code: "C4", stat: "4 in a row" },
   dots_boxes: { code: "D&B", stat: "boxes" },
   clay: { code: "CLY", stat: "pottery" },
+  mancala: { code: "MNC", stat: "seeds" },
 };
 
 // Lightweight inline glyph per game (no icon dependency).
@@ -153,6 +155,20 @@ export function GameGlyph({ type, color }: { type: string; color: string }) {
         <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none" strokeLinejoin="round">
           <path d="M9 4h6" />
           <path d="M9 4c0 2-2 3-2 6s2 4 2 5c-3 1-4 2-4 3.5 0 0 3 1.5 7 1.5s7-1.5 7-1.5c0-1.5-1-2.5-4-3.5 0-1 2-2 2-5s-2-4-2-6" fill={color} fillOpacity="0.22" />
+        </svg>
+      );
+    case "mancala":
+      // a board: a store on the right and two rows of seed pits
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.6} fill="none">
+          <rect x="2.5" y="6" width="13" height="12" rx="3" />
+          <rect x="17" y="4.5" width="4.5" height="15" rx="2.2" fill={color} fillOpacity="0.25" />
+          {[6, 10, 13].map((cx) => (
+            <g key={cx}>
+              <circle cx={cx} cy="10" r="1.5" fill={color} stroke="none" />
+              <circle cx={cx} cy="14" r="1.5" fill={color} stroke="none" />
+            </g>
+          ))}
         </svg>
       );
     default:
