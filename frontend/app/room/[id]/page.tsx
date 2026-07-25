@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BackButton } from "@/components/nav/BackButton";
 import { useParams, useRouter } from "next/navigation";
 import { RoomPortal } from "@/components/lobby/RoomPortal";
 import { PlayerCard } from "@/components/lobby/PlayerCard";
@@ -263,13 +264,7 @@ export default function RoomPage() {
       <ConnectionBadge status={status} />
 
       <header className="flex items-center gap-2 py-4">
-        <button
-          onClick={() => router.push("/")}
-          aria-label="Back to hub"
-          className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 py-1.5 text-sm text-[var(--color-text-secondary)] active:text-[var(--color-text-primary)]"
-        >
-          hub
-        </button>
+        <BackButton href="/" label="Hub" />
         <div className="flex-1 text-center font-[var(--font-mono)] text-lg font-semibold tracking-[0.14em]">
           {id}
         </div>
