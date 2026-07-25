@@ -16,7 +16,7 @@ import logging
 import random
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -861,3 +861,107 @@ async def current(db: AsyncSession) -> Tournament | None:
             select(Tournament).order_by(Tournament.created_at.desc()).limit(1)
         )
     ).scalar_one_or_none()
+
+
+# --------------------------------------------------------------------------- #
+# The tournament world: history and a player's record
+# --------------------------------------------------------------------------- #
+
+async def list_tournaments(db: AsyncSession, *, limit: int = 24) -> list[Tournament]:
+    """Recent tournaments, newest first, for the Past weeks list."""
+    return list(
+        (
+            await db.execute(
+                select(Tournament).order_by(Tournament.created_at.desc()).limit(limit)
+            )
+        ).scalars()
+    )
+
+
+async def entrants_for(
+    db: AsyncSession, tournament_ids: list[str]
+) -> dict[str, list[TournamentEntrant]]:
+    """All entrants for a set of tournaments, grouped by tournament id.
+
+    One query rather than one per card: the Past weeks list would otherwise fan
+    out into a query per tournament just to count heads and name a champion.
+    """
+    if not tournament_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(TournamentEntrant).where(
+                TournamentEntrant.tournament_id.in_(tournament_ids)
+            )
+        )
+    ).scalars()
+    grouped: dict[str, list[TournamentEntrant]] = {}
+    for e in rows:
+        grouped.setdefault(e.tournament_id, []).append(e)
+    return grouped
+
+
+async def player_record(db: AsyncSession, did: str) -> dict:
+    """Everything one player has done across every tournament they entered.
+
+    Derived, not stored. Furthest round is read from the matches they actually
+    appear in rather than the `eliminated_round` column, which nothing writes;
+    a title is the tournament naming them champion. Single elimination means a
+    player loses at most one series, so series_lost is 0 or 1, but it is counted
+    rather than assumed so the shape survives a future format change.
+    """
+    entrants = (
+        await db.execute(
+            select(TournamentEntrant).where(TournamentEntrant.did == did)
+        )
+    ).scalars().all()
+    if not entrants:
+        return {"entries": [], "played": 0, "titles": 0}
+
+    tids = [e.tournament_id for e in entrants]
+    tourneys = {
+        t.id: t
+        for t in (
+            await db.execute(select(Tournament).where(Tournament.id.in_(tids)))
+        ).scalars()
+    }
+    matches = (
+        await db.execute(
+            select(TournamentMatch).where(
+                TournamentMatch.tournament_id.in_(tids),
+                or_(
+                    TournamentMatch.player1_did == did,
+                    TournamentMatch.player2_did == did,
+                ),
+            )
+        )
+    ).scalars().all()
+    by_t: dict[str, list[TournamentMatch]] = {}
+    for m in matches:
+        by_t.setdefault(m.tournament_id, []).append(m)
+
+    entries = []
+    titles = 0
+    for e in entrants:
+        t = tourneys.get(e.tournament_id)
+        if t is None:
+            continue
+        ms = by_t.get(e.tournament_id, [])
+        furthest = max((m.round for m in ms), default=0)
+        is_champ = t.champion_did == did
+        if is_champ:
+            titles += 1
+        entries.append(
+            {
+                "tournament": t,
+                "rounds": t.rounds,
+                "furthest_round": furthest,
+                "is_champion": is_champ,
+                "series_won": sum(1 for m in ms if m.winner_did == did),
+                "series_lost": sum(
+                    1 for m in ms if m.winner_did and m.winner_did != did
+                ),
+            }
+        )
+    entries.sort(key=lambda x: x["tournament"].created_at, reverse=True)
+    return {"entries": entries, "played": len(entries), "titles": titles}

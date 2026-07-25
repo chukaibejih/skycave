@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BlueskyLogo } from "@/components/ui/BlueskyLogo";
 import { Countdown, LocalTime } from "@/components/tournament/Countdown";
+import { TournamentShell } from "@/components/tournament/TournamentShell";
 import { ApiError, enterTournament, getCurrentTournament, type Tournament } from "@/lib/api";
 import { startBlueskyLogin } from "@/lib/bluesky";
 import { gameSlug } from "@/lib/solo";
@@ -82,15 +83,15 @@ export default function TournamentPage() {
 
   if (state === "loading") {
     return (
-      <Shell>
+      <TournamentShell active="now">
         <p className="text-center text-[var(--color-text-secondary)]">Loading the event...</p>
-      </Shell>
+      </TournamentShell>
     );
   }
 
   if (state === "none" || !t) {
     return (
-      <Shell>
+      <TournamentShell active="now">
         <div className="text-center">
           <h1 className="font-[var(--font-display)] text-3xl font-bold">No tournament right now.</h1>
           <p className="mt-3 text-[var(--color-text-secondary)]">
@@ -104,7 +105,7 @@ export default function TournamentPage() {
             Back to the games
           </Link>
         </div>
-      </Shell>
+      </TournamentShell>
     );
   }
 
@@ -112,7 +113,7 @@ export default function TournamentPage() {
   const taken = t.max_players - t.spots_left;
 
   return (
-    <Shell>
+    <TournamentShell active="now">
       {/* ── Hero ───────────────────────────────────────────────────────── */}
       <div className="text-center">
         <span
@@ -281,7 +282,7 @@ export default function TournamentPage() {
       <p className="mt-12 text-center text-xs text-[var(--color-text-secondary)]">
         Play runs Friday to Sunday. Miss your round and it goes to your opponent.
       </p>
-    </Shell>
+    </TournamentShell>
   );
 }
 
@@ -359,20 +360,5 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       </div>
       <div className="mt-0.5 text-sm font-semibold">{children}</div>
     </div>
-  );
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto min-h-[100dvh] w-full max-w-lg px-5 pb-16 pt-8">
-      <Link
-        href="/"
-        className="mb-6 inline-flex h-10 items-center rounded-full border px-4 text-sm text-[var(--color-text-secondary)]"
-        style={{ borderColor: "var(--color-border)" }}
-      >
-        hub
-      </Link>
-      {children}
-    </main>
   );
 }

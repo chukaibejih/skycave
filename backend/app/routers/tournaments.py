@@ -147,6 +147,123 @@ async def current(
     return await _serialise(db, t, identity.id if identity else None)
 
 
+class TournamentCardOut(BaseModel):
+    """A tournament as it appears in the Past weeks list: enough to show a row,
+    not the whole bracket."""
+
+    id: str
+    name: str
+    status: str
+    entrants: int
+    champion: PlayerOut | None = None
+    play_closes_at: datetime
+    created_at: datetime
+
+
+@router.get("/history", response_model=list[TournamentCardOut])
+async def history(db: AsyncSession = Depends(get_db)) -> list[TournamentCardOut]:
+    """Recent tournaments, newest first. Public: the Past weeks list.
+
+    Defined before /{tournament_id} so the literal path wins over the dynamic
+    one. Every entrant for the whole page is fetched in a single query rather
+    than one per card.
+    """
+    ts = await svc.list_tournaments(db, limit=24)
+    by_t = await svc.entrants_for(db, [t.id for t in ts])
+    cards = []
+    for t in ts:
+        elist = by_t.get(t.id, [])
+        champ = next((e for e in elist if e.did == t.champion_did), None)
+        cards.append(
+            TournamentCardOut(
+                id=t.id,
+                name=t.name,
+                status=t.status,
+                entrants=len(elist),
+                champion=(
+                    PlayerOut(
+                        did=champ.did,
+                        handle=champ.handle,
+                        display_name=champ.display_name,
+                        avatar_url=champ.avatar_url,
+                    )
+                    if champ
+                    else None
+                ),
+                play_closes_at=t.play_closes_at,
+                created_at=t.created_at,
+            )
+        )
+    return cards
+
+
+class RecordEntryOut(BaseModel):
+    tournament_id: str
+    name: str
+    status: str
+    stage: str  # "Champion", "Runner-up", "Semi-finals", "Round 1"...
+    is_champion: bool
+    series_won: int
+    series_lost: int
+    played_at: datetime
+
+
+class RecordOut(BaseModel):
+    you: PlayerOut | None = None
+    played: int = 0
+    titles: int = 0
+    entries: list[RecordEntryOut] = []
+
+
+def _stage(furthest: int, rounds: int, is_champion: bool) -> str:
+    """How far a player got, named the way people say it.
+
+    Reaching the final without winning it is "Runner-up", which is a real
+    achievement and worth naming as one rather than "lost in the final".
+    """
+    if is_champion:
+        return "Champion"
+    if furthest <= 0 or rounds <= 0:
+        return "Entered"
+    if furthest == rounds:
+        return "Runner-up"
+    return _round_name(furthest, rounds)
+
+
+@router.get("/me/record", response_model=RecordOut)
+async def my_record(
+    identity: CurrentIdentity, db: AsyncSession = Depends(get_db)
+) -> RecordOut:
+    """The signed-in player's tournament history. Guests have none."""
+    if identity.id.startswith("guest:"):
+        return RecordOut()
+    data = await svc.player_record(db, identity.id)
+    entries = [
+        RecordEntryOut(
+            tournament_id=e["tournament"].id,
+            name=e["tournament"].name,
+            status=e["tournament"].status,
+            stage=_stage(e["furthest_round"], e["rounds"], e["is_champion"]),
+            is_champion=e["is_champion"],
+            series_won=e["series_won"],
+            series_lost=e["series_lost"],
+            played_at=e["tournament"].created_at,
+        )
+        for e in data["entries"]
+    ]
+    return RecordOut(
+        you=PlayerOut(
+            did=identity.id,
+            handle=identity.handle,
+            display_name=identity.display_name,
+            avatar_url=identity.avatar_url,
+        ),
+        played=data["played"],
+        titles=data["titles"],
+        entries=entries,
+    )
+
+
 @router.get("/{tournament_id}", response_model=TournamentOut)
 async def get_one(
     tournament_id: str,

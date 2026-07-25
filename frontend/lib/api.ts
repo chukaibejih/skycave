@@ -364,3 +364,39 @@ export const checkInToMatch = (id: string) =>
  */
 export const startMatchGame = (id: string) =>
   request<MyMatch>(`/tournaments/${id}/start`, { method: "POST" });
+
+// ── The tournament world: history + your record ──
+export interface TournamentCard {
+  id: string;
+  name: string;
+  status: string;
+  entrants: number;
+  champion: TournamentPlayer | null;
+  play_closes_at: string;
+  created_at: string;
+}
+
+/** Recent tournaments, newest first. Public. */
+export const getTournamentHistory = () =>
+  request<TournamentCard[]>("/tournaments/history");
+
+export interface RecordEntry {
+  tournament_id: string;
+  name: string;
+  status: string;
+  stage: string; // "Champion" | "Runner-up" | "Semi-finals" | "Round 1" ...
+  is_champion: boolean;
+  series_won: number;
+  series_lost: number;
+  played_at: string;
+}
+
+export interface PlayerRecord {
+  you: TournamentPlayer | null;
+  played: number;
+  titles: number;
+  entries: RecordEntry[];
+}
+
+/** The signed-in player's tournament history. Guests get an empty record. */
+export const getMyRecord = () => request<PlayerRecord>("/tournaments/me/record");

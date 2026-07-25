@@ -7,6 +7,8 @@ import { GameCard } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
+import { WorldSwitch } from "@/components/nav/WorldSwitch";
+import { HubTournamentStrip } from "@/components/tournament/HubTournamentStrip";
 import { createRoom, listGames } from "@/lib/api";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -105,6 +107,16 @@ export default function Home() {
           </button>
         )}
       </header>
+
+      {/* The spine between the two worlds, plus the tournament's one licence to
+          appear on the hub: a strip that shows only in the closing hours or when
+          the viewer's own match is waiting. */}
+      <div className="flex justify-center pb-1">
+        <WorldSwitch active="hub" />
+      </div>
+      <div className="mt-3">
+        <HubTournamentStrip />
+      </div>
 
       <section className="py-6 lg:py-10">
         <motion.div
