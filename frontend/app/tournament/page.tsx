@@ -501,6 +501,7 @@ const TAGLINES: Record<string, string> = {
   word_hunt: "Trace words in the grid. Longest hunt wins.",
   color_clash: "Tap the ink colour, not the word.",
   word_duel: "Same six letters. Longest real word wins.",
+  mancala: "Sow the seeds. Bank the most to win.",
   clay: "Shape the pot to match the target.",
   dots_boxes: "Close a box, go again. Most boxes wins.",
   uno: "Match colour or number. Empty your hand.",

@@ -30,7 +30,7 @@ GAME_POOL = (
     "connect4",
     "word_hunt",
     "color_clash",
-    "word_duel",
+    "mancala",
     "clay",
     "dots_boxes",
     "uno",
