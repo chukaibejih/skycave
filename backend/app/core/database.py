@@ -65,3 +65,9 @@ async def init_db() -> None:
                 "ADD COLUMN IF NOT EXISTS rooms JSON"
             )
         )
+        await conn.execute(
+            text(
+                "ALTER TABLE tournaments "
+                "ADD COLUMN IF NOT EXISTS countdown_from TIMESTAMPTZ"
+            )
+        )

@@ -9,7 +9,7 @@ bracket when the deadline passes. There is no scheduler.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -58,6 +58,7 @@ class TournamentOut(BaseModel):
     entrants: int
     spots_left: int
     registration_closes_at: datetime
+    countdown_from: datetime | None = None
     play_opens_at: datetime
     play_closes_at: datetime
     bracket_size: int
@@ -117,6 +118,7 @@ async def _serialise(
         entrants=len(people),
         spots_left=max(0, t.max_players - len(people)),
         registration_closes_at=t.registration_closes_at,
+        countdown_from=t.countdown_from,
         play_opens_at=t.play_opens_at,
         play_closes_at=t.play_closes_at,
         bracket_size=t.bracket_size,
@@ -589,6 +591,10 @@ async def start(
 class CreateTournament(BaseModel):
     name: str = "Skycave Weekend Tournament"
     max_players: int = 8
+    # Launch flag: start the visible countdown from now instead of the default
+    # Wednesday gate. Use for the very first event, opened mid-week, so it counts
+    # down from the moment it goes live. Leave false for normal weeks.
+    countdown_from_now: bool = False
 
 
 @router.post("", response_model=TournamentOut)
@@ -612,6 +618,7 @@ async def create(
             registration_closes_at=closes,
             play_opens_at=opens,
             play_closes_at=play_closes,
+            countdown_from=datetime.now(timezone.utc) if body.countdown_from_now else None,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

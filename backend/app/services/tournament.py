@@ -826,6 +826,7 @@ async def create(
     registration_closes_at: datetime,
     play_opens_at: datetime,
     play_closes_at: datetime,
+    countdown_from: datetime | None = None,
 ) -> Tournament:
     if max_players > eng.MAX_FIELD:
         raise ValueError(f"cap {max_players} exceeds the {eng.MAX_FIELD} fairness ceiling")
@@ -836,6 +837,7 @@ async def create(
         registration_closes_at=registration_closes_at,
         play_opens_at=play_opens_at,
         play_closes_at=play_closes_at,
+        countdown_from=countdown_from,
     )
     db.add(t)
     await db.commit()

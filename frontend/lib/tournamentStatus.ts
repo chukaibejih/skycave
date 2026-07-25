@@ -63,7 +63,9 @@ export function statusMeta(t: Tournament): StatusMeta {
       cta: "Enter",
       countdownTo: t.registration_closes_at,
       countdownCaption: "Entries close in",
-      countdownFrom: clockStart(t.registration_closes_at),
+      // A launch event carries its own start (tick from go-live); a normal
+      // week falls back to the Wednesday-before-close gate.
+      countdownFrom: t.countdown_from ?? clockStart(t.registration_closes_at),
     };
   }
   if (t.status === "finished") {

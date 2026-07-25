@@ -69,6 +69,13 @@ class Tournament(Base):
     round_deadlines: Mapped[list] = mapped_column(JSON, default=list)
 
     champion_did: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # When the live ticking countdown should start showing, or NULL to use the
+    # default gate (the Wednesday before close, so a normal week is calm early
+    # and only ticks in the final stretch). A launch event opened mid-week sets
+    # this to its creation time so it counts down from the moment it goes live.
+    countdown_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

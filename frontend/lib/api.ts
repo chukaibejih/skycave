@@ -270,6 +270,7 @@ export interface Tournament {
   entrants: number;
   spots_left: number;
   registration_closes_at: string;
+  countdown_from: string | null;
   play_opens_at: string;
   play_closes_at: string;
   bracket_size: number;
