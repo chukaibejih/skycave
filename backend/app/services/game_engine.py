@@ -22,6 +22,7 @@ from typing import Any
 
 from app.games.base import RACE, TURN_BASED
 from app.games.registry import get_game
+from app.models.game_session import SINGLE_PLAYER_MODES
 from app.services import room_manager as rooms
 from app.websocket import events
 from app.websocket.manager import manager
@@ -88,7 +89,7 @@ async def start_game(room_id: str) -> None:
         if room["status"] == "in_progress":
             return  # already running (guard against duplicate READY)
 
-        is_solo = room.get("mode") in ("solo", "daily")  # both are single-player
+        is_solo = room.get("mode") in SINGLE_PLAYER_MODES  # solo + daily are single-player
         solo_kind = game.solo_kind if is_solo else "rounds"
         scores = {p["id"]: 0 for p in room["players"]}
         game_state = {
@@ -230,7 +231,7 @@ async def handle_action(
         # Single-player continuous sessions have their own driver. It returns
         # True when the run is over (a ladder miss) - we end *outside* the lock
         # because end_game re-acquires it (asyncio locks aren't reentrant).
-        if room.get("mode") in ("solo", "daily") and gs.get("solo_kind") in (
+        if room.get("mode") in SINGLE_PLAYER_MODES and gs.get("solo_kind") in (
             "timed",
             "words",
             "ladder",
@@ -390,9 +391,12 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
         # apply_turn already rejects further moves once there's a winner/full board.
         _schedule(room_id, _TURN_END_HOLD, lambda: end_game(room_id))
         return False
-    # Solo: the AI replies after a short beat so the player sees their move land.
+    # Solo: the AI replies after a beat so the player's move fully plays out and
+    # settles first. The client also queues board updates, so even a long sow is
+    # never cut off; this delay just spaces the Caver's reply so it reads as a
+    # separate, deliberate turn rather than landing on top of yours.
     if gs.get("turn_ai") and new["turn"] == gs["turn_ai"]:
-        _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
+        _schedule(room_id, 1.1, lambda: _turn_ai_move(room_id))
     return False
 
 
@@ -721,7 +725,7 @@ async def end_game(room_id: str) -> None:
         if _tb_game and _tb_game.mode == TURN_BASED and gs.get("turn_state"):
             gs["scores"] = _tb_game.turn_scores(gs["turn_state"])
         scores = gs["scores"]
-        is_solo = room.get("mode") in ("solo", "daily")
+        is_solo = room.get("mode") in SINGLE_PLAYER_MODES
         room["status"] = "finished"
         gs["phase"] = "finished"
         # Clear ready flags so a rematch starts clean.
@@ -757,10 +761,48 @@ async def end_game(room_id: str) -> None:
     # Every finished game is persisted as a GameSession so the back office counts
     # all play. Solo also updates the player's personal best (via _persist_solo
     # above) for the solo leaderboard; that's separate from history/stats here.
+    # A tournament leg is an ordinary versus room in every way that matters to
+    # gameplay, so it is only the recorded mode that marks it as tournament play.
+    fixture = room.get("tournament")
+    persist_mode = "tournament" if fixture else room.get("mode", "versus")
     try:
-        await _persist_game(room, winner_id, "solo" if is_solo else "versus")
+        await _persist_game(room, winner_id, persist_mode)
     except Exception:  # noqa: BLE001 - persistence must never break the game
         logger.exception("failed to persist game session for room %s", room_id)
+
+    if fixture:
+        try:
+            await _record_tournament_leg(room, fixture, winner_id, scores)
+        except Exception:  # noqa: BLE001 - the bracket must not break the game
+            logger.exception("failed to record tournament leg for room %s", room_id)
+
+
+async def _record_tournament_leg(
+    room: dict[str, Any],
+    fixture: dict[str, Any],
+    winner_id: str | None,
+    scores: dict[str, int],
+) -> None:
+    """Push a finished tournament leg into its bracket slot.
+
+    Deliberately after the broadcast and after _persist_game: the players have
+    already seen their result, so nothing here can delay or block it. If this
+    fails the game still counted, and the next read of the fixture simply has
+    not caught up yet.
+    """
+    from app.core.database import AsyncSessionLocal
+    from app.services import tournament as tsvc
+
+    async with AsyncSessionLocal() as db:
+        await tsvc.record_result(
+            db,
+            fixture["id"],
+            int(fixture["round"]),
+            int(fixture["slot"]),
+            room_id=room["id"],
+            winner_did=winner_id,
+            scores=scores,
+        )
 
 
 def _decide_winner(scores: dict[str, int]) -> str | None:

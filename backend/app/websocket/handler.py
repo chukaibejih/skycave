@@ -16,6 +16,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.core.deps import identity_from_token
 from app.services import game_engine, room_expiry, room_manager as rooms
 from app.websocket import events
+from app.models.game_session import SINGLE_PLAYER_MODES
 from app.websocket.manager import manager
 
 logger = logging.getLogger("skycave.ws")
@@ -33,6 +34,11 @@ def _public_room(room: dict, player_id: str) -> dict:
         "players": room["players"],
         "expires_at": room.get("expires_at"),
         "series": room.get("series", {}),
+        # Which fixture this room belongs to, if any. The room page hydrates
+        # from this snapshot rather than REST, so without it the end-of-game
+        # screen has no idea it just played a tournament leg and offers a
+        # rematch that counts for nothing.
+        "tournament": room.get("tournament"),
         "game": None,
     }
     game = room.get("game")
@@ -164,7 +170,7 @@ async def _handle_ready(room_id: str, player_id: str) -> None:
     ))
     # Solo starts with the lone player; versus waits for both. Either way, every
     # present player must be ready and the room must still be waiting.
-    min_players = 1 if room.get("mode") == "solo" else 2
+    min_players = 1 if room.get("mode") in SINGLE_PLAYER_MODES else 2
     if (
         len(room["players"]) >= min_players
         and all(p["ready"] for p in room["players"])

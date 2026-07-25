@@ -19,6 +19,7 @@ from app.core.deps import AdminAuth
 from app.core.redis_client import get_redis
 from app.core.security import create_admin_token
 from app.models import Feedback, GameSession, Room, User
+from app.models.game_session import HEAD_TO_HEAD_MODES, SINGLE_PLAYER_MODES
 from app.schemas.rest import (
     AdminFeedbackResponse,
     AdminFeedbackRow,
@@ -164,7 +165,7 @@ async def timeseries(
     games: dict[str, dict[str, int]] = {}
     for d, mode, c in game_rows:
         bucket = games.setdefault(d.isoformat(), {"versus": 0, "solo": 0})
-        bucket["solo" if mode == "solo" else "versus"] += int(c)
+        bucket["solo" if mode in SINGLE_PLAYER_MODES else "versus"] += int(c)
     users = {d.isoformat(): int(c) for d, c in user_rows}
     feedback = {d.isoformat(): int(c) for d, c in fb_rows}
 
@@ -202,7 +203,9 @@ async def insights(_: AdminAuth, db: AsyncSession = Depends(get_db)) -> AdminIns
     # Only versus rooms arm an expiry timer, so status == "expired" always means a
     # 1v1 room whose invite found no opponent. A finished 1v1 game is a versus
     # GameSession.
-    filled = await db.scalar(select(func.count()).where(GameSession.mode == "versus")) or 0
+    filled = await db.scalar(
+        select(func.count()).where(GameSession.mode.in_(HEAD_TO_HEAD_MODES))
+    ) or 0
     expired = await db.scalar(select(func.count()).select_from(Room).where(Room.status == "expired")) or 0
 
     # --- Feedback by page ---

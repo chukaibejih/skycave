@@ -7,6 +7,7 @@ import { GameCard } from "@/components/ui/GameCard";
 import { SignalFlow } from "@/components/hub/SignalFlow";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
+import { TournamentBanner } from "@/components/tournament/TournamentBanner";
 import { createRoom, listGames } from "@/lib/api";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -183,6 +184,12 @@ export default function Home() {
           </div>
           <SignalFlow games={games} onPlay={launch} />
         </motion.div>
+      </section>
+
+      {/* Match day. The one warm thing on the page, and the only way into the
+          tournament world now the toggle is gone. */}
+      <section className="pb-2">
+        <TournamentBanner />
       </section>
 
       {/* The Cave is hidden from the hub for now. The component and its /cave

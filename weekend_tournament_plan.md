@@ -121,3 +121,83 @@ Double elimination or a consolation bracket (knocked-out players go to the weeke
 ## Honest risk
 
 A tournament is a **retention** mechanic - it gives people who already return a reason to return harder. It will not bring new people in by itself, and with 11 members who have played on two or more days, the first few will be small. That is survivable if the framing matches the size ("the first one," not "the championship"), but the underlying constraint is audience, and this plan does not solve that.
+
+---
+
+## Phase 7: the Tournament world (navigation)
+
+> Added 2026-07-25, after phases 0-6 shipped and a full 4-player run through the
+> tunnel. Agreed with the user in conversation; not yet built. Waiting on one
+> more end-to-end test and the merge to main.
+
+**The reframe that set the shape.** The first instinct was a stateful entry
+pill on the hub - a live doorway that morphs with the event and disappears when
+nothing is on. The user pushed back, and correctly: the tournament is not a
+pop-in that only exists during a live event, it is **a world of its own, like
+the hub**. There is a reason to go there with no live tournament running - past
+weeks, the rulebook, your own record, the countdown to the next one. A pill
+undersells that; a doorway between two standing worlds is the right model.
+
+### The two worlds
+
+- **Hub** stays the front door. It is the first page everyone lands on, and it
+  keeps the name **Hub** (decided - not "Play" or "Games").
+- **Tournament** is the second world, reachable from the hub and standing on its
+  own between events.
+
+A single **switch spine** sits in the same place in both worlds - `Hub |
+Tournament` - and only flips which side is lit. It reads as one piece of
+navigation, not two separate navbars. It behaves as navigation between
+destinations, not a view-toggle on one page.
+
+**The switch carries one live signal.** When a tournament is live *and you are
+in it with a match waiting*, the Tournament side wears a small cyan pip. That
+folds the one urgent thing a plain label cannot say back into the toggle, so the
+world-parity model still shouts "your match is waiting" when it needs to.
+
+### The Tournament world's own home
+
+`/tournament` is already essentially the live-event hero (countdown,
+registration, your match). That stays the hero. Around it, the world gets its
+own sub-navigation:
+
+- **This weekend** - the live event. Hero when something is on; the countdown to
+  the next one when nothing is. This is the existing page.
+- **Past weeks** - finished brackets and champions. The data is already kept
+  (`current()` falls back to the most recent finished tournament), so this is a
+  list view + the existing read-only bracket, not new persistence.
+- **Rulebook** - best-of-3, byes, deadlines, alternating host, check-in,
+  replay-on-draw. Static content. It also pre-answers the questions the
+  announcement posts will generate.
+- **Your record** - the signed-in player's tournament history: entries, furthest
+  round reached, titles won. New aggregation across tournaments, but a cheap
+  query over `tournament_entrants` + `tournament_matches`.
+
+### The hub stays clean
+
+No tournament chrome on the hub all week - deliberately. The one exception: a
+slim, non-invasive countdown strip appears **only inside the final day** before
+registration closes (`Weekend tournament closes in 8h -> Enter`). It is the
+bridge that pulls hub-only players across exactly when it matters, and it is
+silent the other six days. Threshold configurable; default 24h.
+
+### What exists vs what is new
+
+- *Exists*: the live event page, the read-only bracket, the champion moment, the
+  finished-tournament fallback in `current()`.
+- *New*: the switch spine (both worlds); the Tournament home shell + sub-nav;
+  Past weeks list; Rulebook (static); Your record (one new aggregate endpoint);
+  the hub's last-day countdown strip.
+
+### Open question, deferred
+
+Whether the switch lives in the header (tight on mobile next to logo + avatar)
+or as its own row just under it. Decide against the real header at build time.
+
+### Sequencing
+
+This is retention surface, not launch-blocking. It ships **after** the outbox
+go-live (Phase 0c) and the next end-to-end test. The switch spine + Hub
+countdown are small; the four-tab world is the real work and is roughly its own
+phase. Build order: switch spine + This weekend + Past weeks first (the
+navigable core), then Rulebook and Your record.

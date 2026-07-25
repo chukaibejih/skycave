@@ -161,22 +161,31 @@ export default function ResultsPage() {
   const winner = room.players.find((p) => p.id === winnerId);
   const iAmPlayer = !!meId && room.players.some((p) => p.id === meId);
 
+  // A tournament leg is already counted the moment it ends, so "rematch" would
+  // be a game that means nothing. The only move from here is back to the series.
+  const fixture = room.tournament ?? null;
+
   // Headline reads from the viewer's perspective when they played, else names
   // the winner. The trailing period is intentional - it gives it finality.
+  // A tournament leg never offers to run it back: the score is already in the
+  // bracket, and the next thing that happens is the next game of the series.
+  const tail = fixture
+    ? "It is already in the bracket."
+    : "Run it back, or save the image for sharing.";
   let headline: string;
   let subtext: string;
   if (!winnerId) {
     headline = "Dead heat.";
-    subtext = "The scores are level. Run it back, or save the image for sharing.";
+    subtext = fixture
+      ? "The scores are level, so this one gets replayed."
+      : `The scores are level. ${tail}`;
   } else if (iAmPlayer) {
     const won = winnerId === meId;
     headline = won ? "You win." : "You lost.";
-    subtext = won
-      ? "Nice one. Run it back, or save the image for sharing."
-      : "So close. Run it back, or save the image for sharing.";
+    subtext = won ? `Nice one. ${tail}` : `So close. ${tail}`;
   } else {
     headline = `${winner?.display_name} wins.`;
-    subtext = "Run it back, or save the image for sharing.";
+    subtext = tail;
   }
 
   const rematch = async () => {
@@ -193,6 +202,17 @@ export default function ResultsPage() {
   return (
     <main className="mx-auto grid min-h-[100dvh] w-full max-w-6xl items-center gap-8 px-5 py-10 lg:grid-cols-[0.9fr_1.1fr]">
       <section>
+        {fixture && (
+          <span
+            className="mb-4 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em]"
+            style={{
+              borderColor: "color-mix(in srgb, var(--color-cyan) 45%, transparent)",
+              color: "var(--color-cyan)",
+            }}
+          >
+            Tournament · game {fixture.game_index + 1} of 3
+          </span>
+        )}
         <h1 className="font-[var(--font-display)] text-5xl font-bold leading-none text-[#F0F0FF] sm:text-6xl">
           {headline}
         </h1>
@@ -221,22 +241,32 @@ export default function ResultsPage() {
             Download score card
           </button>
 
-          <div className="flex items-center justify-center gap-4 pt-1">
+          {fixture ? (
             <button
-              onClick={rematch}
-              style={{ borderColor: "#2A2A3A", color: "#F0F0FF" }}
-              className="flex h-12 items-center justify-center rounded-[12px] border px-6 font-[var(--font-body)] text-base transition-colors"
+              onClick={() => router.push(`/tournament/${fixture.id}/match`)}
+              style={{ background: "var(--color-cyan)", color: "#05060a" }}
+              className="flex h-[52px] w-full items-center justify-center rounded-[12px] font-[var(--font-body)] text-base font-bold"
             >
-              Rematch
+              Back to your series
             </button>
-            <button
-              onClick={() => router.push("/")}
-              style={{ color: "#8888AA" }}
-              className="flex h-12 items-center justify-center px-3 font-[var(--font-body)] text-sm transition-colors"
-            >
-              new game
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center gap-4 pt-1">
+              <button
+                onClick={rematch}
+                style={{ borderColor: "#2A2A3A", color: "#F0F0FF" }}
+                className="flex h-12 items-center justify-center rounded-[12px] border px-6 font-[var(--font-body)] text-base transition-colors"
+              >
+                Rematch
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                style={{ color: "#8888AA" }}
+                className="flex h-12 items-center justify-center px-3 font-[var(--font-body)] text-sm transition-colors"
+              >
+                new game
+              </button>
+            </div>
+          )}
         </div>
         <GuestNudge show={isGuest} />
       </section>

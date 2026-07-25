@@ -239,3 +239,165 @@ export const getScorecard = (roomId: string) =>
   );
 
 export { API };
+
+// ── Weekend tournament ──
+export interface TournamentPlayer {
+  did: string;
+  handle: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+export interface TournamentMatch {
+  round: number;
+  slot: number;
+  status: string;
+  player1: TournamentPlayer | null;
+  player2: TournamentPlayer | null;
+  games: string[];
+  game_names: string[];
+  results: Record<string, unknown>[];
+  winner_did: string | null;
+  deadline: string | null;
+  checked_in: string[];
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  status: string; // registering | locked | in_progress | finished
+  max_players: number;
+  entrants: number;
+  spots_left: number;
+  registration_closes_at: string;
+  countdown_from: string | null;
+  play_opens_at: string;
+  play_closes_at: string;
+  bracket_size: number;
+  rounds: number;
+  round_deadlines: { round: number; deadline: string }[];
+  champion: TournamentPlayer | null;
+  game_pool: string[];
+  game_pool_names: string[];
+  you: TournamentPlayer | null;
+  you_registered: boolean;
+  players: TournamentPlayer[];
+  matches: TournamentMatch[];
+}
+
+/** The live event, or null when none is running. Public: no auth needed. */
+export const getCurrentTournament = () =>
+  request<Tournament | null>("/tournaments/current");
+
+export const getTournament = (id: string) =>
+  request<Tournament>(`/tournaments/${id}`);
+
+/** Take a seat. Needs a Bluesky identity; the server refuses guests. */
+export const enterTournament = (id: string) =>
+  request<Tournament>(`/tournaments/${id}/register`, { method: "POST" });
+
+/** One game already played in a series, told from the viewer's side. */
+export interface MatchLeg {
+  game_type: string;
+  game_name: string;
+  winner_did: string | null;
+  you_won: boolean;
+  drawn: boolean;
+  replay: boolean;
+  your_score: number;
+  their_score: number;
+  room_id: string | null;
+}
+
+/** One fixture the viewer has already settled, for showing their climb. */
+export interface RunStep {
+  round: number;
+  round_name: string;
+  opponent: TournamentPlayer | null;
+  your_wins: number;
+  their_wins: number;
+  bye: boolean;
+  won: boolean;
+}
+
+export interface MyMatch {
+  tournament_id: string;
+  tournament_name: string;
+  tournament_status: string;
+  round: number;
+  slot: number;
+  round_name: string;
+  status: string; // pending | ready | live | done | bye
+  you: TournamentPlayer;
+  opponent: TournamentPlayer | null;
+  games: string[];
+  game_names: string[];
+  current_game: string | null;
+  current_game_name: string | null;
+  game_number: number;
+  legs: MatchLeg[];
+  your_wins: number;
+  their_wins: number;
+  you_checked_in: boolean;
+  opponent_checked_in: boolean;
+  you_host: boolean;
+  room_id: string | null;
+  is_bye: boolean;
+  eliminated: boolean;
+  won_match: boolean;
+  is_champion: boolean;
+  deadline: string | null;
+  run: RunStep[];
+  prompt: string;
+}
+
+/** The viewer's own fixture. Null when they are not in this tournament. */
+export const getMyMatch = (id: string) =>
+  request<MyMatch | null>(`/tournaments/${id}/my-match`);
+
+/** Say you are here. The room opens by itself once both of you have. */
+export const checkInToMatch = (id: string) =>
+  request<MyMatch>(`/tournaments/${id}/check-in`, { method: "POST" });
+
+/**
+ * Open the room for the game in play, or hand back the one already open.
+ * The same call for game one and the decider, and safe to press twice.
+ */
+export const startMatchGame = (id: string) =>
+  request<MyMatch>(`/tournaments/${id}/start`, { method: "POST" });
+
+// ── The tournament world: history + your record ──
+export interface TournamentCard {
+  id: string;
+  name: string;
+  status: string;
+  entrants: number;
+  champion: TournamentPlayer | null;
+  play_closes_at: string;
+  created_at: string;
+}
+
+/** Recent tournaments, newest first. Public. */
+export const getTournamentHistory = () =>
+  request<TournamentCard[]>("/tournaments/history");
+
+export interface RecordEntry {
+  tournament_id: string;
+  name: string;
+  status: string;
+  stage: string; // "Champion" | "Runner-up" | "Semi-finals" | "Round 1" ...
+  is_champion: boolean;
+  series_won: number;
+  series_lost: number;
+  played_at: string;
+}
+
+export interface PlayerRecord {
+  you: TournamentPlayer | null;
+  played: number;
+  titles: number;
+  entries: RecordEntry[];
+}
+
+/** The signed-in player's tournament history. Guests get an empty record. */
+export const getMyRecord = () => request<PlayerRecord>("/tournaments/me/record");

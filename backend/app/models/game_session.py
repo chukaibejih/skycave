@@ -5,6 +5,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
+# The mode taxonomy, in one place. Every consumer that buckets games by mode
+# reads these rather than hardcoding strings, so adding a mode (daily,
+# tournament) cannot silently land in the wrong bucket.
+SINGLE_PLAYER_MODES = ("solo", "daily")
+HEAD_TO_HEAD_MODES = ("versus", "tournament")
+
 
 class GameSession(Base):
     """A completed game, persisted for history, stats and score cards.

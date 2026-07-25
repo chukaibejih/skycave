@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.redis_client import close_redis, get_redis
 from app.routers import (
+    internal,
+    tournaments,
     admin,
     auth,
     cave,
@@ -60,6 +62,8 @@ app.include_router(admin.router)
 app.include_router(feedback.router)
 app.include_router(leaderboard.router)
 app.include_router(cave.router)
+app.include_router(tournaments.router)
+app.include_router(internal.router)
 
 
 @app.get("/health", tags=["meta"])

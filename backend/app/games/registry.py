@@ -13,6 +13,7 @@ from app.games.dots_boxes import DotsAndBoxes
 from app.games.flag_rush import FlagRush
 from app.games.geoguesss import GeoGuess
 from app.games.mad_math import MadMath
+from app.games.mancala import Mancala
 from app.games.outline_quiz import OutlineQuiz
 from app.games.reaction_grid import ReactionGrid
 from app.games.tile_takeover import TileTakeover
@@ -36,6 +37,7 @@ _GAMES: dict[str, BaseGame] = {
         DotsAndBoxes(),
         Clay(),
         Uno(),
+        Mancala(),
     )
 }
 

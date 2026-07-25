@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.games.registry import get_game
 from app.models import GameSession, PersonalBest, User
+from app.models.game_session import HEAD_TO_HEAD_MODES, SINGLE_PLAYER_MODES
 from app.schemas.rest import (
     Badge,
     ProfileGame,
@@ -174,7 +175,7 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
     # 1v1 vs solo split. games_played counts every mode; solo has no winner, so a
     # single "win rate" over all games is diluted by practice runs. Report the
     # honest 1v1 record separately.
-    in_versus = (GameSession.mode == "versus") & (
+    in_versus = GameSession.mode.in_(HEAD_TO_HEAD_MODES) & (
         (GameSession.player1_id == did) | (GameSession.player2_id == did)
     )
     versus_played = await db.scalar(select(func.count()).select_from(GameSession).where(in_versus)) or 0
@@ -188,7 +189,7 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
     ) or 0
     solo_played = await db.scalar(
         select(func.count()).select_from(GameSession).where(
-            GameSession.mode == "solo", GameSession.player1_id == did
+            GameSession.mode.in_(SINGLE_PLAYER_MODES), GameSession.player1_id == did
         )
     ) or 0
     versus_win_rate = (versus_won / versus_played) if versus_played else 0.0
@@ -213,7 +214,7 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
         is_p1 = s.player1_id == did
         your_score = (s.player1_score if is_p1 else s.player2_score) or 0
         opp_handle = s.player2_handle if is_p1 else s.player1_handle
-        if s.mode == "solo":
+        if s.mode in SINGLE_PLAYER_MODES:
             result, opponent = "solo", "Caver"
         elif s.winner_id is None:
             result, opponent = "draw", opp_handle
@@ -232,7 +233,7 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
     rival_rows = (
         await db.execute(
             select(GameSession)
-            .where(GameSession.mode == "versus", or_(GameSession.player1_id == did, GameSession.player2_id == did))
+            .where(GameSession.mode.in_(HEAD_TO_HEAD_MODES), or_(GameSession.player1_id == did, GameSession.player2_id == did))
             .order_by(desc(GameSession.created_at))
             .limit(500)
         )
