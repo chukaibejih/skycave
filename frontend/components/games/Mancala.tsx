@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, useAnimate } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
 
 interface Props {
@@ -10,49 +10,130 @@ interface Props {
   onAction: (data: Record<string, unknown>) => void;
 }
 
-const YOU = "#ffd166"; // gold seeds, warm - matches Mancala's hub accent
-const OPP = "#8b7cff"; // violet
+// Seeds are wooden beads, the same for both sides (as on a real board); which
+// side a pit is on tells you whose it is. Pit rims tint by side for clarity.
+const SEED = "#e9c27a";
+const SEED_DARK = "#c99a4e";
+const YOU = "#ffd166"; // your side rim (gold - Mancala's hub accent)
+const OPP = "#8b7cff"; // opponent side rim (violet)
 const STORE_A = 6;
 const STORE_B = 13;
+const HOP_MS = 120; // per-seed travel time
 
-/** The pit indices a player owns, and their store, in sowing order. */
 function sidesFor(order: string[], me: string) {
   const iAm0 = order[0] === me;
   const myPits = iAm0 ? [0, 1, 2, 3, 4, 5] : [7, 8, 9, 10, 11, 12];
-  const oppPits = iAm0 ? [7, 8, 9, 10, 11, 12] : [0, 1, 2, 3, 4, 5];
   return {
     myPits, // bottom row, left -> right in sowing order
     myStore: iAm0 ? STORE_A : STORE_B,
-    // Opponent pits laid out ABOVE mine so a capture-opposite sits directly over
-    // its target (pit i opposite = 12 - i).
-    oppTop: myPits.map((i) => 12 - i),
+    oppTop: myPits.map((i) => 12 - i), // opp pits laid out above their capture-target
     oppStore: iAm0 ? STORE_B : STORE_A,
+    iAm0,
   };
 }
 
+// Deterministic scatter so a pit's beads don't jump around on every render.
+const SCATTER = [
+  [50, 50], [32, 38], [68, 40], [40, 66], [63, 64], [50, 28],
+  [28, 58], [72, 60], [38, 46], [62, 46], [50, 72], [30, 72],
+  [70, 72], [22, 44], [78, 46], [50, 40],
+];
+
+/** Sow path: the pits that receive a seed, in order, from `fromPit`. */
+function sowPath(fromPit: number, seeds: number, oppStore: number): number[] {
+  const path: number[] = [];
+  let i = fromPit;
+  while (seeds > 0) {
+    i = (i + 1) % 14;
+    if (i === oppStore) continue;
+    path.push(i);
+    seeds -= 1;
+  }
+  return path;
+}
+
 export function Mancala({ board, meId, players = [], onAction }: Props) {
-  // Pulse pits whose seed count changed, and bump a store when it gains.
-  const prev = useRef<number[] | null>(null);
-  const [changed, setChanged] = useState<Set<number>>(() => new Set());
-  const [gen, setGen] = useState(0);
-
-  useEffect(() => {
-    if (!board?.pits) return;
-    const p = prev.current;
-    if (p && p.length === board.pits.length) {
-      const s = new Set<number>();
-      for (let i = 0; i < board.pits.length; i++) if (p[i] !== board.pits[i]) s.add(i);
-      if (s.size) {
-        setChanged(s);
-        setGen((g) => g + 1);
-      }
-    }
-    prev.current = board.pits.slice();
-  }, [board]);
-
   const order = board?.order ?? [];
   const me = meId && order.includes(meId) ? meId : order[0] ?? "";
   const sides = useMemo(() => sidesFor(order, me), [order, me]);
+
+  // What is drawn. Diverges from the server board only while a sow plays out,
+  // then reconciles exactly.
+  const [display, setDisplay] = useState<number[]>(board?.pits ?? Array(14).fill(0));
+  const [animating, setAnimating] = useState(false);
+  const prevPits = useRef<number[] | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const pitRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [flyer, animate] = useAnimate();
+  const [flyOn, setFlyOn] = useState(false);
+
+  const center = (i: number) => {
+    const el = pitRefs.current[i];
+    const b = boardRef.current;
+    if (!el || !b) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    const bb = b.getBoundingClientRect();
+    return { x: r.left - bb.left + r.width / 2, y: r.top - bb.top + r.height / 2 };
+  };
+
+  useEffect(() => {
+    if (!board?.pits) return;
+    const target = board.pits;
+    const prev = prevPits.current;
+    prevPits.current = target.slice();
+
+    // First paint, or a state we can't replay (no last_pit): just show it.
+    if (!prev || board.last_pit == null || prev.length !== 14) {
+      setDisplay(target.slice());
+      return;
+    }
+
+    const from = board.last_pit;
+    const seeds = prev[from];
+    if (seeds <= 0) {
+      setDisplay(target.slice());
+      return;
+    }
+    // Who moved owns `from`; skip THEIR opponent's store when sowing.
+    const moverIsO = from >= 0 && from <= 5;
+    const skipStore = moverIsO ? STORE_B : STORE_A;
+    const path = sowPath(from, seeds, skipStore);
+
+    let cancelled = false;
+    (async () => {
+      setAnimating(true);
+      // Lift the seeds out of the source pit.
+      const work = prev.slice();
+      work[from] = 0;
+      setDisplay(work.slice());
+
+      // Park the flyer on the source pit, reveal it.
+      const start = center(from);
+      await animate(flyer.current, { x: start.x, y: start.y, opacity: 0, scale: 0.6 }, { duration: 0 });
+      setFlyOn(true);
+      await animate(flyer.current, { opacity: 1, scale: 1 }, { duration: 0.09 });
+
+      // Hop into each pit along the path, dropping one seed as it lands.
+      for (const pit of path) {
+        if (cancelled) return;
+        const c = center(pit);
+        await animate(flyer.current, { x: c.x, y: c.y }, { duration: HOP_MS / 1000, ease: "easeInOut" });
+        work[pit] += 1;
+        setDisplay(work.slice());
+      }
+      setFlyOn(false);
+      // Reconcile to the server's exact board (covers captures + the end sweep).
+      if (!cancelled) {
+        setDisplay(target.slice());
+        setAnimating(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board]);
 
   if (!board || !board.pits) {
     return (
@@ -62,18 +143,16 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
     );
   }
 
-  const pits = board.pits;
   const opp = order.find((id) => id !== me) ?? order[1];
   const oppName = opp === "ai" ? "Caver" : players.find((p) => p.id === opp)?.display_name ?? "opponent";
-  const myTurn = board.turn === me;
+  const myTurn = board.turn === me && !animating;
   const over = !!board.done;
   const captured = new Set(board.captured ?? []);
-
-  const myScore = pits[sides.myStore];
-  const oppScore = pits[sides.oppStore];
+  const myScore = display[sides.myStore];
+  const oppScore = display[sides.oppStore];
 
   const play = (pit: number) => {
-    if (!myTurn || over || pits[pit] === 0) return;
+    if (!myTurn || over || display[pit] === 0) return;
     onAction({ pit });
   };
 
@@ -83,161 +162,240 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
       : board.winner === opp
         ? `${oppName} wins`
         : "A dead heat"
-    : myTurn
+    : board.turn === me
       ? board.extra
-        ? "Again! Your move"
+        ? "Again! your move"
         : "Your move"
       : `${oppName} is sowing`;
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-      {/* Opponent */}
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-3 pb-[max(env(safe-area-inset-bottom),16px)]">
       <header className="flex items-center justify-between py-3">
-        <PlayerTag name={oppName} color={OPP} active={!myTurn && !over} />
+        <PlayerTag name={oppName} color={OPP} active={board.turn === opp && !over} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em]"
              style={{ color: over ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {banner}
         </div>
-        <div className="w-[76px]" />
+        <div className="w-[72px]" />
       </header>
 
-      <div className="flex flex-1 flex-col justify-center gap-3">
-        {/* The board: opponent's store on the left, yours on the right, the two
-            rows of pits between, your row on the bottom facing you. */}
+      <div className="flex flex-1 flex-col justify-center">
+        {/* The board: a carved panel, a store at each end, two rows of scooped
+            pits between. Your row is the bottom, facing you. */}
         <div
-          className="flex items-stretch gap-2 rounded-[20px] border p-3"
-          style={{ borderColor: "var(--color-border)", background: "#141824" }}
+          ref={boardRef}
+          className="relative flex items-stretch gap-2.5 rounded-[28px] p-3"
+          style={{
+            background: "linear-gradient(160deg, #3a2a1a, #241a10 60%, #1c140c)",
+            boxShadow: "inset 0 1px 0 rgba(255,220,160,0.12), 0 10px 30px rgba(0,0,0,0.45)",
+            border: "1px solid rgba(120,90,55,0.5)",
+          }}
         >
-          <Store seeds={oppScore} color={OPP} label={oppName} gen={gen} />
+          <Store
+            seeds={oppScore}
+            color={OPP}
+            label={oppName}
+            innerRef={(el) => (pitRefs.current[sides.oppStore] = el)}
+            captured={captured.has(sides.oppStore)}
+          />
 
-          <div className="flex flex-1 flex-col gap-2.5">
-            {/* Opponent row (not tappable), left->right mirrors your row below */}
-            <div className="grid grid-cols-6 gap-1.5">
+          <div className="flex flex-1 flex-col justify-center gap-3">
+            <div className="grid grid-cols-6 gap-2">
               {sides.oppTop.map((i) => (
-                <Pit key={i} seeds={pits[i]} color={OPP} tappable={false}
-                     pulse={changed.has(i)} captured={captured.has(i)} gen={gen} />
+                <Pit
+                  key={i}
+                  seeds={display[i]}
+                  rim={OPP}
+                  tappable={false}
+                  captured={captured.has(i)}
+                  innerRef={(el) => (pitRefs.current[i] = el)}
+                />
               ))}
             </div>
-            {/* Your row (tappable on your turn) */}
-            <div className="grid grid-cols-6 gap-1.5">
-              {sides.myPits.map((i) => {
-                const canPlay = myTurn && !over && pits[i] > 0;
-                return (
-                  <Pit key={i} seeds={pits[i]} color={YOU} tappable={canPlay}
-                       pulse={changed.has(i)} captured={captured.has(i)} gen={gen}
-                       onTap={() => play(i)} />
-                );
-              })}
+            <div className="grid grid-cols-6 gap-2">
+              {sides.myPits.map((i) => (
+                <Pit
+                  key={i}
+                  seeds={display[i]}
+                  rim={YOU}
+                  tappable={myTurn && !over && display[i] > 0}
+                  captured={captured.has(i)}
+                  innerRef={(el) => (pitRefs.current[i] = el)}
+                  onTap={() => play(i)}
+                />
+              ))}
             </div>
           </div>
 
-          <Store seeds={myScore} color={YOU} label="you" gen={gen} mine />
+          <Store
+            seeds={myScore}
+            color={YOU}
+            label="you"
+            mine
+            innerRef={(el) => (pitRefs.current[sides.myStore] = el)}
+            captured={captured.has(sides.myStore)}
+          />
+
+          {/* The travelling seed, sowing pit to pit. */}
+          <motion.div
+            ref={flyer}
+            className="pointer-events-none absolute left-0 top-0 z-20"
+            style={{ opacity: 0 }}
+          >
+            <span
+              className="block h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                background: `radial-gradient(circle at 35% 30%, ${SEED}, ${SEED_DARK})`,
+                boxShadow: `0 0 10px ${SEED}, 0 2px 3px rgba(0,0,0,0.5)`,
+                visibility: flyOn ? "visible" : "hidden",
+              }}
+            />
+          </motion.div>
         </div>
 
-        <p className="text-center text-xs text-[var(--color-text-secondary)]">
-          tap one of your pits · sow counterclockwise · land in your store to go again
+        <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
+          tap one of your pits · seeds sow counterclockwise · land in your store to go again
         </p>
       </div>
 
-      {/* You */}
       <footer className="flex items-center justify-between py-3">
-        <PlayerTag name="You" color={YOU} active={myTurn && !over} />
+        <PlayerTag name="You" color={YOU} active={board.turn === me && !over} />
         <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
           {myScore} - {oppScore}
         </div>
-        <div className="w-[76px]" />
+        <div className="w-[72px]" />
       </footer>
     </main>
   );
 }
 
+/** A scooped pit holding scattered seed beads. */
 function Pit({
   seeds,
-  color,
+  rim,
   tappable,
-  pulse,
   captured,
-  gen,
+  innerRef,
   onTap,
 }: {
   seeds: number;
-  color: string;
+  rim: string;
   tappable: boolean;
-  pulse: boolean;
   captured: boolean;
-  gen: number;
+  innerRef: (el: HTMLDivElement | null) => void;
   onTap?: () => void;
 }) {
+  const shown = Math.min(seeds, SCATTER.length);
   return (
     <button
       onClick={onTap}
       disabled={!tappable}
-      className="relative flex aspect-square w-full items-center justify-center rounded-full border transition-colors"
+      aria-label={`pit with ${seeds} seeds`}
+      className="relative aspect-square w-full rounded-full transition-transform active:scale-95"
       style={{
-        borderColor: tappable ? color : "var(--color-border)",
-        background: tappable ? `${color}1f` : "#0c0e16",
-        boxShadow: tappable ? `0 0 14px ${color}44` : "inset 0 1px 3px rgba(0,0,0,0.6)",
+        background: "radial-gradient(circle at 50% 38%, #12100c, #241a10 70%, #2c2013)",
+        boxShadow: tappable
+          ? `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 2px ${rim}, 0 0 16px ${rim}66`
+          : `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 1px rgba(120,90,55,0.45)`,
         cursor: tappable ? "pointer" : "default",
       }}
     >
+      <div ref={innerRef} className="absolute inset-0" />
+      <Seeds count={shown} />
+      {seeds > SCATTER.length && (
+        <span className="absolute bottom-0.5 right-1 font-[var(--font-mono)] text-[9px] font-bold text-[var(--color-text-primary)]">
+          {seeds}
+        </span>
+      )}
       {captured && (
         <motion.span
-          key={`cap-${gen}`}
           className="absolute inset-0 rounded-full"
-          initial={{ opacity: 0.9, scale: 1 }}
-          animate={{ opacity: 0, scale: 1.4 }}
-          transition={{ duration: 0.6 }}
-          style={{ boxShadow: `0 0 0 2px ${color}, 0 0 18px ${color}` }}
+          initial={{ opacity: 0.85, scale: 1 }}
+          animate={{ opacity: 0, scale: 1.35 }}
+          transition={{ duration: 0.7 }}
+          style={{ boxShadow: `0 0 0 2px ${rim}, 0 0 18px ${rim}` }}
         />
       )}
-      <motion.span
-        key={`${gen}-${seeds}`}
-        initial={pulse ? { scale: 0.6 } : false}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 500, damping: 22 }}
-        className="font-[var(--font-display)] text-base font-bold tabular-nums"
-        style={{ color: seeds ? "var(--color-text-primary)" : "var(--color-text-secondary)", opacity: seeds ? 1 : 0.4 }}
-      >
-        {seeds}
-      </motion.span>
     </button>
   );
 }
 
+/** Scattered beads for a pit, positioned deterministically. */
+function Seeds({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, k) => {
+        const [x, y] = SCATTER[k];
+        return (
+          <motion.span
+            key={k}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 600, damping: 24 }}
+            className="absolute block h-[22%] w-[22%] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              left: `${x}%`,
+              top: `${y}%`,
+              background: `radial-gradient(circle at 35% 30%, ${SEED}, ${SEED_DARK})`,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.55)",
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/** The big end bowl, showing its hoard of beads and a count. */
 function Store({
   seeds,
   color,
   label,
-  gen,
   mine,
+  innerRef,
+  captured,
 }: {
   seeds: number;
   color: string;
   label: string;
-  gen: number;
   mine?: boolean;
+  innerRef: (el: HTMLDivElement | null) => void;
+  captured: boolean;
 }) {
+  const shown = Math.min(seeds, SCATTER.length);
   return (
     <div
-      className="flex w-[52px] shrink-0 flex-col items-center justify-center rounded-[16px] border"
+      className="relative flex w-[54px] shrink-0 flex-col items-center justify-end rounded-[22px] pb-2"
       style={{
-        borderColor: `color-mix(in srgb, ${color} ${mine ? "55%" : "35%"}, transparent)`,
-        background: `linear-gradient(180deg, ${color}1a, transparent)`,
+        background: "radial-gradient(ellipse at 50% 35%, #12100c, #241a10 75%)",
+        boxShadow: `inset 0 4px 12px rgba(0,0,0,0.8), 0 0 0 ${mine ? 2 : 1}px ${mine ? color : "rgba(120,90,55,0.5)"}${mine ? "" : ""}`,
       }}
     >
+      <div ref={innerRef} className="absolute inset-x-0 top-0 h-2/3">
+        <Seeds count={shown} />
+      </div>
       <motion.span
-        key={`${gen}-${seeds}`}
+        key={seeds}
         initial={{ scale: 0.7 }}
         animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 480, damping: 20 }}
-        className="font-[var(--font-display)] text-2xl font-bold tabular-nums"
+        transition={{ type: "spring", stiffness: 480, damping: 18 }}
+        className="relative z-10 font-[var(--font-display)] text-2xl font-bold tabular-nums"
         style={{ color }}
       >
         {seeds}
       </motion.span>
-      <span className="mt-0.5 max-w-full truncate px-1 font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <span className="relative z-10 mt-0.5 max-w-full truncate px-1 font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[var(--color-text-secondary)]">
         {label}
       </span>
+      {captured && (
+        <motion.span
+          className="absolute inset-0 rounded-[22px]"
+          initial={{ opacity: 0.7, scale: 1 }}
+          animate={{ opacity: 0, scale: 1.1 }}
+          transition={{ duration: 0.7 }}
+          style={{ boxShadow: `0 0 0 2px ${color}, 0 0 22px ${color}` }}
+        />
+      )}
     </div>
   );
 }
@@ -249,7 +407,7 @@ function PlayerTag({ name, color, active }: { name: string; color: string; activ
         className="h-7 w-7 rounded-full"
         style={{ background: color, outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2 }}
       />
-      <span className="max-w-[90px] truncate font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <span className="max-w-[84px] truncate font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
         {name}
       </span>
     </div>
