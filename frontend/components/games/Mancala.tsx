@@ -10,15 +10,16 @@ interface Props {
   onAction: (data: Record<string, unknown>) => void;
 }
 
-// Seeds are wooden beads, the same for both sides (as on a real board); which
-// side a pit is on tells you whose it is. Pit rims tint by side for clarity.
-const SEED = "#e9c27a";
-const SEED_DARK = "#c99a4e";
+// Seeds are pale ivory beads, the same for both sides (as on a real board);
+// which side a pit is on tells you whose it is. Ivory keeps the seeds clearly
+// distinct from the gold rim on your side, which otherwise washed together.
+const SEED = "#f2e8d0";
+const SEED_DARK = "#cbb98f";
 const YOU = "#ffd166"; // your side rim (gold - Mancala's hub accent)
 const OPP = "#8b7cff"; // opponent side rim (violet)
 const STORE_A = 6;
 const STORE_B = 13;
-const HOP_MS = 120; // per-seed travel time
+const HOP_MS = 210; // per-seed travel time - slow enough to follow by eye
 
 function sidesFor(order: string[], me: string) {
   const iAm0 = order[0] === me;
