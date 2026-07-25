@@ -391,9 +391,12 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
         # apply_turn already rejects further moves once there's a winner/full board.
         _schedule(room_id, _TURN_END_HOLD, lambda: end_game(room_id))
         return False
-    # Solo: the AI replies after a short beat so the player sees their move land.
+    # Solo: the AI replies after a beat so the player's move fully plays out and
+    # settles first. The client also queues board updates, so even a long sow is
+    # never cut off; this delay just spaces the Caver's reply so it reads as a
+    # separate, deliberate turn rather than landing on top of yours.
     if gs.get("turn_ai") and new["turn"] == gs["turn_ai"]:
-        _schedule(room_id, 0.7, lambda: _turn_ai_move(room_id))
+        _schedule(room_id, 1.1, lambda: _turn_ai_move(room_id))
     return False
 
 

@@ -59,14 +59,24 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const sides = useMemo(() => sidesFor(order, me), [order, me]);
 
   // What is drawn. Diverges from the server board only while a sow plays out,
-  // then reconciles exactly.
+  // then reconciles exactly. Board updates are queued and played one at a time,
+  // so the opponent's move never lands on top of yours still mid-flight - each
+  // sow finishes, settles, then the next begins.
   const [display, setDisplay] = useState<number[]>(board?.pits ?? Array(14).fill(0));
+  const displayRef = useRef<number[]>(board?.pits ?? Array(14).fill(0));
   const [animating, setAnimating] = useState(false);
-  const prevPits = useRef<number[] | null>(null);
+  const [sowingActor, setSowingActor] = useState<string | null>(null);
+  const queue = useRef<{ pits: number[]; from: number | null }[]>([]);
+  const pumping = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const pitRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [flyer, animate] = useAnimate();
   const [flyOn, setFlyOn] = useState(false);
+
+  const paint = (pits: number[]) => {
+    displayRef.current = pits;
+    setDisplay(pits);
+  };
 
   const center = (i: number) => {
     const el = pitRefs.current[i];
@@ -79,60 +89,57 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
 
   useEffect(() => {
     if (!board?.pits) return;
-    const target = board.pits;
-    const prev = prevPits.current;
-    prevPits.current = target.slice();
+    queue.current.push({ pits: board.pits.slice(), from: board.last_pit ?? null });
+    if (pumping.current) return;
 
-    // First paint, or a state we can't replay (no last_pit): just show it.
-    if (!prev || board.last_pit == null || prev.length !== 14) {
-      setDisplay(target.slice());
-      return;
-    }
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    const from = board.last_pit;
-    const seeds = prev[from];
-    if (seeds <= 0) {
-      setDisplay(target.slice());
-      return;
-    }
-    // Who moved owns `from`; skip THEIR opponent's store when sowing.
-    const moverIsO = from >= 0 && from <= 5;
-    const skipStore = moverIsO ? STORE_B : STORE_A;
-    const path = sowPath(from, seeds, skipStore);
+    const playStep = async (step: { pits: number[]; from: number | null }) => {
+      const prev = displayRef.current;
+      const target = step.pits;
+      // First paint, or a state we can't replay: just show it.
+      if (step.from == null || prev.length !== 14 || prev[step.from] <= 0) {
+        paint(target.slice());
+        return;
+      }
+      const from = step.from;
+      const seeds = prev[from];
+      const moverIsO = from >= 0 && from <= 5;
+      const skipStore = moverIsO ? STORE_B : STORE_A;
+      setSowingActor(moverIsO ? order[0] : order[1]);
+      const path = sowPath(from, seeds, skipStore);
 
-    let cancelled = false;
-    (async () => {
-      setAnimating(true);
-      // Lift the seeds out of the source pit.
       const work = prev.slice();
       work[from] = 0;
-      setDisplay(work.slice());
+      paint(work.slice());
 
-      // Park the flyer on the source pit, reveal it.
       const start = center(from);
       await animate(flyer.current, { x: start.x, y: start.y, opacity: 0, scale: 0.6 }, { duration: 0 });
       setFlyOn(true);
-      await animate(flyer.current, { opacity: 1, scale: 1 }, { duration: 0.09 });
-
-      // Hop into each pit along the path, dropping one seed as it lands.
+      await animate(flyer.current, { opacity: 1, scale: 1 }, { duration: 0.12 });
       for (const pit of path) {
-        if (cancelled) return;
         const c = center(pit);
         await animate(flyer.current, { x: c.x, y: c.y }, { duration: HOP_MS / 1000, ease: "easeInOut" });
         work[pit] += 1;
-        setDisplay(work.slice());
+        paint(work.slice());
       }
       setFlyOn(false);
-      // Reconcile to the server's exact board (covers captures + the end sweep).
-      if (!cancelled) {
-        setDisplay(target.slice());
-        setAnimating(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+      // Reconcile to the server's exact board (captures + end sweep).
+      paint(target.slice());
     };
+
+    (async () => {
+      pumping.current = true;
+      setAnimating(true);
+      while (queue.current.length) {
+        const step = queue.current.shift()!;
+        await playStep(step);
+        if (queue.current.length) await wait(420); // a beat between moves
+      }
+      setSowingActor(null);
+      setAnimating(false);
+      pumping.current = false;
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
@@ -163,11 +170,15 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
       : board.winner === opp
         ? `${oppName} wins`
         : "A dead heat"
-    : board.turn === me
-      ? board.extra
-        ? "Again! your move"
-        : "Your move"
-      : `${oppName} is sowing`;
+    : animating && sowingActor === opp
+      ? `${oppName} is sowing`
+      : animating && sowingActor === me
+        ? "sowing..."
+        : board.turn === me
+          ? board.extra
+            ? "Again! your move"
+            : "Your move"
+          : `${oppName} is thinking`;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-3 pb-[max(env(safe-area-inset-bottom),16px)]">
