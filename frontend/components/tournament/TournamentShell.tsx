@@ -15,11 +15,14 @@ import { TOURNEY } from "@/lib/tournamentStatus";
  */
 export type TournamentTab = "now" | "past" | "rules" | "record";
 
+// Short labels so all four fit across a 390px screen without the last one
+// being clipped at the edge. In the tournament world the context is clear:
+// "Past" is past weeks, "Record" is your record.
 const TABS: { key: TournamentTab; label: string; href: string }[] = [
   { key: "now", label: "This weekend", href: "/tournament" },
-  { key: "past", label: "Past weeks", href: "/tournament/past" },
-  { key: "rules", label: "Rulebook", href: "/tournament/rules" },
-  { key: "record", label: "Your record", href: "/tournament/me" },
+  { key: "past", label: "Past", href: "/tournament/past" },
+  { key: "rules", label: "Rules", href: "/tournament/rules" },
+  { key: "record", label: "Record", href: "/tournament/me" },
 ];
 
 export function TournamentShell({
@@ -38,13 +41,15 @@ export function TournamentShell({
       <BackButton href="/" label="Hub" />
 
       {/* The world's own rooms, as an underline tab bar: text tabs on a shared
-          baseline, the active one carrying a warm underline. Scrolls on its own
-          on a narrow screen rather than wrapping and pushing content down. */}
+          baseline, the active one carrying a warm underline. The bar stays at
+          content width so its baseline lines up with the back button and the
+          page below on both edges; it scrolls within that width rather than
+          bleeding past the content. */}
       <nav
-        className="mt-5 -mx-5 overflow-x-auto border-b px-5"
+        className="mt-4 overflow-x-auto border-b"
         style={{ borderColor: "var(--color-border)" }}
       >
-        <div className="flex w-max gap-6">
+        <div className="flex w-max gap-7">
           {TABS.map((t) => {
             const on = t.key === active;
             return (

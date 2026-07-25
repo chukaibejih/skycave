@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
+import { TOURNEY } from "@/lib/tournamentStatus";
 import { getMyRecord, type PlayerRecord } from "@/lib/api";
 import { startBlueskyLogin } from "@/lib/bluesky";
 import { useAuth } from "@/lib/store";
@@ -43,7 +44,7 @@ export default function MyRecordPage() {
           <button
             onClick={() => startBlueskyLogin()}
             className="mt-6 inline-flex h-12 items-center justify-center rounded-[14px] px-6 font-bold"
-            style={{ background: "var(--color-primary)", color: "#05060a" }}
+            style={{ background: TOURNEY.gradient, color: TOURNEY.ink }}
           >
             Sign in with Bluesky
           </button>
@@ -70,7 +71,7 @@ export default function MyRecordPage() {
           <Link
             href="/tournament"
             className="mt-5 inline-flex h-11 items-center justify-center rounded-[14px] px-5 font-semibold"
-            style={{ background: "var(--color-primary)", color: "#05060a" }}
+            style={{ background: TOURNEY.gradient, color: TOURNEY.ink }}
           >
             This weekend
           </Link>
@@ -161,7 +162,7 @@ function StageBadge({ stage, champion }: { stage: string; champion: boolean }) {
     ? "var(--color-gold)"
     : stage === "Runner-up"
       ? "var(--color-warm)"
-      : "var(--color-primary)";
+      : TOURNEY.accent;
   return (
     <div
       className="grid h-11 w-11 shrink-0 place-items-center rounded-full border text-center font-[var(--font-mono)] text-[9px] uppercase leading-tight tracking-wide"

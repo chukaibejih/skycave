@@ -102,7 +102,7 @@ export default function TournamentPage() {
           <Link
             href="/"
             className="mt-6 inline-flex h-12 items-center justify-center rounded-[14px] px-6 font-semibold"
-            style={{ background: "var(--color-primary)", color: "#05060a" }}
+            style={{ background: TOURNEY.gradient, color: TOURNEY.ink }}
           >
             Back to the games
           </Link>

@@ -1,5 +1,6 @@
 "use client";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
+import { TOURNEY } from "@/lib/tournamentStatus";
 
 /**
  * The rulebook. Static, and deliberately so: these rules do not change week to
@@ -90,8 +91,8 @@ function Rule({
       <div
         className="grid h-8 w-8 shrink-0 place-items-center rounded-full border font-[var(--font-display)] text-sm font-bold"
         style={{
-          borderColor: "color-mix(in srgb, var(--color-primary) 40%, transparent)",
-          color: "var(--color-primary)",
+          borderColor: `color-mix(in srgb, ${TOURNEY.accent} 45%, transparent)`,
+          color: TOURNEY.accent,
         }}
       >
         {n}

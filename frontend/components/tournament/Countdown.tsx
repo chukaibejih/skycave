@@ -65,7 +65,7 @@ export function Countdown({
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.12 }}
               className="grid min-w-[62px] place-items-center rounded-[14px] border px-2 py-2.5 sm:min-w-[74px]"
               style={{
-                borderColor: "color-mix(in srgb, var(--color-primary) 30%, transparent)",
+                borderColor: "color-mix(in srgb, var(--color-warm) 32%, transparent)",
                 background: "color-mix(in srgb, var(--color-elevated) 85%, transparent)",
               }}
             >
@@ -114,7 +114,7 @@ export function LocalTime({ iso }: { iso: string }) {
  * Days drop off once the event is inside a day, so the closing hours read as
  * hours:minutes:seconds rather than a lonely "0" days slab.
  */
-export function Scoreboard({ to, accent = "var(--color-primary)" }: { to: string; accent?: string }) {
+export function Scoreboard({ to, accent = "var(--color-warm)" }: { to: string; accent?: string }) {
   const target = new Date(to).getTime();
   const [left, setLeft] = useState(() => Math.max(0, target - Date.now()));
 
