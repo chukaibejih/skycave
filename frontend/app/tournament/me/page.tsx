@@ -4,9 +4,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
+import { AuthModal } from "@/components/ui/AuthModal";
 import { TOURNEY } from "@/lib/tournamentStatus";
 import { getMyRecord, type PlayerRecord } from "@/lib/api";
-import { startBlueskyLogin } from "@/lib/bluesky";
 import { useAuth } from "@/lib/store";
 
 /**
@@ -18,7 +18,15 @@ import { useAuth } from "@/lib/store";
 export default function MyRecordPage() {
   const { identity, loaded, hydrate } = useAuth();
   const [rec, setRec] = useState<PlayerRecord | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
   const signedIn = !!identity && !identity.is_guest;
+
+  const signIn = () => {
+    // Land back on this page after the OAuth round trip, and show the login
+    // rather than firing OAuth with no handle (which the sidecar cannot resolve).
+    sessionStorage.setItem("cave_return", "/tournament/me");
+    setAuthOpen(true);
+  };
 
   useEffect(() => {
     hydrate();
@@ -42,13 +50,19 @@ export default function MyRecordPage() {
             how far you get, and what you win.
           </p>
           <button
-            onClick={() => startBlueskyLogin()}
+            onClick={signIn}
             className="mt-6 inline-flex h-12 items-center justify-center rounded-[14px] px-6 font-bold"
             style={{ background: TOURNEY.gradient, color: TOURNEY.ink }}
           >
             Sign in with Bluesky
           </button>
         </div>
+        <AuthModal
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          blueskyOnly
+          title="Sign in with Bluesky"
+        />
       </TournamentShell>
     );
   }

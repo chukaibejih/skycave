@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { BlueskyLogo } from "@/components/ui/BlueskyLogo";
 import { Countdown, LocalTime, Scoreboard, Weekday, clockIsLive } from "@/components/tournament/Countdown";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
+import { AuthModal } from "@/components/ui/AuthModal";
 import { GameGlyph, GAME_ACCENT } from "@/components/games/gameVisual";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
 import {
@@ -15,7 +16,6 @@ import {
   type Tournament,
   type TournamentPlayer,
 } from "@/lib/api";
-import { startBlueskyLogin } from "@/lib/bluesky";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
 
@@ -27,6 +27,7 @@ export default function TournamentPage() {
   const [state, setState] = useState<"loading" | "ready" | "none">("loading");
   const [entering, setEntering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -76,8 +77,14 @@ export default function TournamentPage() {
   const onEnter = () => {
     if (!t) return;
     if (!identity || identity.is_guest) {
+      // A guest needs a real account to enter. Show the login (Bluesky only,
+      // since a guest session cannot be tagged in a fixture) rather than firing
+      // OAuth with no handle, which the sidecar cannot resolve and which bounced
+      // the page straight back to the hub. Stash where to resume so the OAuth
+      // round trip lands back here and the effect below takes their seat.
       sessionStorage.setItem("sc-tourney-intent", t.id);
-      startBlueskyLogin();
+      sessionStorage.setItem("cave_return", "/tournament");
+      setAuthOpen(true);
       return;
     }
     void enter();
@@ -178,6 +185,13 @@ export default function TournamentPage() {
       <p className="mt-10 text-center text-xs text-[var(--color-text-secondary)]">
         Play runs Friday to Sunday. Miss your round and it goes to your opponent.
       </p>
+
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        blueskyOnly
+        title="Log in to enter the Cup"
+      />
     </TournamentShell>
   );
 }

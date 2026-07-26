@@ -21,6 +21,12 @@ interface Props {
    * of the two options flips to match that.
    */
   invite?: { hostHandle?: string | null; gameName?: string | null } | null;
+  /**
+   * Hide the guest option entirely. Used where a guest session cannot do the
+   * thing being asked for - the tournament needs a real account so a player can
+   * be tagged in their fixture, so offering "play as guest" there is a dead end.
+   */
+  blueskyOnly?: boolean;
 }
 
 export function AuthModal({
@@ -29,6 +35,7 @@ export function AuthModal({
   onAuthed,
   title = "Play as guest or log in",
   invite = null,
+  blueskyOnly = false,
 }: Props) {
   const setIdentity = useAuth((s) => s.setIdentity);
   const [name, setName] = useState("");
@@ -184,7 +191,9 @@ export function AuthModal({
               <>
                 <h2 className="mb-1 font-[var(--font-display)] text-xl font-bold">{title}</h2>
                 <p className="mb-5 text-sm text-[var(--color-text-secondary)]">
-                  Sign in to keep your scores, or jump in as a guest.
+                  {blueskyOnly
+                    ? "A Bluesky account, so you can be tagged in your fixture."
+                    : "Sign in to keep your scores, or jump in as a guest."}
                 </p>
               </>
             )}
@@ -227,8 +236,12 @@ export function AuthModal({
                 their own room. Guest stays one tap away for anyone who
                 genuinely has no account. */}
             {blueskyBlock}
-            {divider}
-            {guestBlock}
+            {!blueskyOnly && (
+              <>
+                {divider}
+                {guestBlock}
+              </>
+            )}
 
             {error && (
               <p className="mt-3 text-center text-sm text-[var(--color-warm)]">{error}</p>
