@@ -306,7 +306,12 @@ function Action({
     );
   }
   if (!m.opponent_checked_in) {
-    return <Waiting>Waiting for {m.opponent.display_name} to check in</Waiting>;
+    return (
+      <div className="space-y-3">
+        <Waiting>Waiting for {m.opponent.display_name} to check in</Waiting>
+        <NudgeOpponent m={m} />
+      </div>
+    );
   }
   if (m.room_id) {
     return (
@@ -349,6 +354,67 @@ function Big({
       style={style}
     >
       {children}
+    </button>
+  );
+}
+
+/**
+ * When you are checked in and they are not, the one channel that can reach
+ * someone who has left the app is Bluesky. This opens their own composer
+ * prefilled with a friendly @mention, which lands as a real notification for the
+ * opponent. The player sends it from their own account, in their own words, so
+ * nothing is ever posted on their behalf. A soft per-fixture cooldown keeps a
+ * nudge from becoming a pile-on.
+ */
+function NudgeOpponent({ m }: { m: MyMatch }) {
+  const opp = m.opponent;
+  const key = opp ? `nudge:${m.tournament_id}:${m.round}:${m.slot}` : "";
+  const COOLDOWN_MS = 60 * 60_000; // one nudge an hour per fixture
+  const [sentAt, setSentAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    const v = window.localStorage.getItem(key);
+    setSentAt(v ? Number(v) : null);
+  }, [key]);
+
+  if (!opp) return null;
+  const onCooldown = sentAt !== null && Date.now() - sentAt < COOLDOWN_MS;
+
+  // The @mention becomes a real notification once posted; the link auto-links.
+  const text = `@${opp.handle} I'm checked in for our ${m.tournament_name} match. Come settle it 👀 skycave.space/tournament`;
+  const href = `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
+
+  const send = () => {
+    if (key) window.localStorage.setItem(key, String(Date.now()));
+    setSentAt(Date.now());
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
+  if (onCooldown) {
+    return (
+      <p className="text-center text-xs text-[var(--color-text-secondary)]">
+        Nudge sent on Bluesky. Give them a moment to see it.
+      </p>
+    );
+  }
+
+  return (
+    <button
+      onClick={send}
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-[14px] border text-sm font-semibold transition-[filter] active:brightness-95"
+      style={{
+        borderColor: "color-mix(in srgb, var(--color-warm) 55%, transparent)",
+        background: "color-mix(in srgb, var(--color-warm) 10%, var(--color-surface))",
+        color: "var(--color-warm)",
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+      </svg>
+      Nudge {opp.display_name} on Bluesky
     </button>
   );
 }
