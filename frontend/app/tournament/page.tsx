@@ -391,9 +391,12 @@ function YouAreIn({ t }: { t: Tournament }) {
           className="rounded-[18px] border p-4"
           style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
         >
-          <p className="font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">
+          <p
+            className="font-[var(--font-display)] text-base font-bold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             {live ? "Who else made it" : "Who you might face"}
-            <span className="text-[var(--color-text-secondary)]"> · {rivals.length}</span>
+            <span style={{ color: "var(--color-text-secondary)" }}> · {rivals.length}</span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {rivals.slice(0, 14).map((p) => (
