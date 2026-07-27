@@ -391,7 +391,7 @@ function YouAreIn({ t }: { t: Tournament }) {
           className="rounded-[18px] border p-4"
           style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
         >
-          <p className="font-[var(--font-display)] text-base font-bold">
+          <p className="font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">
             {live ? "Who else made it" : "Who you might face"}
             <span className="text-[var(--color-text-secondary)]"> · {rivals.length}</span>
           </p>
