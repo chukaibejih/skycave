@@ -10,7 +10,7 @@ export function CoffeeFooter() {
   return (
     <footer className="mt-16 border-t border-[var(--color-border)] pb-6 pt-8 text-center">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Every game here is free. The cave runs on coffee.
+        Keep the cave caffeinated.
       </p>
       <a
         href="https://buymeacoffee.com/ibejih"
