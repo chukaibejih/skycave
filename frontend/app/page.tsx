@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { GameCard } from "@/components/ui/GameCard";
+import { CoffeeFooter } from "@/components/ui/CoffeeFooter";
 import { SignalFlow } from "@/components/hub/SignalFlow";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -224,6 +225,8 @@ export default function Home() {
         )}
         </div>
       </section>
+
+      <CoffeeFooter />
 
       {creating && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-md">
