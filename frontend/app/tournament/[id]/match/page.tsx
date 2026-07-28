@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Countdown } from "@/components/tournament/Countdown";
 import { ChampionMoment } from "@/components/tournament/ChampionMoment";
 import { BackButton } from "@/components/nav/BackButton";
+import { composeIntentUrl } from "@/lib/bluesky";
 import { TOURNEY } from "@/lib/tournamentStatus";
 import {
   ApiError,
@@ -382,8 +383,9 @@ function NudgeOpponent({ m }: { m: MyMatch }) {
   const onCooldown = sentAt !== null && Date.now() - sentAt < COOLDOWN_MS;
 
   // The @mention becomes a real notification once posted; the link auto-links.
+  // composeIntentUrl appends the community hashtags, same as every other post.
   const text = `@${opp.handle} I'm checked in for our ${m.tournament_name} match. Come settle it 👀 skycave.space/tournament`;
-  const href = `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
+  const href = composeIntentUrl(text);
 
   const send = () => {
     if (key) window.localStorage.setItem(key, String(Date.now()));

@@ -243,7 +243,16 @@ class Mancala(BaseGame):
         return f"banked {score}"
 
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
-        return "beat the Caver" if score else "lost to the Caver"
+        # Every one of the 48 seeds is banked by game's end, so the Caver's total
+        # is simply the rest. Name the scoreline, so the share post carries the
+        # actual result instead of a bare "beat the Caver".
+        total = PITS_PER_SIDE * SEEDS_PER_PIT * 2
+        theirs = total - score
+        if score > theirs:
+            return f"beat the Caver {score}-{theirs}"
+        if score < theirs:
+            return f"lost to the Caver {score}-{theirs}"
+        return f"tied the Caver {score}-{theirs}"
 
     def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
         p = self._pindex(state, player_id)

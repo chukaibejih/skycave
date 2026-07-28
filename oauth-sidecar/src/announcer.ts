@@ -15,6 +15,18 @@ export function announcerConfigured(): boolean {
   return Boolean(HANDLE && APP_PASSWORD);
 }
 
+// Every post from @skycave.space carries these, so the hub and the tournament
+// all surface under the same community tags. RichText.detectFacets turns them
+// into real hashtag facets. Added only when there is room under the 300
+// grapheme ceiling, so a full post never fails to send because of the tags.
+const TAGS = "#blacksky #blackskygamers";
+function withTags(text: string): string {
+  const full = `${text}\n\n${TAGS}`;
+  // Array.from counts by code point (emoji = 1), close enough to graphemes and
+  // conservative, so we never overshoot the real limit.
+  return Array.from(full).length <= 300 ? full : text;
+}
+
 let agent: AtpAgent | null = null;
 
 async function ensureAgent(): Promise<AtpAgent> {
@@ -36,8 +48,8 @@ async function ensureAgent(): Promise<AtpAgent> {
 export async function postAnnouncement(text: string): Promise<string> {
   const attempt = async (): Promise<string> => {
     const a = await ensureAgent();
-    const rt = new RichText({ text });
-    await rt.detectFacets(a); // resolves @handles -> DIDs, links -> facets
+    const rt = new RichText({ text: withTags(text) });
+    await rt.detectFacets(a); // resolves @handles -> DIDs, links + #tags -> facets
     const res = await a.post({
       text: rt.text,
       facets: rt.facets,

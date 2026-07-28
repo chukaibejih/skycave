@@ -32,7 +32,10 @@ from app.models.announcement import AnnouncementOutbox
 
 logger = logging.getLogger("skycave.tournament.posts")
 
-BSKY_LIMIT = 300
+# Bluesky's real ceiling is 300, but the sidecar appends the community hashtags
+# (#blacksky #blackskygamers, ~27 chars) to every post. Compose under a lower
+# limit so those tags always fit and a maxed-out draw post never loses them.
+BSKY_LIMIT = 270
 SITE = "skycave.space"
 
 KIND_DRAW = "tournament_draw"

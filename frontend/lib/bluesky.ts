@@ -68,8 +68,14 @@ export async function resolveActor(handle: string): Promise<BskyActor | null> {
   }
 }
 
+// Appended to every post Skycave composes, hub and tournament alike, so the
+// whole community shows up under the same tags. Bluesky's composer turns these
+// into real hashtag facets on post.
+export const BLUESKY_TAGS = "#blacksky #blackskygamers";
+
 export function composeIntentUrl(text: string): string {
-  return `${COMPOSE}?text=${encodeURIComponent(text)}`;
+  const full = `${text}\n\n${BLUESKY_TAGS}`;
+  return `${COMPOSE}?text=${encodeURIComponent(full)}`;
 }
 
 /** Open the Bluesky composer pre-filled with `text`. */
