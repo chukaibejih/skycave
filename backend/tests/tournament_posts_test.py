@@ -135,20 +135,20 @@ async def test_cadence_and_limit() -> None:
                 # the fixtures has to admit it, or the entrants missing from it
                 # look like they never made the bracket at all.
                 draw = rows[0]
-                pairs = draw.text.count(" vs ")
+                pairs = draw.text.count(" VS ")
                 expected_pairs = len(
                     [
                         m for m in await svc.matches(s, t.id)
                         if m.round == 1 and m.player1_did and m.player2_did
                     ]
                 )
-                assert pairs == expected_pairs or "more fixture" in draw.text, (
+                assert pairs == expected_pairs or "MORE FIXTURE" in draw.text, (
                     f"{players} players: draw shows {pairs} of {expected_pairs} "
                     f"fixtures and never says so\n{draw.text}"
                 )
                 for r in rows:
-                    if r.text.count("Through:"):
-                        listed = r.text.split("Through:")[1].count("@")
+                    if r.text.count("STILL STANDING:"):
+                        listed = r.text.split("STILL STANDING:")[1].count("@")
                         assert "+" in r.text or listed >= 2, r.text
 
                 # Reading the tournament again must not queue a single new post.
@@ -178,7 +178,7 @@ async def test_a_bye_is_never_posted_as_a_beaten_opponent() -> None:
             champ_post = next(r for r in rows if r.kind == posts.KIND_CHAMPION)
             # A field of five means three byes; the champion beat at most 2 people
             # in a bracket of eight if they had one, so the claim must be short.
-            beaten_line = [ln for ln in champ_post.text.split("\n") if ln.startswith("Beat ")]
+            beaten_line = [ln for ln in champ_post.text.split("\n") if ln.startswith("TOOK OUT ")]
             if beaten_line:
                 named = beaten_line[0].count("@")
                 assert named <= t.rounds, (
@@ -213,7 +213,7 @@ async def test_draw_post_names_the_first_round() -> None:
             rows = await _outbox(s, t.id)
             assert len(rows) == 1 and rows[0].kind == posts.KIND_DRAW, [r.kind for r in rows]
             text = rows[0].text
-            assert text.count(" vs ") == 2, f"a field of 4 has 2 opening fixtures:\n{text}"
+            assert text.count(" VS ") == 2, f"a field of 4 has 2 opening fixtures:\n{text}"
             for i in range(4):
                 assert f"@p{i}.bsky.social" in text, f"p{i} was not tagged:\n{text}"
             print("\nthe draw post tags every entrant and names both fixtures")

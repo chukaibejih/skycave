@@ -73,22 +73,22 @@ def _score_line(h: Highlight) -> str:
     name = _game_name(h.game_type)
     who = _at(h.handle)
     if h.game_type == "clay":
-        return f"{who} shaped a {h.score} on Clay \U0001f3fa"  # 🏺
+        return f"{who} SHAPED A {h.score} ON CLAY \U0001f3fa"  # 🏺
     if h.game_type == "uno":
-        return f"{who} ran the Uno table"
+        return f"{who} RAN THE UNO TABLE"
     if h.game_type == "tile_takeover":
-        return f"{who} flooded the board in Tile Takeover"
-    return f"{who} topped {name} with {h.score:,}"
+        return f"{who} FLOODED THE BOARD IN TILE TAKEOVER"
+    return f"{who} TOPPED {name.upper()} WITH {h.score:,}"
 
 
 def _versus_line(handle: str, game_types: list[str]) -> str:
     who = _at(handle)
-    names = [_game_name(g) for g in game_types]
+    names = [_game_name(g).upper() for g in game_types]
     if len(names) == 1:
-        return f"{who} took {names[0]}"
+        return f"{who} TOOK {names[0]}"
     if len(names) == 2:
-        return f"{who} took {names[0]} and {names[1]}"
-    return f"{who} took {names[0]}, {names[1]} and more"
+        return f"{who} TOOK {names[0]} AND {names[1]}"
+    return f"{who} TOOK {names[0]}, {names[1]} AND MORE"
 
 
 def compose_roundup(data: DayData, day_label: str) -> str | None:
@@ -109,11 +109,11 @@ def compose_roundup(data: DayData, day_label: str) -> str | None:
     featured: str | None = None
     if data.first_wins:
         h = data.first_wins[0]
-        lead = f"\U0001f389 {_at(h)} just won their first Skycave game. Welcome in."
+        lead = f"\U0001f389 {_at(h)} JUST GOT THEIR FIRST SKYCAVE WIN. WELCOME TO THE CAVE."
         featured = h
     elif data.newcomers:
         h = data.newcomers[0]
-        lead = f"\U0001f44b {_at(h)} jumped into Skycave for the first time yesterday."
+        lead = f"\U0001f44b {_at(h)} STEPPED INTO THE CAVE FOR THE FIRST TIME YESTERDAY."
         featured = h
 
     star = data.top_solo[0] if data.top_solo else None
@@ -123,17 +123,17 @@ def compose_roundup(data: DayData, day_label: str) -> str | None:
         if lead:
             body = lead
             if star and star.handle != featured:
-                body += f"\n\nAlso yesterday: {_score_line(star)}."
-            tail = "\n\nCome play: skycave.space"
+                body += f"\n\nALSO YESTERDAY: {_score_line(star)}."
+            tail = "\n\nCOME PLAY: skycave.space"
         elif star:
-            body = f"Yesterday's top score: {_score_line(star)}"
-            tail = f"\n\nThink you can beat it? skycave.space/play/{_slug(star.game_type)}"
+            body = f"YESTERDAY'S TOP SCORE: {_score_line(star)}"
+            tail = f"\n\nTHINK YOU CAN BEAT IT? skycave.space/play/{_slug(star.game_type)}"
         else:
             return None
         return _fit(body + tail)
 
     # --- Busy day: a short recap (Option A) ---
-    lines: list[str] = ["Yesterday in the cave \U0001f3ae"]  # 🎮
+    lines: list[str] = ["YESTERDAY IN THE CAVE \U0001f3ae"]  # 🎮
     body_lines: list[str] = []
     used: set[str] = set()
 
@@ -154,7 +154,7 @@ def compose_roundup(data: DayData, day_label: str) -> str | None:
     if not body_lines:
         return None
 
-    post = lines[0] + "\n\n" + "\n".join(body_lines) + "\n\nYour move: skycave.space"
+    post = lines[0] + "\n\n" + "\n".join(body_lines) + "\n\nYOUR MOVE: skycave.space"
     return _fit(post)
 
 

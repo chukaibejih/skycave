@@ -116,11 +116,13 @@ def compose_draw(
     quietly showing the first few, because a truncated list reads as the whole
     draw and the players missing from it look like they were never entered.
     """
-    lead = f"\U0001f3c6 The {name} bracket is up. {entrants} in, {rounds} " \
-           f"{'round' if rounds == 1 else 'rounds'}."  # 🏆
-    fixtures = [f"{_at(p1)} vs {_at(p2)}" for p1, p2 in first_round if p1 and p2]
-    bye_line = f"Byes: {', '.join(_at(h) for h in byes)}" if byes else None
-    tail = f"Best of three all the way.\n{bracket_url(tournament_id)}"
+    lead = (
+        f"THE BRACKET IS LIVE. {entrants} PLAYERS. "
+        f"{rounds} {'ROUND' if rounds == 1 else 'ROUNDS'}. LET'S GO."
+    )
+    fixtures = [f"{_at(p1)} VS {_at(p2)}" for p1, p2 in first_round if p1 and p2]
+    bye_line = f"BYES: {', '.join(_at(h) for h in byes)}" if byes else None
+    tail = f"BEST OF THREE EVERY ROUND.\n{bracket_url(tournament_id)}"
 
     # Byes are supporting detail; they go before any fixture does.
     for extras in ([bye_line] if bye_line else [], []):
@@ -128,7 +130,7 @@ def compose_draw(
             shown = fixtures[:keep]
             left = len(fixtures) - keep
             if left:
-                shown = shown + [f"+{left} more fixture{'s' if left > 1 else ''} on the bracket"]
+                shown = shown + [f"+{left} MORE FIXTURE{'S' if left > 1 else ''} ON THE BRACKET"]
             text = "\n\n".join([lead, "\n".join(shown + extras), tail])
             if len(text) <= BSKY_LIMIT:
                 return text
@@ -149,29 +151,34 @@ def compose_round(
     a match they were never in would be worse than saying nothing.
     """
     played = [r for r in results if r[1] is not None]
-    label, plural = round_label(round, rounds)
-    lead = f"\U0001f3c6 {_sentence(label, plural, 'done.')}"
+    label, _plural = round_label(round, rounds)
 
     # Down to one or two fixtures there is a story, so tell it with the score.
     # Any wider and a list of scorelines is just noise, so name who survived.
-    tail = ""
-    if round < rounds:
-        nxt, nxt_plural = round_label(round + 1, rounds)
-        tail = f"{_sentence(nxt, nxt_plural, 'next.')}\n"
-    tail += bracket_url(tournament_id)
-
     if played and len(played) <= 2:
-        body = [f"{_at(w)} beat {_at(l)} {a}-{b}" for w, l, a, b in played]
+        lead = f"{label.upper()} DONE."
+        tail = ""
+        if round < rounds:
+            nxt, _ = round_label(round + 1, rounds)
+            tail = f"{nxt.upper()} UP NEXT.\n"
+        tail += bracket_url(tournament_id)
+        body = [f"{_at(w)} TOOK IT {a}-{b} AGAINST {_at(l)}" for w, l, a, b in played]
         return _fit(lead, body, tail)
 
     # A wide round names survivors. Same rule as the draw: if they do not all
     # fit, say how many are missing rather than showing a list that looks whole.
+    lead = f"{label.upper()} WRAPPED."
+    tail = ""
+    if round < rounds:
+        nxt, _ = round_label(round + 1, rounds)
+        tail = f"{nxt.upper()} NEXT.\n"
+    tail += bracket_url(tournament_id)
     through = [_at(w) for w, _, _, _ in results if w]
     for keep in range(len(through), 0, -1):
         left = len(through) - keep
-        line = "Through: " + ", ".join(through[:keep])
+        line = "STILL STANDING: " + ", ".join(through[:keep])
         if left:
-            line += f" +{left} more"
+            line += f" +{left} MORE"
         text = "\n\n".join([lead, line, tail])
         if len(text) <= BSKY_LIMIT:
             return text
@@ -188,14 +195,15 @@ def compose_champion(
     final_score: tuple[int, int] | None = None,
 ) -> str:
     """The one that matters. Names who they had to get through to get there."""
-    lead = f"\U0001f451 {_at(champion)} wins the {name}."  # 👑
+    lead = f"\U0001f451 {_at(champion)} WINS THE {name.upper()}."  # 👑
     body: list[str] = []
     if final_score:
-        body.append(f"Took the final {final_score[0]}-{final_score[1]}.")
+        body.append(f"WENT {final_score[0]}-{final_score[1]} IN THE FINAL.")
     if beaten:
-        body.append(f"Beat {', '.join(_at(h) for h in beaten)} on the way.")
+        body.append(f"TOOK OUT {', '.join(_at(h) for h in beaten)} ON THE WAY.")
     tail = (
-        f"{entrants} entered. One left standing.\n{bracket_url(tournament_id)}"
+        f"{entrants} ENTERED. ONE LEFT STANDING. SEE YOU NEXT WEEKEND.\n"
+        f"{bracket_url(tournament_id)}"
     )
     return _fit(lead, body, tail)
 
