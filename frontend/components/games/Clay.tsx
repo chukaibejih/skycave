@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { shareToBluesky } from "@/lib/bluesky";
+import { shareToBluesky, BLUESKY_TAGS } from "@/lib/bluesky";
+import { playUrl } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
 // Clay's gameplay is a canvas; the server issues the target and scores the
@@ -365,16 +366,24 @@ export function Clay() {
    * and open the composer so it can be attached by hand.
    */
   const shareCard = async () => {
-    const text = `${shareLine}\n\nskycave.space`;
+    // Match every other post: a solo run carries "beat my score" + the play
+    // link, so anyone can tap in to beat it. `base` has no hashtags, since the
+    // composer fallback (composeIntentUrl) appends them itself; the native share
+    // sheet does not, so it gets `withTags`. That keeps the tags on both paths
+    // without ever doubling them.
+    const base = isSolo
+      ? `${shareLine}\n\nbeat my score:\n${playUrl("clay")}`
+      : `${shareLine}\n\nskycave.space`;
+    const withTags = `${base}\n\n${BLUESKY_TAGS}`;
     const canvas = cardRef.current;
-    if (!canvas) return shareToBluesky(text);
+    if (!canvas) return shareToBluesky(base);
     setSharing(true);
     try {
       const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
       if (blob) {
         const file = new File([blob], "clay-pot.png", { type: "image/png" });
         if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], text });
+          await navigator.share({ files: [file], text: withTags });
           return; // shared with the picture attached
         }
         const url = URL.createObjectURL(blob);
@@ -384,10 +393,10 @@ export function Clay() {
         a.click();
         URL.revokeObjectURL(url);
       }
-      shareToBluesky(text);
+      shareToBluesky(base);
     } catch (e) {
       // Dismissing the share sheet is a normal outcome, not a failure.
-      if ((e as Error)?.name !== "AbortError") shareToBluesky(text);
+      if ((e as Error)?.name !== "AbortError") shareToBluesky(base);
     } finally {
       setSharing(false);
     }
