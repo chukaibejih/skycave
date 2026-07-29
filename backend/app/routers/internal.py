@@ -66,21 +66,42 @@ async def daily_roundup(
     posting, so the cron can be exercised safely and the copy inspected."""
     _guard(x_internal_secret)
 
+    from app.models.roundup import RoundupShoutout
+
     now = datetime.now(timezone.utc)
     end = now.replace(hour=0, minute=0, second=0, microsecond=0)  # today 00:00 UTC
     start = end - timedelta(days=1)  # yesterday 00:00 UTC
     day_label = start.strftime("%b %-d")
 
+    covered = start.date().isoformat()  # the day this roundup is about
+    prev_day = (start - timedelta(days=1)).date().isoformat()
+
+    # Who the last roundup shouted out. The composer steers the standout away
+    # from these so a dominant player is never featured two days running.
+    prev_row = await db.get(RoundupShoutout, prev_day)
+    recent = set(prev_row.handles or []) if prev_row else set()
+
     data = await announce.collect_day(db, start, end)
-    text = announce.compose_roundup(data, day_label)
+    text, featured = announce.compose_roundup(data, day_label, recent=recent)
 
     if text is None:
         return {"posted": False, "reason": "quiet day", "text": None}
     if dry_run:
-        return {"posted": False, "dry_run": True, "text": text, "chars": len(text)}
+        return {
+            "posted": False, "dry_run": True, "text": text, "chars": len(text),
+            "featured": featured, "suppressed": sorted(recent),
+        }
 
     ok = await _post_to_bluesky(text)
-    return {"posted": ok, "text": text, "chars": len(text)}
+    if ok:
+        # Remember today's shout-outs so tomorrow can avoid a back-to-back.
+        row = await db.get(RoundupShoutout, covered)
+        if row:
+            row.handles = featured
+        else:
+            db.add(RoundupShoutout(day=covered, handles=featured))
+        await db.commit()
+    return {"posted": ok, "text": text, "chars": len(text), "featured": featured}
 
 
 @router.post("/announce-launch")

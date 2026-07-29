@@ -91,14 +91,21 @@ def _versus_line(handle: str, game_types: list[str]) -> str:
     return f"{who} TOOK {names[0]}, {names[1]} AND MORE"
 
 
-def compose_roundup(data: DayData, day_label: str) -> str | None:
-    """The day's post, or None to stay silent.
+def compose_roundup(
+    data: DayData, day_label: str, recent: set[str] | None = None
+) -> tuple[str | None, list[str]]:
+    """The day's post and the handles it featured, or (None, []) to stay silent.
 
     day_label is a short human date like "Jul 22" used only on the quiet-day form.
+    `recent` is who the previous roundup shouted out; the standout score steers
+    away from them so a dominant player is never featured two days running. The
+    returned handles are recorded so tomorrow can do the same.
     """
+    recent = recent or set()
+
     # Guardrail 1: skip quiet days.
     if data.total_games < QUIET_MIN_GAMES or len(data.named_players) < QUIET_MIN_PLAYERS:
-        return None
+        return None, []
 
     busy = data.total_games >= BUSY_MIN_GAMES and len(data.named_players) >= BUSY_MIN_PLAYERS
 
@@ -106,61 +113,81 @@ def compose_roundup(data: DayData, day_label: str) -> str | None:
     # player, else the day's standout score. This is what stops the top scorer
     # from leading every single day.
     lead: str | None = None
-    featured: str | None = None
+    lead_handle: str | None = None
     if data.first_wins:
         h = data.first_wins[0]
         lead = f"\U0001f389 {_at(h)} JUST GOT THEIR FIRST SKYCAVE WIN. WELCOME TO THE CAVE."
-        featured = h
+        lead_handle = h
     elif data.newcomers:
         h = data.newcomers[0]
         lead = f"\U0001f44b {_at(h)} STEPPED INTO THE CAVE FOR THE FIRST TIME YESTERDAY."
-        featured = h
+        lead_handle = h
 
-    star = data.top_solo[0] if data.top_solo else None
+    used: set[str] = {lead_handle} if lead_handle else set()
+    # The standout score, avoiding the lead and yesterday's shout-outs.
+    star = _pick_star(data.top_solo, used, recent)
+    featured: list[str] = []
 
     # --- Quiet day: one highlight + a challenge (Option B) ---
     if not busy:
         if lead:
+            featured.append(lead_handle)  # type: ignore[arg-type]
             body = lead
-            if star and star.handle != featured:
+            if star and star.handle != lead_handle:
                 body += f"\n\nALSO YESTERDAY: {_score_line(star)}."
+                featured.append(star.handle)
             tail = "\n\nCOME PLAY: skycave.space"
         elif star:
             body = f"YESTERDAY'S TOP SCORE: {_score_line(star)}"
+            featured.append(star.handle)
             tail = f"\n\nTHINK YOU CAN BEAT IT? skycave.space/play/{_slug(star.game_type)}"
         else:
-            return None
-        return _fit(body + tail)
+            return None, []
+        return _fit(body + tail), featured
 
     # --- Busy day: a short recap (Option A) ---
     lines: list[str] = ["YESTERDAY IN THE CAVE \U0001f3ae"]  # 🎮
     body_lines: list[str] = []
-    used: set[str] = set()
 
     if lead:
         body_lines.append(lead)
-        used.add(featured or "")
+        featured.append(lead_handle)  # type: ignore[arg-type]
 
     # The standout score, if its player isn't already the lead.
     if star and star.handle not in used:
         body_lines.append(f"{_score_line(star)}.")
         used.add(star.handle)
+        featured.append(star.handle)
 
     # Spotlight spread: pull in a *different* winner than everyone so far.
     other = _second_voice(data, used)
     if other:
-        body_lines.append(f"{other}.")
+        other_handle, other_line = other
+        body_lines.append(f"{other_line}.")
+        featured.append(other_handle)
 
     if not body_lines:
-        return None
+        return None, []
 
     post = lines[0] + "\n\n" + "\n".join(body_lines) + "\n\nYOUR MOVE: skycave.space"
-    return _fit(post)
+    return _fit(post), featured
 
 
-def _second_voice(data: DayData, used: set[str]) -> str | None:
-    """A recap line for a player not yet featured, preferring a lighter name so
-    the spotlight spreads beyond the day's heaviest player."""
+def _pick_star(top_solo: list[Highlight], used: set[str], recent: set[str]) -> Highlight | None:
+    """The standout score. Skip anyone already in the post, and prefer someone
+    who was NOT shouted out in the previous roundup, so the top player does not
+    headline two days running. Only if nobody else scored do we allow a repeat,
+    since a real highlight beats going silent."""
+    fresh = [h for h in top_solo if h.handle not in used and h.handle not in recent]
+    if fresh:
+        return fresh[0]
+    rest = [h for h in top_solo if h.handle not in used]
+    return rest[0] if rest else None
+
+
+def _second_voice(data: DayData, used: set[str]) -> tuple[str, str] | None:
+    """A recap (handle, line) for a player not yet featured, preferring a lighter
+    name so the spotlight spreads beyond the day's heaviest player."""
     # Aggregate 1v1 wins by handle, skipping anyone already featured.
     by_handle: dict[str, list[str]] = {}
     for handle, gt in data.versus_wins:
@@ -173,11 +200,11 @@ def _second_voice(data: DayData, used: set[str]) -> str | None:
         # Fall back to a second solo scorer.
         for h in data.top_solo:
             if h.handle not in used and h.handle != "guest":
-                return _score_line(h)
+                return h.handle, _score_line(h)
         return None
     # Prefer the handle with the FEWEST wins (the lighter player), to spread it.
     handle = min(by_handle, key=lambda h: len(by_handle[h]))
-    return _versus_line(handle, by_handle[handle])
+    return handle, _versus_line(handle, by_handle[handle])
 
 
 def _fit(text: str) -> str:
