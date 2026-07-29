@@ -16,6 +16,7 @@ unit-tested against real production numbers without touching a database.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from app.games.registry import get_game
@@ -33,6 +34,12 @@ BSKY_LIMIT = 300  # a Bluesky post's hard character ceiling
 def _game_name(game_type: str) -> str:
     g = get_game(game_type)
     return g.name if g else game_type
+
+
+def _solo_name(name: str) -> str:
+    """A name for a solo highlight. Some names bake in a mode (e.g. "GeoGuess
+    1v1"), which reads wrong on a solo score, so trim a trailing 1v1."""
+    return re.sub(r"\s*1v1$", "", name, flags=re.IGNORECASE)
 
 
 def _slug(game_type: str) -> str:
@@ -78,7 +85,7 @@ def _score_line(h: Highlight) -> str:
         return f"{who} RAN THE UNO TABLE"
     if h.game_type == "tile_takeover":
         return f"{who} FLOODED THE BOARD IN TILE TAKEOVER"
-    return f"{who} TOPPED {name.upper()} WITH {h.score:,}"
+    return f"{who} TOPPED {_solo_name(name).upper()} WITH {h.score:,}"
 
 
 def _versus_line(handle: str, game_types: list[str]) -> str:

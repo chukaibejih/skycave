@@ -15,3 +15,7 @@ export const GAME_NAME: Record<string, string> = {
   uno: "Uno",
 };
 export const gameName = (t: string) => GAME_NAME[t] ?? t;
+
+// A game name for solo / mode-agnostic contexts. Some names bake in a mode
+// (e.g. "GeoGuess 1v1"), which reads wrong on a solo run, so trim a trailing 1v1.
+export const soloName = (name: string) => name.replace(/\s*1v1$/i, "");

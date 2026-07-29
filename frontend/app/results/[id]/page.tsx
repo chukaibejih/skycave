@@ -9,6 +9,7 @@ import { createRoom, getRoom, getScorecard } from "@/lib/api";
 import { BlueskyConnect } from "@/components/ui/BlueskyConnect";
 import { downloadScoreCard } from "@/lib/scorecard-image";
 import { resolveSoloBest, soloShareText, gameSlug } from "@/lib/solo";
+import { soloName } from "@/lib/gameNames";
 import { useAuth } from "@/lib/store";
 import type { Room } from "@/lib/types";
 
@@ -78,7 +79,8 @@ export default function ResultsPage() {
     const metric = summary?.metric ?? `${score.toLocaleString()} pts`;
     const isBest = soloBest?.isBest ?? false;
     const prevBest = soloBest?.prevBest ?? null;
-    const gameName = room.game_name ?? room.game_type;
+    // Solo run: never carry a "1v1" the game name bakes in (e.g. GeoGuess 1v1).
+    const gameName = soloName(room.game_name ?? room.game_type);
     const slug = gameSlug(room.game_type);
 
     const text = soloShareText({ gameName, gameType: room.game_type, metric, isBest });
