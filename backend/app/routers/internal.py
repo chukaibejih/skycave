@@ -11,6 +11,7 @@ password and turns @handles + links into real facets.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -36,15 +37,17 @@ def _guard(secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
-async def _post_to_bluesky(text: str) -> bool:
+async def _post_to_bluesky(payload: str | list[str]) -> bool:
     """Hand finished text to the sidecar, which owns the credential and facets.
-    Fire-and-forget in spirit: never raises into the caller."""
+    A list posts as a thread (first post tagged, the rest as replies); a string
+    posts as a single announcement. Fire-and-forget in spirit: never raises."""
     url = f"{settings.oauth_sidecar_url.rstrip('/')}/internal/announce"
+    body = {"posts": payload} if isinstance(payload, list) else {"text": payload}
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(
                 url,
-                json={"text": text},
+                json=body,
                 headers={"x-internal-secret": settings.oauth_internal_secret},
             )
         if r.status_code != 200:
@@ -132,6 +135,23 @@ MAX_ATTEMPTS = 5
 # of posts in one second, which is what gets an account flagged.
 DRAIN_LIMIT = 4
 
+# The draw is stored as a JSON array of thread posts (see tournament_posts and
+# tournament.lock_and_draw). Everything else is a single post.
+KIND_DRAW = "tournament_draw"
+
+
+def _row_payload(row: AnnouncementOutbox) -> str | list[str]:
+    """A draw row carries a JSON list of thread posts; hand that to the sidecar
+    as a thread. Anything else (and any malformed draw row) posts as one post."""
+    if row.kind == KIND_DRAW:
+        try:
+            data = json.loads(row.text)
+            if isinstance(data, list) and data:
+                return [str(p) for p in data]
+        except (ValueError, TypeError):
+            pass
+    return row.text
+
 
 @router.post("/announce-drain")
 async def announce_drain(
@@ -174,7 +194,7 @@ async def announce_drain(
     sent, failed = 0, 0
     for row in pending:
         row.attempts += 1
-        if await _post_to_bluesky(row.text):
+        if await _post_to_bluesky(_row_payload(row)):
             row.posted_at = datetime.now(timezone.utc)
             row.error = None
             sent += 1

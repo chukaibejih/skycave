@@ -14,6 +14,7 @@ Two things matter here and neither is provable by reading the composer:
 The posts are printed so the copy can be read as a human would see it.
 """
 import asyncio
+import json
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -126,9 +127,23 @@ async def test_cadence_and_limit() -> None:
                 assert kinds[0] == posts.KIND_DRAW, kinds
                 assert kinds[-1] == posts.KIND_CHAMPION, kinds
                 for r in rows:
-                    assert len(r.text) <= posts.BSKY_LIMIT, (
-                        f"{players} players, {r.dedupe_key}: {len(r.text)} chars over the limit"
-                    )
+                    if r.kind == posts.KIND_DRAW:
+                        # The draw is a JSON array of thread posts. The first
+                        # leaves room for the hashtags; continuation posts carry
+                        # none, so they use the full 300.
+                        segs = json.loads(r.text)
+                        assert isinstance(segs, list) and segs, r.text
+                        assert len(segs[0]) <= posts.BSKY_LIMIT, (
+                            f"{players} players draw post 1: {len(segs[0])} over the limit"
+                        )
+                        for seg in segs[1:]:
+                            assert len(seg) <= 300, (
+                                f"{players} players draw reply: {len(seg)} over 300"
+                            )
+                    else:
+                        assert len(r.text) <= posts.BSKY_LIMIT, (
+                            f"{players} players, {r.dedupe_key}: {len(r.text)} chars over the limit"
+                        )
                     assert t.id in r.text, f"{r.dedupe_key} has no bracket link"
 
                 # Nothing is dropped in silence. A draw post that shows some of

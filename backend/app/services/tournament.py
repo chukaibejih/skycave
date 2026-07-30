@@ -12,6 +12,7 @@ nothing is remembered in process.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 from datetime import datetime, timezone
@@ -335,11 +336,13 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     # drawn tournament can never exist without its announcement owed.
     handles = {e.did: e.handle for e in people}
     r1 = [fx for fx in fixtures if fx.round == 1]
+    # compose_draw returns an ordered list of thread posts; store it as JSON so
+    # the drain can post them as a thread (KIND_DRAW rows carry a JSON array).
     await posts.enqueue(
         db,
         kind=posts.KIND_DRAW,
         dedupe_key=f"{locked.id}:draw",
-        text=posts.compose_draw(
+        text=json.dumps(posts.compose_draw(
             name=locked.name,
             tournament_id=locked.id,
             entrants=len(people),
@@ -354,7 +357,7 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
                 for fx in r1
                 if fx.is_bye
             ],
-        ),
+        )),
     )
     await db.commit()
     logger.info(

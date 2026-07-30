@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import { createClient, FRONTEND_URL } from "./client";
 import { handleCallback } from "./callback";
 import { readDidFromCookie, clearSessionCookie } from "./session";
-import { postAnnouncement, announcerConfigured } from "./announcer";
+import { postAnnouncement, postThread, announcerConfigured } from "./announcer";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const INTERNAL_SECRET = process.env.OAUTH_INTERNAL_SECRET ?? "";
@@ -65,10 +65,18 @@ async function main() {
     if (!announcerConfigured()) {
       return res.status(503).json({ error: "announcer_not_configured" });
     }
+    // A `posts` array threads (first post tagged, the rest replies); `text` is a
+    // single announcement.
+    const posts = Array.isArray(req.body?.posts)
+      ? req.body.posts.map((p: unknown) => String(p).trim()).filter(Boolean)
+      : null;
     const text = String((req.body && req.body.text) || "").trim();
-    if (!text) return res.status(400).json({ error: "empty_text" });
+    if ((!posts || posts.length === 0) && !text) {
+      return res.status(400).json({ error: "empty_text" });
+    }
     try {
-      const uri = await postAnnouncement(text);
+      const uri =
+        posts && posts.length ? await postThread(posts) : await postAnnouncement(text);
       return res.json({ ok: true, uri });
     } catch (err) {
       console.error("[announce] post failed:", err);

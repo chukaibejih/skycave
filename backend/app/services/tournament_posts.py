@@ -100,6 +100,31 @@ def _fit(lead: str, body: list[str], tail: str) -> str:
 # The three posts
 # --------------------------------------------------------------------------- #
 
+# Post-length budgets for the draw thread. The first post leaves room for the
+# hashtags the sidecar appends; continuation posts carry none, so they use the
+# full ceiling.
+DRAW_FIRST_LIMIT = BSKY_LIMIT  # 270, room for #blacksky #blackskygamers
+DRAW_CONT_LIMIT = 297
+
+
+def _bye_lines(byes: list[str]) -> list[str]:
+    """Bye handles as one or more taggable lines, split so none overflows a post.
+    Byes are players too, and the whole point of the thread is that every player
+    is tagged."""
+    lines: list[str] = []
+    cur: list[str] = []
+    for h in byes:
+        tag = _at(h)
+        if cur and len("BYES: " + ", ".join(cur + [tag])) > 240:
+            lines.append("BYES: " + ", ".join(cur))
+            cur = [tag]
+        else:
+            cur.append(tag)
+    if cur:
+        lines.append("BYES: " + ", ".join(cur))
+    return lines
+
+
 def compose_draw(
     *,
     name: str,
@@ -108,33 +133,55 @@ def compose_draw(
     rounds: int,
     first_round: list[tuple[str | None, str | None]],
     byes: list[str],
-) -> str:
-    """The bracket is up. The one post everybody in the field wants to see.
+) -> list[str]:
+    """The bracket is up, composed as a THREAD so every player is tagged no
+    matter the field size.
 
-    A big field of long handles cannot fit every opening fixture in 300
-    characters. When that happens the post says how many it left out instead of
-    quietly showing the first few, because a truncated list reads as the whole
-    draw and the players missing from it look like they were never entered.
+    The first post leads, carries the link, and (once the sidecar adds them) the
+    hashtags; continuation posts carry the remaining fixtures. Nobody is folded
+    into a "+N more" that never tags them. Returns the ordered post texts.
     """
     lead = (
         f"THE BRACKET IS LIVE. {entrants} PLAYERS. "
         f"{rounds} {'ROUND' if rounds == 1 else 'ROUNDS'}. LET'S GO."
     )
-    fixtures = [f"{_at(p1)} VS {_at(p2)}" for p1, p2 in first_round if p1 and p2]
-    bye_line = f"BYES: {', '.join(_at(h) for h in byes)}" if byes else None
     tail = f"BEST OF THREE EVERY ROUND.\n{bracket_url(tournament_id)}"
+    items = [f"{_at(p1)} VS {_at(p2)}" for p1, p2 in first_round if p1 and p2]
+    items += _bye_lines(byes)
 
-    # Byes are supporting detail; they go before any fixture does.
-    for extras in ([bye_line] if bye_line else [], []):
-        for keep in range(len(fixtures), 0, -1):
-            shown = fixtures[:keep]
-            left = len(fixtures) - keep
-            if left:
-                shown = shown + [f"+{left} MORE FIXTURE{'S' if left > 1 else ''} ON THE BRACKET"]
-            text = "\n\n".join([lead, "\n".join(shown + extras), tail])
-            if len(text) <= BSKY_LIMIT:
-                return text
-    return f"{lead}\n\n{tail}"[:BSKY_LIMIT]
+    thread: list[str] = []
+
+    # First post: lead + as many fixtures as fit above the link.
+    i, first_body = 0, []
+    while i < len(items):
+        trial = "\n\n".join([lead, "\n".join(first_body + [items[i]]), tail])
+        if len(trial) <= DRAW_FIRST_LIMIT:
+            first_body.append(items[i])
+            i += 1
+        else:
+            break
+    thread.append(
+        "\n\n".join([lead, "\n".join(first_body), tail])
+        if first_body
+        else f"{lead}\n\n{tail}"
+    )
+
+    # Continuation posts: the rest of the fixtures, so nobody is left untagged.
+    while i < len(items):
+        body: list[str] = []
+        while i < len(items):
+            trial = "\n".join(["MORE FIXTURES:"] + body + [items[i]])
+            if len(trial) <= DRAW_CONT_LIMIT:
+                body.append(items[i])
+                i += 1
+            else:
+                break
+        if not body:  # a single line longer than a whole post (pathological)
+            body = [items[i]]
+            i += 1
+        thread.append("\n".join(["MORE FIXTURES:"] + body))
+
+    return thread
 
 
 def compose_round(

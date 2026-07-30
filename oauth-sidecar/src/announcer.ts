@@ -65,3 +65,48 @@ export async function postAnnouncement(text: string): Promise<string> {
     return await attempt();
   }
 }
+
+/**
+ * Post an ordered thread as @skycave.space. The first post carries the hashtags
+ * (via withTags) and becomes the thread root; each later post is a reply chained
+ * to the previous one, and carries no hashtags. Returns the root post's AT URI.
+ *
+ * The first post gets the stale-session retry (safe: nothing is posted yet).
+ * Once it lands, replies are best-effort: a failed reply is logged and skipped,
+ * never thrown, so the drain marks the row sent and cannot repost the root,
+ * which would duplicate the whole thread.
+ */
+export async function postThread(posts: string[]): Promise<string> {
+  type Ref = { uri: string; cid: string };
+  const write = async (text: string, reply?: { root: Ref; parent: Ref }) => {
+    const a = await ensureAgent();
+    const rt = new RichText({ text });
+    await rt.detectFacets(a);
+    return a.post({
+      text: rt.text,
+      facets: rt.facets,
+      ...(reply ? { reply } : {}),
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  let first;
+  try {
+    first = await write(withTags(posts[0]));
+  } catch (err) {
+    agent = null; // stale session on the very first post; log in fresh, retry once
+    first = await write(withTags(posts[0]));
+  }
+
+  const root = { uri: first.uri, cid: first.cid };
+  let parent = root;
+  for (let i = 1; i < posts.length; i++) {
+    try {
+      const rep = await write(posts[i], { root, parent });
+      parent = { uri: rep.uri, cid: rep.cid };
+    } catch (err) {
+      console.error(`[announce] thread reply ${i} failed:`, err);
+    }
+  }
+  return first.uri;
+}
