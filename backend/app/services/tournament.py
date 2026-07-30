@@ -458,13 +458,15 @@ async def _queue_progress(
                 (handles.get(f.winner), handles.get(loser or "") if loser else None,
                  wins, losses)
             )
+        # compose_round returns a list of thread posts (a wide round tags every
+        # survivor across the thread); store it as JSON like the draw.
         await posts.enqueue(
             db,
             kind=posts.KIND_ROUND,
             dedupe_key=f"{t.id}:round:{rnd}",
-            text=posts.compose_round(
+            text=json.dumps(posts.compose_round(
                 tournament_id=t.id, round=rnd, rounds=rounds, results=results
-            ),
+            )),
         )
 
     if not champ:

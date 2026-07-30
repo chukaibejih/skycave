@@ -100,11 +100,11 @@ def _fit(lead: str, body: list[str], tail: str) -> str:
 # The three posts
 # --------------------------------------------------------------------------- #
 
-# Post-length budgets for the draw thread. The first post leaves room for the
-# hashtags the sidecar appends; continuation posts carry none, so they use the
-# full ceiling.
-DRAW_FIRST_LIMIT = BSKY_LIMIT  # 270, room for #blacksky #blackskygamers
-DRAW_CONT_LIMIT = 297
+# Post-length budgets for a thread (the draw and wide rounds). The first post
+# leaves room for the hashtags the sidecar appends; continuation posts carry
+# none, so they use the full ceiling.
+THREAD_FIRST_LIMIT = BSKY_LIMIT  # 270, room for #blacksky #blackskygamers
+THREAD_CONT_LIMIT = 297
 
 
 def _bye_lines(byes: list[str]) -> list[str]:
@@ -155,7 +155,7 @@ def compose_draw(
     i, first_body = 0, []
     while i < len(items):
         trial = "\n\n".join([lead, "\n".join(first_body + [items[i]]), tail])
-        if len(trial) <= DRAW_FIRST_LIMIT:
+        if len(trial) <= THREAD_FIRST_LIMIT:
             first_body.append(items[i])
             i += 1
         else:
@@ -171,7 +171,7 @@ def compose_draw(
         body: list[str] = []
         while i < len(items):
             trial = "\n".join(["MORE FIXTURES:"] + body + [items[i]])
-            if len(trial) <= DRAW_CONT_LIMIT:
+            if len(trial) <= THREAD_CONT_LIMIT:
                 body.append(items[i])
                 i += 1
             else:
@@ -190,8 +190,13 @@ def compose_round(
     round: int,
     rounds: int,
     results: list[tuple[str | None, str | None, int, int]],
-) -> str:
+) -> list[str]:
     """A round is done. `results` is (winner, loser, winner_wins, loser_wins).
+
+    Returns an ordered list of thread posts. A round down to one or two fixtures
+    is a single post that tells the story with the scoreline. A wider round names
+    every survivor, threaded so all of them are tagged no matter how many, rather
+    than a single post that would truncate to "+N more".
 
     A loser of None is a bye, and a bye is never posted as a beaten opponent:
     walking through unopposed is not a result, and naming someone as having lost
@@ -201,7 +206,6 @@ def compose_round(
     label, _plural = round_label(round, rounds)
 
     # Down to one or two fixtures there is a story, so tell it with the score.
-    # Any wider and a list of scorelines is just noise, so name who survived.
     if played and len(played) <= 2:
         lead = f"{label.upper()} DONE."
         tail = ""
@@ -210,26 +214,47 @@ def compose_round(
             tail = f"{nxt.upper()} UP NEXT.\n"
         tail += bracket_url(tournament_id)
         body = [f"{_at(w)} TOOK IT {a}-{b} AGAINST {_at(l)}" for w, l, a, b in played]
-        return _fit(lead, body, tail)
+        return [_fit(lead, body, tail)]
 
-    # A wide round names survivors. Same rule as the draw: if they do not all
-    # fit, say how many are missing rather than showing a list that looks whole.
+    # A wide round names every survivor, threaded so all are tagged.
     lead = f"{label.upper()} WRAPPED."
     tail = ""
     if round < rounds:
         nxt, _ = round_label(round + 1, rounds)
         tail = f"{nxt.upper()} NEXT.\n"
     tail += bracket_url(tournament_id)
-    through = [_at(w) for w, _, _, _ in results if w]
-    for keep in range(len(through), 0, -1):
-        left = len(through) - keep
-        line = "STILL STANDING: " + ", ".join(through[:keep])
-        if left:
-            line += f" +{left} MORE"
-        text = "\n\n".join([lead, line, tail])
-        if len(text) <= BSKY_LIMIT:
-            return text
-    return f"{lead}\n\n{tail}"[:BSKY_LIMIT]
+    survivors = [_at(w) for w, _, _, _ in results if w]
+
+    thread: list[str] = []
+
+    # First post: lead + "STILL STANDING: <names that fit>" + tail.
+    i, first = 0, []
+    while i < len(survivors):
+        line = "STILL STANDING: " + ", ".join(first + [survivors[i]])
+        if len("\n\n".join([lead, line, tail])) <= THREAD_FIRST_LIMIT:
+            first.append(survivors[i])
+            i += 1
+        else:
+            break
+    first_line = "STILL STANDING: " + ", ".join(first) if first else "STILL STANDING:"
+    thread.append("\n\n".join([lead, first_line, tail]))
+
+    # Continuation posts: the rest of the survivors, so nobody is left untagged.
+    while i < len(survivors):
+        names: list[str] = []
+        while i < len(survivors):
+            line = "STILL STANDING: " + ", ".join(names + [survivors[i]])
+            if len(line) <= THREAD_CONT_LIMIT:
+                names.append(survivors[i])
+                i += 1
+            else:
+                break
+        if not names:  # a single name longer than a whole post (pathological)
+            names = [survivors[i]]
+            i += 1
+        thread.append("STILL STANDING: " + ", ".join(names))
+
+    return thread
 
 
 def compose_champion(

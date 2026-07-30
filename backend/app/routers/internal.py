@@ -135,21 +135,17 @@ MAX_ATTEMPTS = 5
 # of posts in one second, which is what gets an account flagged.
 DRAIN_LIMIT = 4
 
-# The draw is stored as a JSON array of thread posts (see tournament_posts and
-# tournament.lock_and_draw). Everything else is a single post.
-KIND_DRAW = "tournament_draw"
-
-
 def _row_payload(row: AnnouncementOutbox) -> str | list[str]:
-    """A draw row carries a JSON list of thread posts; hand that to the sidecar
-    as a thread. Anything else (and any malformed draw row) posts as one post."""
-    if row.kind == KIND_DRAW:
-        try:
-            data = json.loads(row.text)
-            if isinstance(data, list) and data:
-                return [str(p) for p in data]
-        except (ValueError, TypeError):
-            pass
+    """Draw and round rows store a JSON list of thread posts (see
+    tournament_posts); hand those to the sidecar as a thread. Everything else is
+    a plain string and posts as a single announcement. A plain post is never
+    valid JSON, so the parse cleanly distinguishes the two."""
+    try:
+        data = json.loads(row.text)
+        if isinstance(data, list) and data:
+            return [str(p) for p in data]
+    except (ValueError, TypeError):
+        pass
     return row.text
 
 
