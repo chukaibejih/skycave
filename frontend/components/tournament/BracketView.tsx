@@ -454,16 +454,22 @@ function Slot({
           />
         </>
       )}
-      <Avatar id={player.did} name={player.display_name} avatarUrl={player.avatar_url} size={22} />
-      <span
-        className="relative min-w-0 flex-1 truncate text-xs"
-        style={{
-          color: "var(--color-text-primary)",
-          fontWeight: winner ? 700 : 500,
-        }}
+      <Link
+        href={`/u/${player.handle}`}
+        className="relative flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-80"
+        title={`@${player.handle}`}
       >
-        {player.display_name}
-      </span>
+        <Avatar id={player.did} name={player.display_name} avatarUrl={player.avatar_url} size={22} />
+        <span
+          className="min-w-0 flex-1 truncate text-xs"
+          style={{
+            color: "var(--color-text-primary)",
+            fontWeight: winner ? 700 : 500,
+          }}
+        >
+          {player.display_name}
+        </span>
+      </Link>
       {wins !== null && wins !== undefined && (
         <span
           className="relative shrink-0 pr-1.5 font-[var(--font-display)] text-[13px] font-bold tabular-nums"
