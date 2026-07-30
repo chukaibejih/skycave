@@ -21,6 +21,9 @@ export interface SoloSummary {
   player_id: string;
   score: number;
   metric: string; // e.g. "18,420 pts · 5 rounds"
+  // Beat the Caver? Set only for the vs-Caver win/lose games; null for pure
+  // solo games (where there is no opponent, just your own best).
+  won: boolean | null;
   is_best: boolean | null; // null for guests (decided client-side)
   prev_best: number | null;
 }

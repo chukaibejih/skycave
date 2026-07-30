@@ -889,10 +889,21 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
     score = gs["scores"].get(pid, 0)
     metric = game.solo_metric(score, gs) if game else f"{score:,} pts"
 
+    # Did the player beat the Caver? Only meaningful for the vs-Caver turn games
+    # (two scores in play); pure solo games (one score) leave it null. The client
+    # uses this to frame the share for win/lose games, where a bare count says
+    # nothing about who actually won.
+    scores = gs.get("scores", {})
+    won: bool | None = None
+    if len(scores) > 1:
+        opponent = max((v for k, v in scores.items() if k != pid), default=0)
+        won = score > opponent
+
     summary: dict[str, Any] = {
         "player_id": pid,
         "score": score,
         "metric": metric,
+        "won": won,
         "is_best": None,
         "prev_best": None,
     }

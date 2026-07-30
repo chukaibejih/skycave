@@ -35,15 +35,31 @@ function shortDate(): string {
  *   beat my score:
  *   skycave.space/play/color-clash
  */
+// Games that are won or lost, not scored. A bare count ("34 tiles") or a plain
+// "beat the Caver" reads oddly under "beat my score", so these get a first-person
+// brag instead of the score format.
+const WINLOSS_GAMES = new Set(["connect4", "uno", "tile_takeover", "dots_boxes"]);
+
 export function soloShareText(opts: {
   gameName: string;
   gameType: string;
   metric: string;
   isBest: boolean;
+  won?: boolean | null;
 }): string {
+  const url = playUrl(opts.gameType);
+
+  // Win/lose games: brag or rally, no phantom "score".
+  if (WINLOSS_GAMES.has(opts.gameType)) {
+    return opts.won
+      ? [`I just beat the Caver at ${opts.gameName} 🏆`, "", "Bet you can't:", url].join("\n")
+      : [`The Caver got me at ${opts.gameName} 😮‍💨`, "", "Avenge me:", url].join("\n");
+  }
+
+  // Scored games: the number is the point, so keep it.
   const lines = [`${opts.gameName} on Skycave · ${shortDate()}`, "", opts.metric];
   if (opts.isBest) lines.push("personal best");
-  lines.push("", "beat my score:", playUrl(opts.gameType));
+  lines.push("", "beat my score:", url);
   return lines.join("\n");
 }
 

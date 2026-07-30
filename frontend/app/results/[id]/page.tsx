@@ -83,7 +83,13 @@ export default function ResultsPage() {
     const gameName = soloName(room.game_name ?? room.game_type);
     const slug = gameSlug(room.game_type);
 
-    const text = soloShareText({ gameName, gameType: room.game_type, metric, isBest });
+    const text = soloShareText({
+      gameName,
+      gameType: room.game_type,
+      metric,
+      isBest,
+      won: summary?.won ?? null,
+    });
 
     return (
       <main className="mx-auto grid min-h-[100dvh] w-full max-w-6xl items-center gap-8 px-5 py-10 lg:grid-cols-[0.9fr_1.1fr]">
