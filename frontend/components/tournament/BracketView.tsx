@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackButton } from "@/components/nav/BackButton";
-import { Countdown, Weekday } from "@/components/tournament/Countdown";
+import { Countdown, LocalTime } from "@/components/tournament/Countdown";
 import { getTournament, type Tournament, type TournamentMatch, type TournamentPlayer } from "@/lib/api";
 
 const POLL_MS = 30_000;
@@ -89,6 +89,9 @@ export function BracketView({ id }: { id: string }) {
   // The live round is the earliest one still holding an undecided match.
   const activeRound =
     t.matches.filter((m) => m.status !== "done" && m.status !== "bye").sort((a, b) => a.round - b.round)[0]?.round ?? null;
+  // Before play opens the round deadline is not counting down on anyone yet, so
+  // showing "closes in..." next to it just reads as a second, confusing clock.
+  const playOpen = Date.now() >= new Date(t.play_opens_at).getTime();
 
   return (
     <Shell>
@@ -117,7 +120,7 @@ export function BracketView({ id }: { id: string }) {
                   >
                     {roundName(r, rounds)}
                   </div>
-                  {dl && live && (
+                  {dl && live && playOpen && (
                     <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
                       closes in <Countdown to={dl} compact />
                     </div>
@@ -529,7 +532,7 @@ function PlayStrip({ t }: { t: Tournament }) {
           </span>
         ) : (
           <span>
-            Play opens <Weekday iso={t.play_opens_at} /> ·{" "}
+            Play opens <LocalTime iso={t.play_opens_at} /> ·{" "}
             <span className="tabular-nums text-[var(--color-text-primary)]">
               <Countdown to={t.play_opens_at} compact onElapsed={() => setOpen(true)} />
             </span>
