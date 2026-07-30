@@ -299,6 +299,10 @@ function Action({
   if (!m.opponent) {
     return <Waiting>Waiting on the match that feeds yours</Waiting>;
   }
+  // The bracket is drawn, but nobody plays until the play window opens.
+  if (Date.now() < new Date(m.play_opens_at).getTime()) {
+    return <PlayOpensSoon iso={m.play_opens_at} />;
+  }
   if (!m.you_checked_in) {
     return (
       <Big onClick={onCheckIn} disabled={busy} tone="primary">
@@ -418,6 +422,29 @@ function NudgeOpponent({ m }: { m: MyMatch }) {
       </svg>
       Nudge {opp.display_name} on Bluesky
     </button>
+  );
+}
+
+/**
+ * The bracket is up but play has not started. A deactivated play button with a
+ * live countdown to the opening, so a player knows they are in and exactly when
+ * to come back, rather than a check-in button that would only be refused.
+ */
+function PlayOpensSoon({ iso }: { iso: string }) {
+  return (
+    <div
+      className="flex h-[56px] w-full cursor-not-allowed items-center justify-center gap-2 rounded-[16px] text-base font-bold"
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        color: "var(--color-text-secondary)",
+      }}
+    >
+      Play opens in
+      <span className="tabular-nums text-[var(--color-text-primary)]">
+        <Countdown to={iso} compact />
+      </span>
+    </div>
   );
 }
 

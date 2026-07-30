@@ -370,6 +370,9 @@ class MyMatchOut(BaseModel):
     won_match: bool = False
     is_champion: bool = False
     deadline: datetime | None = None
+    # When the play window opens. Until then the bracket is drawn but nobody may
+    # play, so the client shows a disabled "play opens in..." button.
+    play_opens_at: datetime
     # Every fixture the viewer has played in this event, earliest first. It is
     # what makes winning feel earned: a champion sees the whole climb, not just
     # the last game.
@@ -512,6 +515,7 @@ async def _my_match(
         won_match=won,
         is_champion=t.champion_did == did,
         deadline=m.deadline,
+        play_opens_at=t.play_opens_at,
         run=run,
         prompt=prompt,
     )
@@ -522,6 +526,17 @@ async def _live(db: AsyncSession, tournament_id: str) -> Tournament:
     if t is None:
         raise HTTPException(status_code=404, detail="No tournament with that id")
     return await svc.ensure_fresh(db, t)
+
+
+def _require_play_open(t: Tournament) -> None:
+    """The bracket is drawn at registration close, but play does not start until
+    the play window opens. Block check-in and room-opening until then, so the
+    disabled 'play opens in...' button on the client is backed by real gating."""
+    opens = t.play_opens_at
+    if opens.tzinfo is None:
+        opens = opens.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) < opens:
+        raise HTTPException(status_code=409, detail="Play has not opened yet.")
 
 
 @router.get("/{tournament_id}/my-match", response_model=MyMatchOut | None)
@@ -543,6 +558,7 @@ async def check_in(
 ) -> MyMatchOut:
     """Say you are here. The room opens once both of you have."""
     t = await _live(db, tournament_id)
+    _require_play_open(t)
     m = await svc.my_match(db, t.id, identity.id)
     if m is None:
         raise HTTPException(status_code=404, detail="You have no fixture to play")
@@ -570,6 +586,7 @@ async def start(
     is never what decides who holds the host seat.
     """
     t = await _live(db, tournament_id)
+    _require_play_open(t)
     m = await svc.my_match(db, t.id, identity.id)
     if m is None:
         raise HTTPException(status_code=404, detail="You have no fixture to play")

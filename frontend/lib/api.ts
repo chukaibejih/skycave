@@ -347,6 +347,7 @@ export interface MyMatch {
   won_match: boolean;
   is_champion: boolean;
   deadline: string | null;
+  play_opens_at: string;
   run: RunStep[];
   prompt: string;
 }

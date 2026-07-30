@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackButton } from "@/components/nav/BackButton";
-import { Countdown } from "@/components/tournament/Countdown";
+import { Countdown, Weekday } from "@/components/tournament/Countdown";
 import { getTournament, type Tournament, type TournamentMatch, type TournamentPlayer } from "@/lib/api";
 
 const POLL_MS = 30_000;
@@ -93,6 +93,8 @@ export function BracketView({ id }: { id: string }) {
   return (
     <Shell>
       <Header t={t} />
+
+      {t.status !== "finished" && <PlayStrip t={t} />}
 
       {t.champion && <ChampionBanner player={t.champion} />}
 
@@ -498,6 +500,66 @@ function ChampionBanner({ player }: { player: TournamentPlayer }) {
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * The one strip that answers "can I play, and when". The bracket is drawn at
+ * registration close, but play does not start until the play window opens, so
+ * before then this shows a deactivated play button and a countdown to the start;
+ * once open, a live button straight to the player's fixture. Only entrants get
+ * the button; spectators just see the status.
+ */
+function PlayStrip({ t }: { t: Tournament }) {
+  const opensAt = new Date(t.play_opens_at).getTime();
+  const [open, setOpen] = useState(Date.now() >= opensAt);
+
+  const btnBase =
+    "inline-flex h-11 shrink-0 items-center justify-center rounded-[13px] px-5 text-sm font-bold";
+
+  return (
+    <div
+      className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border p-4"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+    >
+      <div className="text-sm font-semibold">
+        {open ? (
+          <span style={{ color: "var(--color-success)" }}>
+            Play is live. Go and play your match.
+          </span>
+        ) : (
+          <span>
+            Play opens <Weekday iso={t.play_opens_at} /> ·{" "}
+            <span className="tabular-nums text-[var(--color-text-primary)]">
+              <Countdown to={t.play_opens_at} compact onElapsed={() => setOpen(true)} />
+            </span>
+          </span>
+        )}
+      </div>
+
+      {t.you_registered &&
+        (open ? (
+          <Link
+            href={`/tournament/${t.id}/match`}
+            className={btnBase}
+            style={{ background: "var(--color-success)", color: "#05060a" }}
+          >
+            Play your match →
+          </Link>
+        ) : (
+          <span
+            aria-disabled
+            className={`${btnBase} cursor-not-allowed`}
+            style={{
+              background: "var(--color-elevated)",
+              color: "var(--color-text-secondary)",
+              opacity: 0.7,
+            }}
+          >
+            Play your match
+          </span>
+        ))}
+    </div>
   );
 }
 
