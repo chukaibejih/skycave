@@ -189,13 +189,18 @@ def compose_play_live(
     *, name: str, tournament_id: str, players: list[str]
 ) -> list[str]:
     """Play just opened: the kickoff post, tagging everyone with a round-one
-    fixture so they get a notification that it is time to go play. Threaded like
-    the draw, so no field size leaves anyone untagged."""
+    fixture so they know it is open. Threaded like the draw so no field size
+    leaves anyone untagged.
+
+    Unlike the celebratory posts, this one does not shout. It is the tournament
+    telling players they can start, and that they have until the round closes, so
+    the tone is a calm nudge, not a starting gun.
+    """
     lead = (
-        f"\U0001f534 ROUND 1 IS LIVE. {len(players)} IN. "
-        f"GO PLAY YOUR FIRST FIXTURE."
-    )  # 🔴
-    tail = f"BEST OF THREE. WIN IT, YOU'RE THROUGH.\n{bracket_url(tournament_id)}"
+        "Round one is open. No rush, play your first fixture any time before "
+        "the round closes. Best of three, the winner goes through."
+    )
+    tail = bracket_url(tournament_id)
     items = [_at(h) for h in players]
 
     thread: list[str] = []
@@ -217,7 +222,7 @@ def compose_play_live(
     while i < len(items):
         names: list[str] = []
         while i < len(items):
-            line = "ALSO PLAYING: " + ", ".join(names + [items[i]])
+            line = "Also up: " + ", ".join(names + [items[i]])
             if len(line) <= THREAD_CONT_LIMIT:
                 names.append(items[i])
                 i += 1
@@ -226,7 +231,7 @@ def compose_play_live(
         if not names:
             names = [items[i]]
             i += 1
-        thread.append("ALSO PLAYING: " + ", ".join(names))
+        thread.append("Also up: " + ", ".join(names))
 
     return thread
 
