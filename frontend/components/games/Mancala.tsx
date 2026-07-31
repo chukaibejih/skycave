@@ -78,6 +78,13 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const [help, setHelp] = useState(false);
   // The "Hint" button's suggestion (a pit index), shown only in solo.
   const [hintedPit, setHintedPit] = useState<number | null>(null);
+  // Players who want the pure challenge can switch the assist off; the choice
+  // is remembered. Starts on, since the whole point is helping people who stall.
+  const [assistOn, setAssistOn] = useState(true);
+  useEffect(() => {
+    const v = typeof window !== "undefined" ? window.localStorage.getItem("mancala-assist") : null;
+    if (v !== null) setAssistOn(v === "1");
+  }, []);
 
   const paint = (pits: number[]) => {
     displayRef.current = pits;
@@ -171,9 +178,10 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const solo = opp === "ai";
   const mySide = sides.iAm0 ? 0 : 1;
   const pits = board.pits; // narrowed non-null by the guard above
+  const assist = solo && assistOn;
   const hints = useMemo<Record<number, MoveHint>>(
-    () => (solo && myTurn && !over ? moveHints(pits, mySide) : {}),
-    [solo, myTurn, over, pits, mySide]
+    () => (assist && myTurn && !over ? moveHints(pits, mySide) : {}),
+    [assist, myTurn, over, pits, mySide]
   );
 
   const play = (pit: number) => {
@@ -185,6 +193,19 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const showHint = () => {
     const m = bestMove(pits, mySide);
     if (m !== null) setHintedPit(m);
+  };
+
+  const toggleAssist = () => {
+    setAssistOn((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem("mancala-assist", next ? "1" : "0");
+      } catch {
+        /* private mode; the choice just won't persist */
+      }
+      if (!next) setHintedPit(null);
+      return next;
+    });
   };
 
   const banner = over
@@ -211,11 +232,29 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
              style={{ color: over ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {banner}
         </div>
-        <div className="flex w-[72px] justify-end">
+        <div className="flex items-center justify-end gap-1.5">
+          {solo && (
+            <button
+              onClick={toggleAssist}
+              aria-pressed={assistOn}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition-colors"
+              style={{
+                borderColor: assistOn ? YOU : "var(--color-border)",
+                background: assistOn ? `${YOU}1f` : "var(--color-surface)",
+                color: assistOn ? YOU : "var(--color-text-secondary)",
+              }}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: assistOn ? YOU : "var(--color-text-secondary)" }}
+              />
+              Assist
+            </button>
+          )}
           <button
             onClick={() => setHelp(true)}
             aria-label="How to play"
-            className="grid h-8 w-8 place-items-center rounded-full border font-[var(--font-display)] text-sm font-bold text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border font-[var(--font-display)] text-sm font-bold text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
             style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
           >
             ?
@@ -310,7 +349,7 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
           {myScore} - {oppScore}
         </div>
         <div className="flex w-[72px] justify-end">
-          {solo && myTurn && !over && (
+          {assist && myTurn && !over && (
             <button
               onClick={showHint}
               className="inline-flex h-8 items-center gap-1 rounded-full border px-3 font-[var(--font-display)] text-xs font-bold text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
