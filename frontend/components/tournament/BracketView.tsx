@@ -5,7 +5,14 @@ import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackButton } from "@/components/nav/BackButton";
 import { Countdown, LocalTime } from "@/components/tournament/Countdown";
-import { getTournament, type Tournament, type TournamentMatch, type TournamentPlayer } from "@/lib/api";
+import {
+  getTournament,
+  getMyMatch,
+  type Tournament,
+  type TournamentMatch,
+  type TournamentPlayer,
+  type MyMatch,
+} from "@/lib/api";
 
 const POLL_MS = 30_000;
 
@@ -513,61 +520,97 @@ function ChampionBanner({ player }: { player: TournamentPlayer }) {
 }
 
 /**
- * The one strip that answers "can I play, and when". The bracket is drawn at
- * registration close, but play does not start until the play window opens, so
- * before then this shows a deactivated play button and a countdown to the start;
- * once open, a live button straight to the player's fixture. Only entrants get
- * the button; spectators just see the status.
+ * The one strip that answers "can I play, and when". Before the play window it
+ * counts down to the start with a deactivated button. Once open, it reflects the
+ * viewer's actual standing (out, through, champion, or a live fixture) via
+ * my-match, so an eliminated player is never told to go play. Spectators just
+ * see that play is live.
  */
 function PlayStrip({ t }: { t: Tournament }) {
   const opensAt = new Date(t.play_opens_at).getTime();
   const [open, setOpen] = useState(Date.now() >= opensAt);
+  const [mine, setMine] = useState<MyMatch | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!open || !t.you_registered) {
+      setMine(null);
+      return;
+    }
+    let alive = true;
+    const load = () =>
+      getMyMatch(t.id)
+        .then((m) => alive && setMine(m))
+        .catch(() => alive && setMine(null));
+    load();
+    const iv = setInterval(load, 20_000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, [open, t.id, t.you_registered]);
 
   const btnBase =
     "inline-flex h-11 shrink-0 items-center justify-center rounded-[13px] px-5 text-sm font-bold";
+  const S = "var(--color-success)";
+
+  // The line, and whether there is a match to actually play right now.
+  let line: React.ReactNode;
+  let canPlay = false;
+  if (!open) {
+    line = (
+      <span>
+        Play opens <LocalTime iso={t.play_opens_at} /> ·{" "}
+        <span className="tabular-nums text-[var(--color-text-primary)]">
+          <Countdown to={t.play_opens_at} compact onElapsed={() => setOpen(true)} />
+        </span>
+      </span>
+    );
+  } else if (!t.you_registered || mine === undefined) {
+    line = <span style={{ color: S }}>Play is live.</span>; // spectator, or still loading
+  } else if (mine?.is_champion) {
+    line = <span style={{ color: "var(--color-gold)" }}>You won the Cup.</span>;
+  } else if (mine?.eliminated) {
+    line = <span style={{ color: "var(--color-text-secondary)" }}>You are out. Good run.</span>;
+  } else if (mine?.won_match || mine?.is_bye) {
+    line = <span style={{ color: S }}>You are through. Next opponent still to be decided.</span>;
+  } else if (mine && !mine.opponent) {
+    line = (
+      <span style={{ color: "var(--color-text-secondary)" }}>
+        Waiting on the match that feeds yours.
+      </span>
+    );
+  } else if (mine) {
+    line = <span style={{ color: S }}>Play is live. Go and play your match.</span>;
+    canPlay = true;
+  } else {
+    line = <span style={{ color: S }}>Play is live.</span>;
+  }
 
   return (
     <div
       className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border p-4"
       style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
     >
-      <div className="text-sm font-semibold">
-        {open ? (
-          <span style={{ color: "var(--color-success)" }}>
-            Play is live. Go and play your match.
-          </span>
-        ) : (
-          <span>
-            Play opens <LocalTime iso={t.play_opens_at} /> ·{" "}
-            <span className="tabular-nums text-[var(--color-text-primary)]">
-              <Countdown to={t.play_opens_at} compact onElapsed={() => setOpen(true)} />
-            </span>
-          </span>
-        )}
-      </div>
+      <div className="text-sm font-semibold">{line}</div>
 
-      {t.you_registered &&
-        (open ? (
-          <Link
-            href={`/tournament/${t.id}/match`}
-            className={btnBase}
-            style={{ background: "var(--color-success)", color: "#05060a" }}
-          >
-            Play your match →
-          </Link>
-        ) : (
-          <span
-            aria-disabled
-            className={`${btnBase} cursor-not-allowed`}
-            style={{
-              background: "var(--color-elevated)",
-              color: "var(--color-text-secondary)",
-              opacity: 0.7,
-            }}
-          >
-            Play your match
-          </span>
-        ))}
+      {t.you_registered && !open && (
+        <span
+          aria-disabled
+          className={`${btnBase} cursor-not-allowed`}
+          style={{ background: "var(--color-elevated)", color: "var(--color-text-secondary)", opacity: 0.7 }}
+        >
+          Play your match
+        </span>
+      )}
+      {t.you_registered && open && canPlay && (
+        <Link
+          href={`/tournament/${t.id}/match`}
+          className={btnBase}
+          style={{ background: S, color: "#05060a" }}
+        >
+          Play your match →
+        </Link>
+      )}
     </div>
   );
 }
