@@ -156,6 +156,19 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board]);
 
+  // Move markers for the solo assist. Computed before any early return, so the
+  // hook order stays constant across renders (React error #310 otherwise). Empty
+  // in 1v1, when the assist is off, or when it is not your turn.
+  const hints = useMemo<Record<number, MoveHint>>(() => {
+    if (!board?.pits) return {};
+    const oppId = order.find((id) => id !== me) ?? order[1];
+    const myTurnNow = board.turn === me && !animating;
+    const side = sides.iAm0 ? 0 : 1;
+    return oppId === "ai" && assistOn && myTurnNow && !board.done
+      ? moveHints(board.pits, side)
+      : {};
+  }, [board, order, me, animating, assistOn, sides.iAm0]);
+
   if (!board || !board.pits) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center font-[var(--font-display)] text-2xl text-[var(--color-text-secondary)]">
@@ -179,10 +192,6 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const mySide = sides.iAm0 ? 0 : 1;
   const pits = board.pits; // narrowed non-null by the guard above
   const assist = solo && assistOn;
-  const hints = useMemo<Record<number, MoveHint>>(
-    () => (assist && myTurn && !over ? moveHints(pits, mySide) : {}),
-    [assist, myTurn, over, pits, mySide]
-  );
 
   const play = (pit: number) => {
     if (!myTurn || over || display[pit] === 0) return;
