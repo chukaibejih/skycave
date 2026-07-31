@@ -39,6 +39,7 @@ BSKY_LIMIT = 270
 SITE = "skycave.space"
 
 KIND_DRAW = "tournament_draw"
+KIND_LIVE = "tournament_live"
 KIND_ROUND = "tournament_round"
 KIND_CHAMPION = "tournament_champion"
 
@@ -180,6 +181,52 @@ def compose_draw(
             body = [items[i]]
             i += 1
         thread.append("\n".join(["MORE FIXTURES:"] + body))
+
+    return thread
+
+
+def compose_play_live(
+    *, name: str, tournament_id: str, players: list[str]
+) -> list[str]:
+    """Play just opened: the kickoff post, tagging everyone with a round-one
+    fixture so they get a notification that it is time to go play. Threaded like
+    the draw, so no field size leaves anyone untagged."""
+    lead = (
+        f"\U0001f534 ROUND 1 IS LIVE. {len(players)} IN. "
+        f"GO PLAY YOUR FIRST FIXTURE."
+    )  # 🔴
+    tail = f"BEST OF THREE. WIN IT, YOU'RE THROUGH.\n{bracket_url(tournament_id)}"
+    items = [_at(h) for h in players]
+
+    thread: list[str] = []
+
+    # First post: lead + as many mentions as fit above the link.
+    i, first = 0, []
+    while i < len(items):
+        line = ", ".join(first + [items[i]])
+        if len("\n\n".join([lead, line, tail])) <= THREAD_FIRST_LIMIT:
+            first.append(items[i])
+            i += 1
+        else:
+            break
+    thread.append(
+        "\n\n".join([lead, ", ".join(first), tail]) if first else f"{lead}\n\n{tail}"
+    )
+
+    # Continuation posts: the rest of the players, so nobody is left untagged.
+    while i < len(items):
+        names: list[str] = []
+        while i < len(items):
+            line = "ALSO PLAYING: " + ", ".join(names + [items[i]])
+            if len(line) <= THREAD_CONT_LIMIT:
+                names.append(items[i])
+                i += 1
+            else:
+                break
+        if not names:
+            names = [items[i]]
+            i += 1
+        thread.append("ALSO PLAYING: " + ", ".join(names))
 
     return thread
 

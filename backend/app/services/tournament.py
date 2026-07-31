@@ -190,6 +190,31 @@ async def matches(db: AsyncSession, tournament_id: str) -> list[TournamentMatch]
 # Lifecycle, all derived on read
 # --------------------------------------------------------------------------- #
 
+async def _enqueue_play_live(db: AsyncSession, t: Tournament) -> None:
+    """Queue the kickoff post, tagging everyone with a round-one fixture (byes
+    skip round one, so they are not pinged to play yet)."""
+    rows = await matches(db, t.id)
+    handle_of = {e.did: e.handle for e in await entrants(db, t.id)}
+    players: list[str] = []
+    for m in rows:
+        if m.round != 1 or not (m.player1_did and m.player2_did):
+            continue
+        for did in (m.player1_did, m.player2_did):
+            h = handle_of.get(did)
+            if h:
+                players.append(h)
+    if not players:
+        return
+    await posts.enqueue(
+        db,
+        kind=posts.KIND_LIVE,
+        dedupe_key=f"{t.id}:live",
+        text=json.dumps(posts.compose_play_live(
+            name=t.name, tournament_id=t.id, players=players,
+        )),
+    )
+
+
 async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
     """Bring a tournament up to date with the clock. Safe on every read.
 
@@ -208,6 +233,10 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
 
     if t.status == LOCKED and now >= _aware(t.play_opens_at):
         t.status = IN_PROGRESS
+        # Play just opened: post the kickoff, tagging everyone with a round-one
+        # fixture so they are pinged to go play. Dedupe-keyed, so the enqueue is
+        # a no-op if this transition is somehow read twice.
+        await _enqueue_play_live(db, t)
         await db.commit()
 
     if t.status in (LOCKED, IN_PROGRESS):
