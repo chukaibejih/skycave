@@ -194,7 +194,19 @@ export default function RoomPage() {
 
   // Versus game finished: stay in the room and offer a seamless rematch on the
   // same room. Solo redirected to results above, so this is versus only.
-  if (ready && gameEnd && room!.status === "finished" && room!.mode !== "solo" && room!.game_type !== "clay") {
+  //
+  // Clay normally owns its own end screen (the pot + share), so it is excluded
+  // here - EXCEPT in a tournament, where the only next step is the next game of
+  // the series. There, Clay must go through GameOver like every other game, or a
+  // player who drew Clay gets stranded on the result with no way forward.
+  const clayInTournament = room?.game_type === "clay" && !!room?.tournament;
+  if (
+    ready &&
+    gameEnd &&
+    room!.status === "finished" &&
+    room!.mode !== "solo" &&
+    (room!.game_type !== "clay" || clayInTournament)
+  ) {
     return (
       <>
         <ConnectionBadge status={status} />
