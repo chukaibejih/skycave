@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimate } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
+import { moveHints, bestMove, type MoveHint } from "@/lib/mancalaAssist";
 
 interface Props {
   board: BoardState | null;
@@ -75,6 +76,8 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const [flyer, animate] = useAnimate();
   const [flyOn, setFlyOn] = useState(false);
   const [help, setHelp] = useState(false);
+  // The "Hint" button's suggestion (a pit index), shown only in solo.
+  const [hintedPit, setHintedPit] = useState<number | null>(null);
 
   const paint = (pits: number[]) => {
     displayRef.current = pits;
@@ -162,9 +165,26 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
   const myScore = display[sides.myStore];
   const oppScore = display[sides.oppStore];
 
+  // The assist is solo-only (the Caver's id is "ai"), so nothing here reaches a
+  // real 1v1 opponent. Markers show what each of your moves does; the Hint
+  // button suggests the strongest one.
+  const solo = opp === "ai";
+  const mySide = sides.iAm0 ? 0 : 1;
+  const pits = board.pits; // narrowed non-null by the guard above
+  const hints = useMemo<Record<number, MoveHint>>(
+    () => (solo && myTurn && !over ? moveHints(pits, mySide) : {}),
+    [solo, myTurn, over, pits, mySide]
+  );
+
   const play = (pit: number) => {
     if (!myTurn || over || display[pit] === 0) return;
+    setHintedPit(null);
     onAction({ pit });
+  };
+
+  const showHint = () => {
+    const m = bestMove(pits, mySide);
+    if (m !== null) setHintedPit(m);
   };
 
   const banner = over
@@ -246,6 +266,8 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
                   captured={captured.has(i)}
                   innerRef={(el) => (pitRefs.current[i] = el)}
                   onTap={() => play(i)}
+                  hint={hints[i]}
+                  hinted={hintedPit === i && myTurn && !over}
                 />
               ))}
             </div>
@@ -287,7 +309,17 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
         <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
           {myScore} - {oppScore}
         </div>
-        <div className="w-[72px]" />
+        <div className="flex w-[72px] justify-end">
+          {solo && myTurn && !over && (
+            <button
+              onClick={showHint}
+              className="inline-flex h-8 items-center gap-1 rounded-full border px-3 font-[var(--font-display)] text-xs font-bold text-[var(--color-text-secondary)] transition-colors active:text-[var(--color-text-primary)]"
+              style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+            >
+              Hint
+            </button>
+          )}
+        </div>
       </footer>
 
       <AnimatePresence>{help && <HowToPlay onClose={() => setHelp(false)} />}</AnimatePresence>
@@ -381,6 +413,8 @@ function Pit({
   captured,
   innerRef,
   onTap,
+  hint,
+  hinted,
 }: {
   seeds: number;
   rim: string;
@@ -388,8 +422,14 @@ function Pit({
   captured: boolean;
   innerRef: (el: HTMLDivElement | null) => void;
   onTap?: () => void;
+  hint?: MoveHint;
+  hinted?: boolean;
 }) {
   const shown = Math.min(seeds, SCATTER.length);
+  // The move marker: "again" if this lands in your store, else "+N" if it banks
+  // seeds (a capture). Plain moves get nothing, so only the useful ones stand out.
+  const marker = hint?.extra ? "again" : hint && hint.gain > 0 ? `+${hint.gain}` : null;
+  const markerBg = hint?.extra ? YOU : "#56f0aa"; // cyan for go-again, mint for a bank
   return (
     <button
       onClick={onTap}
@@ -398,12 +438,31 @@ function Pit({
       className="relative aspect-square w-full rounded-full transition-transform active:scale-95"
       style={{
         background: "radial-gradient(circle at 50% 38%, #12100c, #241a10 70%, #2c2013)",
-        boxShadow: tappable
-          ? `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 2px ${rim}, 0 0 16px ${rim}66`
-          : `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 1px rgba(120,90,55,0.45)`,
+        boxShadow: hinted
+          ? `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 2px var(--color-gold), 0 0 20px var(--color-gold)`
+          : tappable
+            ? `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 2px ${rim}, 0 0 16px ${rim}66`
+            : `inset 0 3px 8px rgba(0,0,0,0.75), 0 0 0 1px rgba(120,90,55,0.45)`,
         cursor: tappable ? "pointer" : "default",
       }}
     >
+      {marker && (
+        <span
+          className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-1.5 py-[1px] text-[8px] font-bold leading-none"
+          style={{ background: markerBg, color: "#05060a", boxShadow: `0 0 8px ${markerBg}88` }}
+        >
+          {marker}
+        </span>
+      )}
+      {hinted && (
+        <motion.span
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          animate={{ opacity: [0.9, 0.35, 0.9] }}
+          transition={{ duration: 1.1, repeat: Infinity }}
+          style={{ boxShadow: `0 0 0 2px var(--color-gold), 0 0 16px var(--color-gold)` }}
+        />
+      )}
       <div ref={innerRef} className="absolute inset-0" />
       <Seeds count={shown} />
       {seeds > SCATTER.length && (
