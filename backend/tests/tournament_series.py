@@ -149,6 +149,29 @@ async def test_check_in_gates_the_room() -> None:
             await _cleanup(s, t)
 
 
+async def test_stale_open_room_is_ignored() -> None:
+    async with async_session() as s:
+        t = await _tournament(s, players=4, window=(timedelta(hours=-1), timedelta(hours=72)))
+        try:
+            m = _contested(await svc.matches(s, t.id))
+            people = await _people(s, t)
+            await svc.check_in(s, m, m.player1_did)
+            m = await svc.find_match(s, t.id, m.round, m.slot)
+            await svc.check_in(s, m, m.player2_did)
+            m = await svc.find_match(s, t.id, m.round, m.slot)
+
+            room_id = await svc.open_leg(s, t, m, people)
+            assert room_id is not None
+            await get_redis().delete(rm._key(room_id))
+
+            fresh = await svc.find_match(s, t.id, m.round, m.slot)
+            assert fresh is not None
+            assert await svc.open_room_id(fresh) is None, "dead room ids should not be surfaced"
+            print("a dead room id is hidden so the fixture can reopen cleanly")
+        finally:
+            await _cleanup(s, t)
+
+
 async def test_series_alternates_host_and_advances() -> None:
     async with async_session() as s:
         t = await _tournament(s, players=4, window=(timedelta(hours=-1), timedelta(hours=72)))

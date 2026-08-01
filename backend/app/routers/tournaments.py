@@ -435,10 +435,7 @@ async def _my_match(
     theirs = sum(1 for lg in legs if lg.winner_did and not lg.you_won)
 
     leg = svc.leg_index(m)
-    open_room = None
-    all_rooms = list(m.rooms or [])
-    if leg < len(all_rooms):
-        open_room = all_rooms[leg]
+    open_room = await svc.open_room_id(m)
 
     game = svc.current_game(m)
     is_bye = m.status == M_BYE

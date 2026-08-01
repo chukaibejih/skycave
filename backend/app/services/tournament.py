@@ -576,6 +576,20 @@ async def my_match(
     return max(mine, key=lambda m: m.round)
 
 
+async def open_room_id(m: TournamentMatch) -> str | None:
+    """The room currently open for this leg, if it still exists in Redis."""
+    leg = leg_index(m)
+    rooms = list(m.rooms or [])
+    if leg >= len(rooms):
+        return None
+    room_id = rooms[leg]
+    if not room_id:
+        return None
+    from app.services import room_manager as rm
+
+    return room_id if await rm.get_room(room_id) is not None else None
+
+
 def leg_index(m: TournamentMatch) -> int:
     """Which sitting is next (0-based). Replays count: each is its own room."""
     return len(m.results or [])
