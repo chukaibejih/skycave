@@ -299,6 +299,21 @@ function seriesWins(m: TournamentMatch): [number, number] {
   ];
 }
 
+/**
+ * The player who forfeited this fixture, if any. You cannot play a series
+ * without checking in, so a decided match whose loser never appears in
+ * `checked_in` was awarded past the deadline, not won on the board: the loser
+ * did not show. A bye is not a forfeit (there was simply no opponent to face),
+ * and an unresolved match has no loser yet. Marking the absent side lets anyone
+ * reading the bracket see that their opponent advanced on a walkover.
+ */
+function forfeitedDid(m: TournamentMatch): string | null {
+  if (m.status === "bye" || !m.winner_did) return null;
+  const loser = m.winner_did === m.player1?.did ? m.player2 : m.player1;
+  if (!loser) return null;
+  return (m.checked_in ?? []).includes(loser.did) ? null : loser.did;
+}
+
 function MatchCard({ m }: { m: TournamentMatch }) {
   const live = m.status === "live";
   const done = m.status === "done";
@@ -307,6 +322,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
   const [w1, w2] = seriesWins(m);
   const started = w1 + w2 > 0 || (m.results?.length ?? 0) > 0;
   const lines = gameLines(m);
+  const forfeiter = forfeitedDid(m);
 
   return (
     <motion.div
@@ -346,6 +362,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
             dim={done && m.winner_did !== m.player1?.did}
             wins={started ? w1 : null}
             leading={w1 > w2}
+            forfeit={!!m.player1 && forfeiter === m.player1.did}
           />
           <div className="my-1 h-px" style={{ background: "var(--color-border)" }} />
           <Slot
@@ -354,6 +371,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
             dim={done && m.winner_did !== m.player2?.did}
             wins={started ? w2 : null}
             leading={w2 > w1}
+            forfeit={!!m.player2 && forfeiter === m.player2.did}
           />
 
           {/* The games, with their scorelines. Before this the card showed the
@@ -419,6 +437,7 @@ function Slot({
   dim,
   wins,
   leading,
+  forfeit,
 }: {
   player: TournamentPlayer | null | undefined;
   winner?: boolean;
@@ -426,6 +445,8 @@ function Slot({
   /** Games won in this series, or null before a ball is kicked. */
   wins?: number | null;
   leading?: boolean;
+  /** This player never showed and lost the fixture by walkover. */
+  forfeit?: boolean;
 }) {
   if (!player) {
     return (
@@ -442,7 +463,9 @@ function Slot({
     // ticks you have to decode.
     <div
       className="relative flex h-[30px] items-center gap-2 rounded-r-[6px] py-0.5 pl-2.5 pr-0.5"
-      style={{ opacity: dim ? 0.4 : 1 }}
+      // A forfeiter is still de-emphasised, but lifted enough that the reason
+      // (the badge) stays legible rather than fading out with them.
+      style={{ opacity: forfeit ? 0.62 : dim ? 0.4 : 1 }}
     >
       {winner && (
         <>
@@ -477,7 +500,20 @@ function Slot({
           {player.display_name}
         </span>
       </Link>
-      {wins !== null && wins !== undefined && (
+      {forfeit ? (
+        // Where the score would sit, name the reason this side lost: they never
+        // turned up, so the fixture was awarded past the deadline.
+        <span
+          className="relative shrink-0 rounded-[4px] border px-1.5 py-px font-[var(--font-mono)] text-[8px] uppercase tracking-[0.08em]"
+          style={{
+            color: "var(--color-warm)",
+            borderColor: "color-mix(in srgb, var(--color-warm) 45%, transparent)",
+            background: "color-mix(in srgb, var(--color-warm) 12%, transparent)",
+          }}
+        >
+          forfeit
+        </span>
+      ) : wins !== null && wins !== undefined ? (
         <span
           className="relative shrink-0 pr-1.5 font-[var(--font-display)] text-[13px] font-bold tabular-nums"
           style={{
@@ -486,7 +522,7 @@ function Slot({
         >
           {wins}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
