@@ -692,7 +692,13 @@ async def open_leg(
     else:
         raise MatchError("no_room", "Could not open a room. Try again.")
 
-    await rm.create_room(room_id, game_type, _identity(host), mode="versus")
+    await rm.create_room(
+        room_id,
+        game_type,
+        _identity(host),
+        mode="versus",
+        ttl_seconds=rm.TOURNAMENT_ROOM_TTL_SECONDS,
+    )
     await rm.join_room(room_id, _identity(guest))
     # Tag the room with the fixture it belongs to, so the result knows where to
     # go home to and the room UI can show which leg of the series this is.
@@ -704,6 +710,7 @@ async def open_leg(
         "leg": leg,
         "game_index": sum(1 for r in (locked.results or []) if not r.get("replay")),
     }
+    room["ttl_seconds"] = rm.TOURNAMENT_ROOM_TTL_SECONDS
     await rm.save_room(room)
     # Deliberately not armed with the no-opponent expiry. That timer exists for
     # a room waiting on an invite link, and it already refuses to fire once a

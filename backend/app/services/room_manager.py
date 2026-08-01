@@ -31,6 +31,7 @@ from typing import Any
 from app.core.redis_client import get_redis
 
 ROOM_TTL_SECONDS = 6 * 60 * 60  # rooms self-expire after 6h of inactivity
+TOURNAMENT_ROOM_TTL_SECONDS = 7 * 24 * 60 * 60  # tournament legs outlive the weekend
 MAX_PLAYERS = 2
 
 _locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -52,13 +53,18 @@ async def get_room(room_id: str) -> dict[str, Any] | None:
 
 
 async def save_room(room: dict[str, Any]) -> None:
+    ttl_seconds = int(room.get("ttl_seconds") or ROOM_TTL_SECONDS)
     await get_redis().set(
-        _key(room["id"]), json.dumps(room), ex=ROOM_TTL_SECONDS
+        _key(room["id"]), json.dumps(room), ex=ttl_seconds
     )
 
 
 async def create_room(
-    room_id: str, game_type: str, host: dict[str, Any], mode: str = "versus"
+    room_id: str,
+    game_type: str,
+    host: dict[str, Any],
+    mode: str = "versus",
+    ttl_seconds: int | None = None,
 ) -> dict[str, Any]:
     room = {
         "id": room_id,
@@ -72,6 +78,8 @@ async def create_room(
         "players": [_player_slot(host)],
         "game": None,
     }
+    if ttl_seconds is not None:
+        room["ttl_seconds"] = int(ttl_seconds)
     await save_room(room)
     return room
 

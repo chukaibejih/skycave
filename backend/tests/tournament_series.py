@@ -130,6 +130,8 @@ async def test_check_in_gates_the_room() -> None:
 
             room = await rm.get_room(room_id)
             assert room is not None, "the room was not created in Redis"
+            ttl = await get_redis().ttl(rm._key(room_id))
+            assert ttl > rm.ROOM_TTL_SECONDS, f"tournament room ttl was too short: {ttl}"
             seated = {p["id"] for p in room["players"]}
             assert seated == {m.player1_did, m.player2_did}, seated
             assert room["game_type"] == m.games[0], (room["game_type"], m.games)
