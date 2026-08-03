@@ -25,7 +25,11 @@ export function recoverFromChunkError(error: unknown): boolean {
     const last = Number(sessionStorage.getItem(CHUNK_HEAL_KEY) ?? 0);
     if (Date.now() - last < CHUNK_HEAL_COOLDOWN) return false;
     sessionStorage.setItem(CHUNK_HEAL_KEY, String(Date.now()));
-    window.location.reload();
+    // A plain reload can still reuse stale HTML/chunk metadata. Force the next
+    // request to bypass that cache so the tab comes back on the current build.
+    const url = new URL(window.location.href);
+    url.searchParams.set("sc-reload", String(Date.now()));
+    window.location.replace(url.toString());
     return true;
   } catch {
     return false;
