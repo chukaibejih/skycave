@@ -6,26 +6,19 @@ import { statusMeta } from "@/lib/tournamentStatus";
 import { useTournamentSignal } from "@/lib/useTournamentSignal";
 
 /**
- * The tournament's entry point on the hub, built to feel like match day rather
- * than a menu item.
+ * The tournament's entry point on the hub, overhauled for a premium feel.
  *
- * It is deliberately the one warm thing on a cool, dark page: amber into deep
- * orange, so it lifts off the surface instead of sitting in the list. It answers
- * the three questions at a glance without reading - what is happening (the
- * status), what to do (one button), how long (the countdown when time is what
- * matters) - and it is the only way into the tournament world, which is why the
- * old Hub/Tournament toggle is gone.
+ * It uses a sleek dark glassmorphic aesthetic with an ethereal, animated
+ * cyan and amber orb floating behind the content to convey an exclusive,
+ * high-stakes championship vibe.
  */
-const WARM = "linear-gradient(135deg, #ffb64d 0%, #ff7a3c 52%, #ff5b5b 100%)";
-const INK = "#2a1400"; // dark text that holds contrast on amber
 
-const BASE_SHADOW = "0 14px 40px rgba(255, 110, 60, 0.28)";
-// The final-stretch pulse: the calm amber shadow with a red halo that blinks in
-// and out, so a page-glance registers "closing soon" before a word is read.
+const BASE_SHADOW = "0 14px 40px rgba(0, 0, 0, 0.5)";
+// The final-stretch pulse: a red halo that blinks in and out.
 const RED_PULSE = [
-  "0 14px 40px rgba(255,110,60,0.28), 0 0 0px 0px rgba(220,30,30,0)",
-  "0 16px 46px rgba(255,110,60,0.42), 0 0 34px 6px rgba(220,30,30,0.6)",
-  "0 14px 40px rgba(255,110,60,0.28), 0 0 0px 0px rgba(220,30,30,0)",
+  "0 14px 40px rgba(220, 30, 30, 0.15), 0 0 0px 0px rgba(220,30,30,0)",
+  "0 16px 46px rgba(220, 30, 30, 0.35), 0 0 34px 6px rgba(220,30,30,0.5)",
+  "0 14px 40px rgba(220, 30, 30, 0.15), 0 0 0px 0px rgba(220,30,30,0)",
 ];
 // How close to the deadline the red urgency kicks in.
 const URGENT_MS = 12 * 60 * 60 * 1000;
@@ -47,7 +40,7 @@ export function TournamentBanner() {
 
   // Eyebrow says "Closing soon"; keep the sub-label on the action so they don't echo.
   const label = urgent ? "Last call" : s.label;
-  const cta = livePip ? "Your match is waiting" : urgent ? "Grab your slot" : s.cta;
+  const cta = livePip ? "Your match is waiting" : urgent ? "Claim Your Spot" : s.cta === "Grab your slot" ? "Claim Your Spot" : s.cta;
 
   return (
     <motion.div
@@ -55,10 +48,9 @@ export function TournamentBanner() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 200, damping: 24 }}
     >
-      <Link href={href} className="block">
+      <Link href={href} className="block group">
         <motion.div
-          className="relative overflow-hidden rounded-[22px] p-5 sm:p-6"
-          style={{ background: WARM }}
+          className="relative overflow-hidden rounded-[22px] border border-white/10 bg-black/50 p-5 backdrop-blur-xl sm:p-6"
           animate={{ boxShadow: urgent ? RED_PULSE : BASE_SHADOW }}
           transition={
             urgent
@@ -66,26 +58,45 @@ export function TournamentBanner() {
               : { duration: 0.3 }
           }
         >
-          {/* A slow drift of light across the card, so it reads as alive. */}
+          {/* Animated Ambient Orb - Mixing Cyan and Amber */}
           <motion.div
             aria-hidden
-            className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.35), transparent 65%)" }}
-            animate={{ x: [-10, 24, -10], opacity: [0.5, 0.8, 0.5] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute -right-32 -top-32 h-[400px] w-[400px] rounded-full opacity-40 mix-blend-screen"
+            style={{
+              background: "radial-gradient(circle, var(--color-cyan) 0%, #ffb64d 45%, transparent 70%)",
+              filter: "blur(40px)",
+            }}
+            animate={{
+              scale: [1, 1.25, 1],
+              opacity: [0.3, 0.6, 0.3],
+              rotate: [0, 90, 0],
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           />
 
-          <div className="relative">
+          {/* Abstract floating trophy/championship graphic on the right */}
+          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 opacity-20 mix-blend-overlay transition-opacity duration-500 group-hover:opacity-40 sm:right-10">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[#ffb64d]">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+            </svg>
+          </div>
+
+          <div className="relative z-10">
             <div className="flex items-center gap-2">
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-[var(--font-mono)] text-[10px] font-semibold uppercase tracking-[0.2em]"
-                style={{ background: urgent ? "rgba(150,10,10,0.28)" : "rgba(0,0,0,0.18)", color: INK }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 font-[var(--font-mono)] text-[10px] font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur-md"
+                style={{ background: urgent ? "rgba(200, 22, 22, 0.3)" : "rgba(255, 255, 255, 0.05)" }}
               >
                 {(urgent || s.phase === "live" || s.phase === "finals") && (
                   <motion.span
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: urgent ? "#c81616" : INK }}
-                    animate={{ opacity: [1, 0.25, 1] }}
+                    style={{ background: urgent ? "#ff4444" : "var(--color-cyan)" }}
+                    animate={{ opacity: [1, 0.25, 1], scale: [1, 1.2, 1] }}
                     transition={{ duration: urgent ? 0.85 : 1.3, repeat: Infinity }}
                   />
                 )}
@@ -93,18 +104,15 @@ export function TournamentBanner() {
               </span>
             </div>
 
-            <h2
-              className="mt-2.5 font-[var(--font-display)] text-2xl font-bold leading-[1.05] sm:text-3xl"
-              style={{ color: INK }}
-            >
+            <h2 className="mt-3 font-[var(--font-display)] text-2xl font-bold leading-[1.05] text-white drop-shadow-md sm:text-3xl">
               {t.name}
             </h2>
 
-            <p className="mt-1.5 text-xs font-semibold sm:text-sm leading-snug" style={{ color: "rgba(42,20,0,0.88)" }}>
-              Compete head-to-head in the games you already play.
+            <p className="mt-2 text-xs font-medium leading-snug text-white/80 sm:text-sm">
+              Free to enter &middot; 1v1 weekend bracket &middot; Crowned Monday
             </p>
 
-            <p className="mt-2.5 text-xs font-medium uppercase tracking-wide" style={{ color: "rgba(42,20,0,0.75)" }}>
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--color-cyan)] drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
               {label}
               {spots && ` · ${spots}`}
               {/* Calm until the final stretch: a day, not a ticking clock. */}
@@ -116,29 +124,26 @@ export function TournamentBanner() {
               )}
             </p>
 
-            {/* Only once the countdown means something (from Wednesday) does the
-                loud clock appear - dark scoreboard chips that pop on the amber. */}
+            {/* Only once the countdown means something (from Wednesday) does the loud clock appear. */}
             {s.countdownTo && clockIsLive(s.countdownFrom) && (
               <div className="mt-4">
-                <div
-                  className="inline-flex rounded-[14px] px-3 py-2"
-                  style={{ background: "rgba(0,0,0,0.22)" }}
-                >
+                <div className="inline-flex rounded-[14px] border border-white/10 bg-black/40 px-3 py-2 backdrop-blur-md">
                   <BannerClock to={s.countdownTo} />
                 </div>
               </div>
             )}
 
-            <div className="mt-5 flex items-center gap-3">
-              <span
-                className="inline-flex h-11 items-center justify-center rounded-[13px] px-5 text-sm font-bold"
-                style={{ background: "#fff", color: INK }}
+            <div className="mt-6 flex items-center gap-3">
+              <motion.span
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex h-11 items-center justify-center rounded-[13px] border border-white/20 bg-white/10 px-5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-md transition-colors group-hover:bg-white/20"
               >
                 {cta}
-                <span aria-hidden className="ml-1.5">
+                <span aria-hidden className="ml-1.5 transition-transform duration-300 group-hover:translate-x-1">
                   →
                 </span>
-              </span>
+              </motion.span>
             </div>
           </div>
         </motion.div>
@@ -147,10 +152,10 @@ export function TournamentBanner() {
   );
 }
 
-/** The countdown as it reads on the warm card: white numerals on dark chips. */
+/** The countdown as it reads on the dark glass card: white numerals on dark chips. */
 function BannerClock({ to }: { to: string }) {
   return (
-    <span className="font-[var(--font-display)] text-2xl font-bold tabular-nums text-white sm:text-3xl">
+    <span className="font-[var(--font-display)] text-2xl font-bold tabular-nums text-white sm:text-3xl drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
       <Countdown to={to} compact />
     </span>
   );

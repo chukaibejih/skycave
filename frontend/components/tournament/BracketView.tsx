@@ -102,6 +102,20 @@ export function BracketView({ id }: { id: string }) {
 
   return (
     <Shell>
+      <style>{`
+        @keyframes flow-h {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @keyframes flow-v-down {
+          0% { background-position: 0 -200%; }
+          100% { background-position: 0 200%; }
+        }
+        @keyframes flow-v-up {
+          0% { background-position: 0 200%; }
+          100% { background-position: 0 -200%; }
+        }
+      `}</style>
       <Header t={t} />
 
       {t.status !== "finished" && <PlayStrip t={t} />}
@@ -109,7 +123,7 @@ export function BracketView({ id }: { id: string }) {
       {t.champion && <ChampionBanner player={t.champion} />}
 
       {/* Round headers + deadlines, aligned to the columns below. */}
-      <div className="mt-8 overflow-x-auto pb-4">
+      <div className="mt-8 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div style={{ minWidth: rounds * COL_W + (rounds - 1) * GUTTER }}>
           <div
             className="mb-3 grid"
@@ -192,6 +206,7 @@ function Elbow({ evenSlot, lit }: { evenSlot: boolean; lit: boolean }) {
   const thickness = lit ? 2 : 1;
   return (
     <>
+      {/* Horizontal run */}
       <span
         aria-hidden
         className="pointer-events-none absolute top-1/2"
@@ -199,17 +214,22 @@ function Elbow({ evenSlot, lit }: { evenSlot: boolean; lit: boolean }) {
           right: -GUTTER / 2,
           width: GUTTER / 2,
           height: thickness,
-          background: line,
+          background: lit ? `linear-gradient(90deg, transparent, var(--color-cyan) 50%, transparent)` : line,
+          backgroundSize: lit ? "200% 100%" : "auto",
+          animation: lit ? "flow-h 2s linear infinite" : "none",
           boxShadow: glow,
         }}
       />
+      {/* Vertical run */}
       <span
         aria-hidden
         className="pointer-events-none absolute"
         style={{
           right: -GUTTER / 2,
           width: thickness,
-          background: line,
+          background: lit ? `linear-gradient(180deg, transparent, var(--color-cyan) 50%, transparent)` : line,
+          backgroundSize: lit ? "100% 200%" : "auto",
+          animation: lit ? (evenSlot ? "flow-v-down 2s linear infinite" : "flow-v-up 2s linear infinite") : "none",
           boxShadow: glow,
           ...(evenSlot ? { top: "50%", bottom: 0 } : { top: 0, bottom: "50%" }),
         }}
@@ -231,7 +251,9 @@ function InThread({ lit }: { lit: boolean }) {
         left: -GUTTER / 2,
         width: GUTTER / 2,
         height: lit ? 2 : 1,
-        background: line,
+        background: lit ? `linear-gradient(90deg, transparent, var(--color-cyan) 50%, transparent)` : line,
+        backgroundSize: lit ? "200% 100%" : "auto",
+        animation: lit ? "flow-h 2.5s linear infinite" : "none",
         boxShadow: lit ? "0 0 7px var(--color-cyan)" : "none",
       }}
     />
@@ -327,12 +349,11 @@ function MatchCard({ m }: { m: TournamentMatch }) {
   return (
     <motion.div
       layout
-      className="relative w-full rounded-[12px] border"
+      className="relative w-full rounded-[12px] border bg-[var(--color-surface)]/60 backdrop-blur-md"
       style={{
         borderColor: live
           ? "color-mix(in srgb, var(--color-warm) 60%, transparent)"
-          : "var(--color-border)",
-        background: "var(--color-surface)",
+          : "rgba(255, 255, 255, 0.1)",
         boxShadow: live ? "0 0 18px color-mix(in srgb, var(--color-warm) 22%, transparent)" : "none",
       }}
     >
@@ -479,7 +500,7 @@ function Slot({
             className="pointer-events-none absolute inset-y-0 left-0 w-1/2 rounded-r-[6px]"
             style={{
               background:
-                "linear-gradient(90deg, color-mix(in srgb, var(--color-cyan) 13%, transparent), transparent)",
+                "linear-gradient(90deg, color-mix(in srgb, var(--color-cyan) 30%, transparent), transparent)",
             }}
           />
         </>
@@ -530,24 +551,38 @@ function Slot({
 function ChampionBanner({ player }: { player: TournamentPlayer }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mt-6 rounded-[18px] border p-5 text-center"
-      style={{
-        borderColor: "color-mix(in srgb, var(--color-gold) 55%, transparent)",
-        background:
-          "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 65%), var(--color-surface)",
-      }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative mb-4 mt-8 flex flex-col items-center justify-center"
     >
-      <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.2em]" style={{ color: "var(--color-gold)" }}>
-        Champion
-      </div>
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <Avatar id={player.did} name={player.display_name} avatarUrl={player.avatar_url} size={52} />
-        <div className="text-left">
-          <div className="font-[var(--font-display)] text-2xl font-bold">{player.display_name}</div>
-          <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-            @{player.handle}
+      <div className="absolute inset-0 rounded-[24px] bg-[var(--color-gold)] opacity-10 blur-2xl" />
+      <div
+        className="relative flex w-full max-w-sm flex-col items-center overflow-hidden rounded-[24px] border border-white/20 bg-black/40 p-8 backdrop-blur-xl"
+        style={{
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)",
+        }}
+      >
+        <motion.div
+          className="pointer-events-none absolute -left-32 -top-32 h-[300px] w-[300px] rounded-full opacity-30 mix-blend-screen"
+          style={{ background: "radial-gradient(circle, var(--color-gold) 0%, transparent 70%)" }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <div className="relative z-10 font-[var(--font-mono)] text-[12px] uppercase tracking-[0.2em] text-[var(--color-gold)] drop-shadow-md">
+          Champion
+        </div>
+        <div className="relative z-10 mt-5 flex flex-col items-center gap-3">
+          <motion.div
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Avatar id={player.did} name={player.display_name} avatarUrl={player.avatar_url} size={72} />
+          </motion.div>
+          <div className="mt-2 text-center">
+            <div className="font-[var(--font-display)] text-3xl font-bold text-white drop-shadow-lg">{player.display_name}</div>
+            <div className="font-[var(--font-mono)] text-sm text-white/70">
+              @{player.handle}
+            </div>
           </div>
         </div>
       </div>
