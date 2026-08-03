@@ -24,7 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.announcement import AnnouncementOutbox
-from app.services import announce
+from app.models.tournament import FINISHED, Tournament
+from app.services import announce, tournament as svc, tournament_engine as eng
 
 logger = logging.getLogger("skycave.internal")
 
@@ -199,3 +200,74 @@ async def announce_drain(
             failed += 1
     await db.commit()
     return {"sent": sent, "failed": failed, "considered": len(pending)}
+
+
+@router.post("/tournaments/rotate")
+async def rotate_tournament(
+    x_internal_secret: str | None = Header(default=None),
+    dry_run: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create the coming weekend's tournament if no active one exists, and post the signup announcement.
+
+    Driven by host cron (e.g. Monday 8:00 AM Pacific / 15:00 UTC). Safe to run repeatedly:
+    if an active non-finished tournament exists, it is a no-op.
+    """
+    _guard(x_internal_secret)
+
+    now = datetime.now(timezone.utc)
+    closes, opens, play_closes = eng.weekend_anchors(now)
+
+    existing = (
+        await db.execute(
+            select(Tournament)
+            .where(Tournament.status != FINISHED)
+            .order_by(Tournament.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        return {
+            "status": "already_exists",
+            "tournament_id": existing.id,
+            "tournament_status": existing.status,
+            "announced": False,
+        }
+
+    announcement_text = (
+        "Registration is now open for this weekend's Skycave Tournament! 🏆\n\n"
+        "Claim your seat before registration closes on Thursday.\n\n"
+        "Claim your spot here: skycave.space/tournament"
+    )
+
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "would_create": {
+                "name": "Skycave Weekend Tournament",
+                "max_players": 64,
+                "registration_closes_at": closes.isoformat(),
+                "play_opens_at": opens.isoformat(),
+                "play_closes_at": play_closes.isoformat(),
+            },
+            "announcement_text": announcement_text,
+        }
+
+    t = await svc.create(
+        db,
+        name="Skycave Weekend Tournament",
+        max_players=64,
+        registration_closes_at=closes,
+        play_opens_at=opens,
+        play_closes_at=play_closes,
+    )
+
+    announced = await _post_to_bluesky(announcement_text)
+    return {
+        "status": "created",
+        "tournament_id": t.id,
+        "registration_closes_at": t.registration_closes_at.isoformat(),
+        "announced": announced,
+    }
+

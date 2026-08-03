@@ -100,7 +100,11 @@ export function TournamentBanner() {
               {t.name}
             </h2>
 
-            <p className="mt-1 text-sm font-semibold" style={{ color: "rgba(42,20,0,0.78)" }}>
+            <p className="mt-1.5 text-xs font-semibold sm:text-sm leading-snug" style={{ color: "rgba(42,20,0,0.88)" }}>
+              Compete head-to-head in the games you already play.
+            </p>
+
+            <p className="mt-2.5 text-xs font-medium uppercase tracking-wide" style={{ color: "rgba(42,20,0,0.75)" }}>
               {label}
               {spots && ` · ${spots}`}
               {/* Calm until the final stretch: a day, not a ticking clock. */}

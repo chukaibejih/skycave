@@ -60,7 +60,7 @@ export function statusMeta(t: Tournament): StatusMeta {
       phase: "open",
       label: "Registration open",
       color: TOURNEY.accentSoft, // warm, not violet: this is the tournament world
-      cta: "Enter",
+      cta: "Enter Tournament",
       countdownTo: t.registration_closes_at,
       countdownCaption: "Entries close in",
       // A launch event carries its own start (tick from go-live); a normal
@@ -73,7 +73,7 @@ export function statusMeta(t: Tournament): StatusMeta {
       phase: "finished",
       label: t.champion ? `${t.champion.display_name} wins` : "Tournament over",
       color: "var(--color-gold)",
-      cta: "See how it went",
+      cta: "See results & bracket",
       countdownTo: null,
       countdownCaption: null,
       countdownFrom: null,
@@ -86,7 +86,7 @@ export function statusMeta(t: Tournament): StatusMeta {
     phase: isFinal ? "finals" : "live",
     label: isFinal ? "The final is on" : "Bracket is live",
     color: isFinal ? "var(--color-warm)" : "var(--color-success)",
-    cta: "Follow the bracket",
+    cta: "View Live Bracket",
     countdownTo: null,
     countdownCaption: null,
     countdownFrom: null,
