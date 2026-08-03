@@ -262,7 +262,7 @@ function FeedbackView({
       {feedback.map((f) => (
         <div
           key={f.id}
-          className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition-opacity"
+          className="rounded-[14px] border border-white/5 bg-black/40 p-4 shadow-lg backdrop-blur-md transition-opacity"
           style={{ opacity: f.resolved ? 0.55 : 1 }}
         >
           <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
@@ -354,7 +354,7 @@ function OverviewView({ o }: { o: Overview }) {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div key={c.label} className="rounded-[14px] border border-white/5 bg-black/40 p-4 shadow-xl backdrop-blur-md">
             <div className="font-[var(--font-display)] text-3xl font-bold">{c.value.toLocaleString()}</div>
             <div className="mt-1 text-xs text-[var(--color-text-secondary)]">{c.label}</div>
           </div>
@@ -460,7 +460,7 @@ function OverviewView({ o }: { o: Overview }) {
             <>
               <div className="grid grid-cols-3 gap-3">
                 {([["DAU", ins.active.dau], ["WAU", ins.active.wau], ["MAU", ins.active.mau]] as const).map(([l, v]) => (
-                  <div key={l} className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-center">
+                  <div key={l} className="rounded-[12px] border border-white/5 bg-black/40 p-3 text-center shadow-md">
                     <div className="font-[var(--font-display)] text-2xl font-bold">{v.toLocaleString()}</div>
                     <div className="mt-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">{l}</div>
                   </div>
@@ -578,9 +578,9 @@ function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)]/60 p-4 sm:p-5">
+    <div className="rounded-[16px] border border-white/5 bg-black/40 p-4 shadow-xl backdrop-blur-md sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h3 className="font-[var(--font-display)] text-[1rem] font-semibold">{title}</h3>
+        <h3 className="font-[var(--font-display)] text-[1rem] font-semibold text-[var(--color-text-primary)]">{title}</h3>
         {legend}
       </div>
       {children}
@@ -589,7 +589,7 @@ function ChartCard({
 }
 
 function ChartSkeleton() {
-  return <div className="h-[200px] animate-pulse rounded-[12px] bg-[var(--color-surface)]" />;
+  return <div className="h-[200px] animate-pulse rounded-[12px] bg-white/5" />;
 }
 
 function UsersView({ users, startIndex = 0 }: { users: UserRow[] | null; startIndex?: number }) {
