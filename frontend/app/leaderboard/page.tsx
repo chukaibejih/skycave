@@ -88,26 +88,29 @@ export default function LeaderboardPage() {
       </header>
 
       {/* Game selector */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        {games.map((g) => (
-          <button
-            key={g.type}
-            onClick={() => setGame(g.type)}
-            className="shrink-0 rounded-full border px-3.5 py-2 text-sm transition-colors"
-            style={{
-              borderColor: g.type === game ? "var(--color-primary)" : "var(--color-border)",
-              color: g.type === game ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              background: g.type === game ? "color-mix(in srgb, var(--color-primary) 16%, transparent)" : "transparent",
-            }}
-          >
-            {shortName(g.name)}
-          </button>
-        ))}
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex rounded-full border border-white/5 bg-black/40 p-1 shadow-inner backdrop-blur-md">
+          {games.map((g) => (
+            <button
+              key={g.type}
+              onClick={() => setGame(g.type)}
+              className="relative shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+              style={{
+                color: g.type === game ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                background: g.type === game ? "var(--color-surface)" : "transparent",
+                boxShadow: g.type === game ? "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)" : "none",
+                border: g.type === game ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
+              }}
+            >
+              {shortName(g.name)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Mode + period */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex rounded-full border border-white/5 bg-black/40 p-1 shadow-inner backdrop-blur-md">
           {cumulative ? (
             <Toggle on onClick={() => setMode("total")}>
               Total points
@@ -121,7 +124,7 @@ export default function LeaderboardPage() {
           )}
         </div>
         {!solo && (
-          <div className="flex gap-2">
+          <div className="flex rounded-full border border-white/5 bg-black/40 p-1 shadow-inner backdrop-blur-md">
             {(["week", "all"] as LeaderboardPeriod[]).map((p) => (
               <Toggle key={p} on={period === p} onClick={() => setPeriod(p)} subtle>
                 {p === "week" ? "This week" : "All time"}
@@ -159,64 +162,25 @@ export default function LeaderboardPage() {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[16px] border border-[var(--color-border)]">
-          {entries.map((e, i) => (
-            <motion.div
-              key={e.did}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i * 0.03, 0.4) }}
-              className="border-t border-[var(--color-border)] first:border-t-0"
-            >
-            <Link
-              href={`/u/${e.handle}`}
-              className="flex items-center gap-3 bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-elevated)] active:bg-[var(--color-elevated)] sm:px-4"
-            >
-              <div className="w-7 shrink-0 text-center font-[var(--font-display)] text-lg font-bold" style={{ color: rankColor(e.rank) }}>
-                {e.rank}
-              </div>
-              <Avatar id={e.did} name={e.display_name ?? e.handle} avatarUrl={e.avatar_url} size={40} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-[var(--font-display)] font-semibold">
-                  {e.display_name ?? e.handle}
-                </div>
-                <div className="truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                  @{e.handle}
-                </div>
-              </div>
-              {/* Stats: 1v1 shows played/won on wider screens; solo shows plays */}
-              <div className="hidden text-right sm:block">
-                {total ? (
-                  <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                    {e.games_played} {e.games_played === 1 ? "play" : "plays"}
-                    {e.games_won > 0 && ` · ${e.games_won} won`}
-                  </div>
-                ) : solo ? (
-                  <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                    {e.games_played} {e.games_played === 1 ? "run" : "runs"}
-                  </div>
-                ) : (
-                  <>
-                    <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                      {e.games_won} won · {e.games_played} played
-                    </div>
-                    <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                      {Math.round(e.win_rate * 100)}% win
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="w-16 shrink-0 text-right sm:w-20">
-                <div className="font-[var(--font-display)] text-lg font-bold text-[var(--color-primary)]">
-                  {solo || total ? e.total_score.toLocaleString() : e.games_won}
-                </div>
-                <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  {total ? "points" : solo ? "best" : "wins"}
-                </div>
-              </div>
-            </Link>
-            </motion.div>
-          ))}
+        <div className="flex flex-col gap-8">
+          {/* PODIUM (Top 3) */}
+          <div className="flex flex-row items-end justify-center gap-2 pt-4 sm:gap-6">
+            {/* Rank 2 */}
+            {entries[1] && <PodiumCard entry={entries[1]} total={total} solo={solo} />}
+            {/* Rank 1 */}
+            {entries[0] && <PodiumCard entry={entries[0]} total={total} solo={solo} isFirst />}
+            {/* Rank 3 */}
+            {entries[2] && <PodiumCard entry={entries[2]} total={total} solo={solo} />}
+          </div>
+
+          {/* LIST (Ranks 4+) */}
+          {entries.length > 3 && (
+            <div className="flex flex-col gap-3">
+              {entries.slice(3).map((e, i) => (
+                <ListCard key={e.did} e={e} index={i} total={total} solo={solo} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -249,13 +213,12 @@ function Toggle({
   return (
     <button
       onClick={onClick}
-      className="rounded-full border px-4 py-2 text-sm transition-colors"
+      className="relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
       style={{
-        borderColor: on ? "var(--color-primary)" : "var(--color-border)",
         color: on ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-        background: on
-          ? `color-mix(in srgb, var(--color-primary) ${subtle ? 12 : 18}%, transparent)`
-          : "transparent",
+        background: on ? "var(--color-surface)" : "transparent",
+        boxShadow: on ? "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)" : "none",
+        border: on ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
       }}
     >
       {children}
@@ -269,4 +232,108 @@ function rankColor(rank: number): string {
   if (rank === 2) return "#cbd5e1";
   if (rank === 3) return "#e0a678";
   return "var(--color-text-secondary)";
+}
+
+function PodiumCard({ entry, total, solo, isFirst }: { entry: LeaderboardEntry; total: boolean; solo: boolean; isFirst?: boolean }) {
+  const color = rankColor(entry.rank);
+  const size = isFirst ? 56 : 44;
+  const padding = isFirst ? "p-3 sm:p-6" : "p-2 sm:p-4";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: entry.rank * 0.1 }}
+      className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[24px] border border-white/10 bg-black/40 backdrop-blur-xl ${padding}`}
+      style={{
+        maxWidth: "240px",
+        boxShadow: isFirst ? `0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 40px ${color}22` : "0 10px 20px rgba(0,0,0,0.3)",
+      }}
+    >
+      {isFirst && (
+        <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-[var(--color-gold)] opacity-10 blur-xl" />
+      )}
+      <div className="relative z-10 font-[var(--font-display)] text-lg font-bold sm:text-xl" style={{ color }}>
+        #{entry.rank}
+      </div>
+      <div className="relative z-10 mt-2 sm:mt-3">
+        <Link href={`/u/${entry.handle}`}>
+          <Avatar id={entry.did} name={entry.display_name ?? entry.handle} avatarUrl={entry.avatar_url} size={size} />
+        </Link>
+      </div>
+      <div className="relative z-10 w-full mt-2 text-center sm:mt-3">
+        <Link href={`/u/${entry.handle}`} className="block w-full truncate font-[var(--font-display)] text-sm font-bold text-white transition-opacity hover:opacity-80 sm:text-base" style={{ fontSize: isFirst ? "clamp(0.85rem, 3.5vw, 1.25rem)" : "clamp(0.75rem, 3vw, 1rem)" }}>
+          {entry.display_name ?? entry.handle}
+        </Link>
+        <div className="hidden truncate font-[var(--font-mono)] text-xs text-white/60 sm:block">
+          @{entry.handle}
+        </div>
+      </div>
+      <div className="relative z-10 mt-2 text-center sm:mt-4">
+        <div className="font-[var(--font-display)] text-lg font-bold sm:text-2xl" style={{ color: isFirst ? color : "var(--color-primary)" }}>
+          {solo || total ? entry.total_score.toLocaleString() : entry.games_won}
+        </div>
+        <div className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)] sm:text-[10px]">
+          {total ? "points" : solo ? "best" : "wins"}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ListCard({ e, index, total, solo }: { e: LeaderboardEntry; index: number; total: boolean; solo: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.03, 0.4) }}
+    >
+      <Link
+        href={`/u/${e.handle}`}
+        className="flex items-center gap-3 rounded-[16px] border border-white/5 bg-black/40 px-3 py-3 backdrop-blur-md transition-colors hover:bg-white/10 active:bg-white/10 sm:px-4"
+      >
+        <div className="w-7 shrink-0 text-center font-[var(--font-display)] text-lg font-bold" style={{ color: rankColor(e.rank) }}>
+          {e.rank}
+        </div>
+        <Avatar id={e.did} name={e.display_name ?? e.handle} avatarUrl={e.avatar_url} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-[var(--font-display)] font-semibold text-white/90">
+            {e.display_name ?? e.handle}
+          </div>
+          <div className="truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+            @{e.handle}
+          </div>
+        </div>
+        <div className="hidden text-right sm:block">
+          {total ? (
+            <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+              {e.games_played} {e.games_played === 1 ? "play" : "plays"}
+              {e.games_won > 0 && ` · ${e.games_won} won`}
+            </div>
+          ) : solo ? (
+            <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+              {e.games_played} {e.games_played === 1 ? "run" : "runs"}
+            </div>
+          ) : (
+            <>
+              <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+                {e.games_won} won · {e.games_played} played
+              </div>
+              <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+                {Math.round(e.win_rate * 100)}% win
+              </div>
+            </>
+          )}
+        </div>
+        <div className="w-16 shrink-0 text-right sm:w-20">
+          <div className="font-[var(--font-display)] text-lg font-bold text-[var(--color-primary)]">
+            {solo || total ? e.total_score.toLocaleString() : e.games_won}
+          </div>
+          <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+            {total ? "points" : solo ? "best" : "wins"}
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
 }

@@ -164,6 +164,8 @@ class ProfileResponse(BaseModel):
     solo_played: int  # solo runs
     total_score: int
     rank: int  # overall, by 1v1 wins
+    tournament_wins: int = 0
+    is_reigning_champion: bool = False
     bests: list[ProfileGame]
     recent: list[ProfileRecent]
     rivals: list[ProfileRival]
