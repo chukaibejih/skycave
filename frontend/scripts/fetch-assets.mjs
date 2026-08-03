@@ -83,9 +83,17 @@ async function main() {
 
   if (!(await exists("public/textures/earth-blue-marble.jpg"))) {
     await download(TEXTURE, "public/textures/earth-blue-marble.jpg");
-    console.log("globe texture: downloaded");
+    console.log("globe texture (marble): downloaded");
   } else {
-    console.log("globe texture: present");
+    console.log("globe texture (marble): present");
+  }
+
+  const DAY_TEXTURE = "https://cdn.jsdelivr.net/npm/three-globe@2.45.2/example/img/earth-day.jpg";
+  if (!(await exists("public/textures/earth-day.jpg"))) {
+    await download(DAY_TEXTURE, "public/textures/earth-day.jpg");
+    console.log("globe texture (day): downloaded");
+  } else {
+    console.log("globe texture (day): present");
   }
 }
 
