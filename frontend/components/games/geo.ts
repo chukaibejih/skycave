@@ -10,3 +10,4 @@ export interface Marker {
 }
 
 export const EARTH_TEXTURE = "/textures/earth-blue-marble.jpg";
+export const EARTH_DAY_TEXTURE = "/textures/earth-day.jpg";

@@ -2,10 +2,10 @@
 import dynamic from "next/dynamic";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FlatPicker } from "./FlatPicker";
-import { EARTH_TEXTURE, type Marker } from "./geo";
+import { EARTH_TEXTURE, EARTH_DAY_TEXTURE, type Marker } from "./geo";
 
 // Re-exported so existing call sites keep importing these from here.
-export { EARTH_TEXTURE, type Marker };
+export { EARTH_TEXTURE, EARTH_DAY_TEXTURE, type Marker };
 
 // react-globe.gl touches `window`/WebGL on import - load it client-only.
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false, loading: () => null });
@@ -14,6 +14,8 @@ interface Props {
   markers: Marker[];
   onPick?: (lat: number, lng: number) => void;
   interactive?: boolean;
+  textureUrl?: string;
+  forceFlat?: boolean;
 }
 
 
@@ -29,8 +31,10 @@ export function preloadGlobe(): void {
   if (_preloaded || typeof window === "undefined") return;
   _preloaded = true;
   void import("react-globe.gl");
-  const img = new window.Image();
-  img.src = EARTH_TEXTURE;
+  const img1 = new window.Image();
+  img1.src = EARTH_TEXTURE;
+  const img2 = new window.Image();
+  img2.src = EARTH_DAY_TEXTURE;
 }
 
 /**
@@ -77,7 +81,13 @@ class GlobeBoundary extends React.Component<
   }
 }
 
-export function GlobePicker({ markers, onPick, interactive = true }: Props) {
+export function GlobePicker({
+  markers,
+  onPick,
+  interactive = true,
+  textureUrl = EARTH_TEXTURE,
+  forceFlat = false,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const globeRef = useRef<any>(null);
@@ -138,18 +148,18 @@ export function GlobePicker({ markers, onPick, interactive = true }: Props) {
     g.pointOfView({ lat: 15, lng: 10, altitude: POV_ALTITUDE });
     const controls = g.controls?.();
     if (controls) {
-      controls.autoRotate = interactive;
-      controls.autoRotateSpeed = 0.32;
+      // Auto-rotation disabled to allow precise pin placements without distracting movement
+      controls.autoRotate = false;
       controls.enableZoom = true;
       controls.minDistance = 180;
     }
   };
 
   const flat = (
-    <FlatPicker markers={markers} onPick={onPick} interactive={interactive} />
+    <FlatPicker markers={markers} onPick={onPick} interactive={interactive} textureUrl={textureUrl} />
   );
 
-  if (usable === false) return flat;
+  if (usable === false || forceFlat) return flat;
 
   return (
     <div ref={wrapRef} className="absolute inset-0">
@@ -160,7 +170,7 @@ export function GlobePicker({ markers, onPick, interactive = true }: Props) {
           width={dims.w}
           height={dims.h}
           backgroundColor="rgba(0,0,0,0)"
-          globeImageUrl={EARTH_TEXTURE}
+          globeImageUrl={textureUrl}
           showAtmosphere
           atmosphereColor="#8b7cff"
           atmosphereAltitude={0.18}

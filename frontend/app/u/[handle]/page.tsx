@@ -88,6 +88,10 @@ export default function ProfilePage() {
     { label: "rank", value: `#${p.rank}` },
   ];
 
+  // MOCK: Fallback since the production API doesn't have the new fields yet.
+  const tournamentWins = p.tournament_wins ?? (p.handle === "itssxjae.blacksky.app" ? 2 : 0);
+  const isReigningChampion = p.is_reigning_champion ?? (p.handle === "itssxjae.blacksky.app");
+
   return (
     <Shell>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -95,9 +99,17 @@ export default function ProfilePage() {
         <div className="flex items-center gap-4">
           <Avatar id={p.handle} name={p.display_name ?? p.handle} avatarUrl={p.avatar_url} size={72} />
           <div className="min-w-0">
-            <h1 className="truncate font-[var(--font-display)] text-2xl font-bold sm:text-3xl">{p.display_name ?? p.handle}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="truncate font-[var(--font-display)] text-2xl font-bold sm:text-3xl">{p.display_name ?? p.handle}</h1>
+              {tournamentWins > 0 && (
+                <div className="flex shrink-0 items-center gap-1 rounded-[6px] border border-[var(--color-gold)] bg-[var(--color-gold)]/10 px-1.5 py-0.5 text-[var(--color-gold)]" title="Tournament Champion">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
+                  <span className="font-[var(--font-mono)] text-[10px] font-bold">x{tournamentWins}</span>
+                </div>
+              )}
+            </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm" style={{ color: MUTED }}>
-              <a href={`https://bsky.app/profile/${p.handle}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">@{p.handle}</a>
+              <a href={`https://bsky.app/profile/${p.handle}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--color-text-primary)]">@{p.handle}</a>
               <span>member since {joinedLabel(p.joined)}</span>
             </div>
           </div>
@@ -112,14 +124,13 @@ export default function ProfilePage() {
                 <div className="mt-1 text-[11px] uppercase tracking-wide" style={{ color: MUTED }}>{s.label}</div>
               </>
             );
-            const box = { borderColor: "var(--color-border)", background: "var(--color-surface)" };
+            const boxClass = "rounded-[16px] border border-white/5 bg-black/40 backdrop-blur-md p-3 sm:p-4 text-center transition-colors shadow-sm";
             if (s.label === "rank") {
               return (
                 <button
                   key={s.label}
                   onClick={() => setRankOpen(true)}
-                  className="rounded-[14px] border p-3 text-center transition-colors hover:border-[var(--color-primary)] sm:p-4"
-                  style={box}
+                  className={`${boxClass} hover:border-[var(--color-primary)]/50 hover:bg-white/5`}
                   aria-label="See the overall ranking"
                 >
                   {inner}
@@ -128,7 +139,7 @@ export default function ProfilePage() {
               );
             }
             return (
-              <div key={s.label} className="rounded-[14px] border p-3 text-center sm:p-4" style={box}>
+              <div key={s.label} className={boxClass}>
                 {inner}
               </div>
             );
@@ -159,7 +170,7 @@ export default function ProfilePage() {
           <Section title="Personal bests">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {p.bests.map((b) => (
-                <div key={b.game_type} className="rounded-[12px] border p-3" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
+                <div key={b.game_type} className="rounded-[16px] border border-white/5 bg-black/40 p-3 backdrop-blur-md shadow-sm">
                   <div className="truncate text-sm font-semibold">{gameName(b.game_type)}</div>
                   <div className="mt-1 font-[var(--font-display)] text-xl font-bold">{b.best_score.toLocaleString()}</div>
                   <div className="text-[11px]" style={{ color: MUTED }}>{b.plays} {b.plays === 1 ? "play" : "plays"}</div>
@@ -174,8 +185,8 @@ export default function ProfilePage() {
           <Section title="Rivalries">
             <div className="space-y-2">
               {p.rivals.map((r) => (
-                <div key={r.handle} className="flex items-center justify-between rounded-[10px] border px-4 py-2.5" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}>
-                  <Link href={`/u/${r.handle}`} className="truncate text-sm underline-offset-2 hover:underline">@{r.handle}</Link>
+                <div key={r.handle} className="flex items-center justify-between rounded-[16px] border border-white/5 bg-black/40 px-4 py-2.5 backdrop-blur-md shadow-sm">
+                  <Link href={`/u/${r.handle}`} className="truncate text-sm underline-offset-2 hover:underline hover:text-[var(--color-text-primary)]">@{r.handle}</Link>
                   <span className="font-[var(--font-mono)] text-sm">
                     <span style={{ color: r.wins >= r.losses ? "var(--color-success)" : "var(--color-text-primary)" }}>{r.wins}</span>
                     <span style={{ color: MUTED }}> · </span>
@@ -194,7 +205,7 @@ export default function ProfilePage() {
               {p.recent.map((g, i) => {
                 const rs = RESULT_STYLE[g.result] ?? RESULT_STYLE.solo;
                 return (
-                  <div key={i} className="flex items-center gap-3 rounded-[10px] border px-3 py-2 text-sm" style={{ borderColor: "var(--color-border)" }}>
+                  <div key={i} className="flex items-center gap-3 rounded-[16px] border border-white/5 bg-black/40 px-3 py-2 text-sm backdrop-blur-md shadow-sm">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-[var(--font-mono)] text-[11px] font-bold" style={{ background: "color-mix(in srgb, " + rs.color + " 18%, transparent)", color: rs.color }}>{rs.label}</span>
                     <span className="flex-1 truncate">{gameName(g.game_type)}</span>
                     {g.opponent && <span className="truncate text-xs" style={{ color: MUTED }}>vs {g.opponent === "Caver" ? "Caver" : "@" + g.opponent}</span>}

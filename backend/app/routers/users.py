@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.games.registry import get_game
-from app.models import GameSession, PersonalBest, User
+from app.models import GameSession, PersonalBest, User, Tournament
 from app.models.game_session import HEAD_TO_HEAD_MODES, SINGLE_PLAYER_MODES
 from app.schemas.rest import (
     Badge,
@@ -194,6 +194,18 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
     ) or 0
     versus_win_rate = (versus_won / versus_played) if versus_played else 0.0
 
+    tournament_wins = await db.scalar(
+        select(func.count()).select_from(Tournament).where(Tournament.champion_did == did)
+    ) or 0
+
+    latest_tournament_champion_did = await db.scalar(
+        select(Tournament.champion_did)
+        .where(Tournament.status == "finished")
+        .order_by(desc(Tournament.created_at))
+        .limit(1)
+    )
+    is_reigning_champion = bool(latest_tournament_champion_did and latest_tournament_champion_did == did)
+
     best_rows = (
         await db.execute(
             select(PersonalBest).where(PersonalBest.player_id == did).order_by(desc(PersonalBest.plays))
@@ -271,6 +283,8 @@ async def profile(handle: str, db: AsyncSession = Depends(get_db)) -> ProfileRes
         solo_played=solo_played,
         total_score=user.total_score,
         rank=rank,
+        tournament_wins=tournament_wins,
+        is_reigning_champion=is_reigning_champion,
         bests=bests,
         recent=recent,
         rivals=rivals,

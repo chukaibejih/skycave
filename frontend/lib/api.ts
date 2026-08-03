@@ -157,6 +157,8 @@ export interface Profile {
   solo_played: number;
   total_score: number;
   rank: number;
+  tournament_wins: number;
+  is_reigning_champion: boolean;
   bests: ProfileGame[];
   recent: ProfileRecent[];
   rivals: ProfileRival[];
