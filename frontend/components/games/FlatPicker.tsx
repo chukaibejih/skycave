@@ -146,11 +146,15 @@ export function FlatPicker({ markers, onPick, interactive = true, textureUrl = E
       }
     };
 
+    const onTouchEnd = () => {
+      isDragging = false;
+    };
+
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onPointerUp);
-    el.addEventListener("touchcancel", onPointerUp);
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
     el.addEventListener("pointerdown", onPointerDown);
     el.addEventListener("pointermove", onPointerMove);
     el.addEventListener("pointerup", onPointerUp);
@@ -159,8 +163,8 @@ export function FlatPicker({ markers, onPick, interactive = true, textureUrl = E
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onPointerUp);
-      el.removeEventListener("touchcancel", onPointerUp);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
       el.removeEventListener("pointerdown", onPointerDown);
       el.removeEventListener("pointermove", onPointerMove);
       el.removeEventListener("pointerup", onPointerUp);
