@@ -47,7 +47,7 @@ class ReactionGrid(BaseGame):
         return seq
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        length = min(2 + round_number, 8)  # round 1 -> 3, capped at 8
+        length = min(3 + (round_number - 1) // 5, 8)  # increases every 5 rounds, capped at 8
         sequence = self._sequence(length)
         public = {
             "tiles": TILES,
