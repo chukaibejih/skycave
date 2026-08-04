@@ -49,8 +49,22 @@ function connect4Hint(owner: (string | null)[], cols: number, rows: number, me: 
   };
   for (const c of legal) if (wins(c, me)) return c;
   for (const c of legal) if (wins(c, opp)) return c;
+  
+  // Filter out moves that give the opponent an immediate win on their next turn
+  // A move is bad if placing a piece at `c` means the row above it becomes a winning spot for opp.
+  const safeLegal = legal.filter((c) => {
+    const r = dropRow(owner, c, cols, rows);
+    if (r === null || r === 0) return true; // if r===0, the column becomes full, so opp can't play there
+    const b = owner.slice();
+    b[r * cols + c] = me; // simulate my move
+    // simulate opp playing on top of it
+    b[(r - 1) * cols + c] = opp;
+    return !isFour(b, r - 1, c, opp, cols, rows);
+  });
+  
+  const choices = safeLegal.length > 0 ? safeLegal : legal; // fallback to legal if all moves are unsafe
   const mid = Math.floor(cols / 2);
-  return legal.reduce((b, c) => (Math.abs(c - mid) < Math.abs(b - mid) ? c : b), legal[0]);
+  return choices.reduce((b, c) => (Math.abs(c - mid) < Math.abs(b - mid) ? c : b), choices[0]);
 }
 
 export function Connect4({ board, meId, players = [], onAction }: Props) {
