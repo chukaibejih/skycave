@@ -262,10 +262,10 @@ function PodiumCard({ entry, total, solo, isFirst }: { entry: LeaderboardEntry; 
         </Link>
       </div>
       <div className="relative z-10 w-full mt-2 text-center sm:mt-3">
-        <Link href={`/u/${entry.handle}`} className="block w-full truncate font-[var(--font-display)] text-sm font-bold text-white transition-opacity hover:opacity-80 sm:text-base" style={{ fontSize: isFirst ? "clamp(0.85rem, 3.5vw, 1.25rem)" : "clamp(0.75rem, 3vw, 1rem)" }}>
+        <Link href={`/u/${entry.handle}`} className="block w-full truncate font-[var(--font-display)] text-sm font-bold text-[var(--color-text-primary)] transition-opacity hover:opacity-80 sm:text-base" style={{ fontSize: isFirst ? "clamp(0.85rem, 3.5vw, 1.25rem)" : "clamp(0.75rem, 3vw, 1rem)" }}>
           {entry.display_name ?? entry.handle}
         </Link>
-        <div className="hidden truncate font-[var(--font-mono)] text-xs text-white/60 sm:block">
+        <div className="hidden truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">
           @{entry.handle}
         </div>
       </div>
@@ -297,7 +297,7 @@ function ListCard({ e, index, total, solo }: { e: LeaderboardEntry; index: numbe
         </div>
         <Avatar id={e.did} name={e.display_name ?? e.handle} avatarUrl={e.avatar_url} size={40} />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-[var(--font-display)] font-semibold text-white/90">
+          <div className="truncate font-[var(--font-display)] font-semibold text-[var(--color-text-primary)]">
             {e.display_name ?? e.handle}
           </div>
           <div className="truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
