@@ -6,7 +6,9 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts WeekendCup out/skycave-weekend-cup.mp4",
-    "render:wide": "remotion render src/index.ts WeekendCupWide out/skycave-weekend-cup-wide.mp4"
+    "render:wide": "remotion render src/index.ts WeekendCupWide out/skycave-weekend-cup-wide.mp4",
+    "render:geo": "remotion render src/index.ts GeoGuessUpdate out/skycave-geoguess-update.mp4",
+    "render:geo:wide": "remotion render src/index.ts GeoGuessUpdateWide out/skycave-geoguess-update-wide.mp4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.239",
