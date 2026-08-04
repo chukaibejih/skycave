@@ -73,17 +73,17 @@ function Card({
         height: h,
         // A wild carries all four colours so it reads as "any colour" at a glance.
         background: wild
-          ? "conic-gradient(#ff5a4e 0deg 90deg, #ffd166 90deg 180deg, #3fce7c 180deg 270deg, #4a90ff 270deg 360deg)"
-          : SUIT[card.color],
-        borderColor: fresh ? "var(--color-cyan)" : raised ? "#f5f7ff" : "rgba(5,6,10,0.35)",
+          ? "radial-gradient(circle at top left, #ff5a4e 0%, transparent 65%), radial-gradient(circle at top right, #ffd166 0%, transparent 65%), radial-gradient(circle at bottom left, #3fce7c 0%, transparent 65%), radial-gradient(circle at bottom right, #4a90ff 0%, transparent 65%), #171b27"
+          : `linear-gradient(135deg, ${SUIT[card.color]}, color-mix(in srgb, ${SUIT[card.color]} 65%, black))`,
+        borderColor: fresh ? "var(--color-cyan)" : raised ? "#f5f7ff" : "rgba(255,255,255,0.15)",
         color: "#05060a",
         opacity: dim ? 0.62 : 1,
         cursor: onClick ? "pointer" : "default",
         boxShadow: fresh
-          ? "0 0 0 2px var(--color-cyan), 0 6px 18px rgba(103,232,249,0.45)"
+          ? "inset 0 1px 1px rgba(255,255,255,0.4), 0 0 0 2px var(--color-cyan), 0 6px 18px rgba(103,232,249,0.45)"
           : raised
-            ? "0 6px 18px rgba(139,124,255,0.45)"
-            : "0 2px 6px rgba(0,0,0,0.4)",
+            ? "inset 0 1px 1px rgba(255,255,255,0.4), 0 6px 18px rgba(139,124,255,0.45)"
+            : "inset 0 1px 1px rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.5)",
       }}
     >
       {wild && (
@@ -451,8 +451,16 @@ export function Uno({ board, meId, players, onAction }: Props) {
             looking at the back of a hand held across the table, so flipping it
             is what makes the two read as facing each other rather than as two
             hands held side by side. */}
-        <div ref={setOppNode} className="relative h-[56px] flex-1" style={{ maxWidth: 200 }}>
-          {fanLayout(oppCount, oppW, 30, 10, 7).map((pos, i) => (
+        <div className="relative h-[56px] flex-1" style={{ maxWidth: 200 }}>
+          {oppCount === 1 && (
+            <motion.div
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="absolute inset-0 z-0 bg-[var(--color-warm)] blur-2xl"
+            />
+          )}
+          <div ref={setOppNode} className="relative z-10 w-full h-full">
+            {fanLayout(oppCount, oppW, 30, 10, 7).map((pos, i) => (
             <motion.div
               key={i}
               // The fan rides Framer's own y/rotate rather than an inline
@@ -472,6 +480,7 @@ export function Uno({ board, meId, players, onAction }: Props) {
               <CardBack w={30} h={44} />
             </motion.div>
           ))}
+          </div>
         </div>
       </div>
 
@@ -564,6 +573,13 @@ export function Uno({ board, meId, players, onAction }: Props) {
       {/* Your hand. Playable cards lift and brighten; a freshly drawn one is
           ringed and scrolled into view so you can see what just changed. */}
       <div ref={setHandNode} className="relative h-[124px] w-full">
+        {myCount === 1 && (
+          <motion.div
+            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="absolute bottom-0 left-1/2 h-[80px] w-[140px] -translate-x-1/2 rounded-full bg-[var(--color-warm)] blur-3xl pointer-events-none"
+          />
+        )}
         {(() => {
           const cards = hand?.hand ?? [];
           const fan = fanLayout(cards.length, handW, HAND_W, 9, 12);
@@ -589,12 +605,17 @@ export function Uno({ board, meId, players, onAction }: Props) {
                   zIndex: can ? 40 + i : i,
                 }}
               >
-                <Card
-                  card={c}
-                  dim={myTurn && !can}
-                  fresh={fresh}
-                  onClick={can ? () => play(c) : undefined}
-                />
+                <motion.div
+                  animate={can ? { y: [0, -6, 0] } : { y: 0 }}
+                  transition={can ? { duration: 2, repeat: Infinity, ease: "easeInOut", delay: i * 0.15 } : {}}
+                >
+                  <Card
+                    card={c}
+                    dim={myTurn && !can}
+                    fresh={fresh}
+                    onClick={can ? () => play(c) : undefined}
+                  />
+                </motion.div>
               </div>
             );
           });
@@ -715,29 +736,34 @@ export function Uno({ board, meId, players, onAction }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 grid place-items-center bg-[rgba(5,6,10,0.72)] p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 grid place-items-center bg-[rgba(5,6,10,0.85)] p-6 backdrop-blur-md"
             onClick={() => setPendingWild(null)}
           >
             <motion.div
               initial={{ scale: 0.94, y: 8 }}
               animate={{ scale: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xs rounded-[16px] border p-5"
-              style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+              className="w-full max-w-xs rounded-[24px] border border-white/10 bg-black/40 p-5 shadow-2xl backdrop-blur-2xl"
             >
-              <div className="mb-3 text-center font-[var(--font-display)] text-lg font-bold">
+              <div className="mb-4 text-center font-[var(--font-display)] text-xl font-bold text-white">
                 Pick a colour
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 {(["r", "y", "g", "b"] as const).map((c) => (
-                  <button
+                  <motion.button
                     key={c}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => chooseColor(c)}
-                    className="h-16 rounded-[12px] font-[var(--font-display)] font-bold capitalize"
-                    style={{ background: SUIT[c], color: "#05060a" }}
+                    className="relative h-20 overflow-hidden rounded-[16px] font-[var(--font-display)] text-lg font-bold capitalize"
+                    style={{
+                      background: `linear-gradient(135deg, ${SUIT[c]}, color-mix(in srgb, ${SUIT[c]} 50%, black))`,
+                      color: "#05060a",
+                      boxShadow: `inset 0 1px 1px rgba(255,255,255,0.4), 0 4px 12px color-mix(in srgb, ${SUIT[c]} 30%, transparent)`
+                    }}
                   >
                     {COLOR_NAME[c]}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </motion.div>
