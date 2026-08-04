@@ -2,6 +2,7 @@ import React from "react";
 import { Composition } from "remotion";
 import { FPS, WIDTH, HEIGHT } from "./theme";
 import { WeekendCup, WEEKEND_CUP_FRAMES } from "./WeekendCup";
+import { GeoGuessUpdate, GEO_UPDATE_FRAMES } from "./GeoGuessUpdate";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -20,6 +21,25 @@ export const RemotionRoot: React.FC = () => (
       id="WeekendCupWide"
       component={WeekendCup}
       durationInFrames={WEEKEND_CUP_FRAMES}
+      fps={FPS}
+      width={1920}
+      height={1080}
+    />
+
+    {/* GeoGuess map update: pan/zoom + redesigned toggles. Vertical + wide, the
+        same four scenes reflowing off the canvas size. */}
+    <Composition
+      id="GeoGuessUpdate"
+      component={GeoGuessUpdate}
+      durationInFrames={GEO_UPDATE_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+    />
+    <Composition
+      id="GeoGuessUpdateWide"
+      component={GeoGuessUpdate}
+      durationInFrames={GEO_UPDATE_FRAMES}
       fps={FPS}
       width={1920}
       height={1080}
