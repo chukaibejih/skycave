@@ -115,17 +115,9 @@ export function TournamentBanner() {
             <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--color-cyan)] drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
               {label}
               {spots && ` · ${spots}`}
-              {/* Calm until the final stretch: a day, not a ticking clock. */}
-              {s.countdownTo && !clockIsLive(s.countdownFrom) && (
-                <>
-                  {" · closes "}
-                  <Weekday iso={s.countdownTo} />
-                </>
-              )}
             </p>
 
-            {/* Only once the countdown means something (from Wednesday) does the loud clock appear. */}
-            {s.countdownTo && clockIsLive(s.countdownFrom) && (
+            {s.countdownTo && (
               <div className="mt-4">
                 <div className="inline-flex rounded-[14px] border border-white/10 bg-black/40 px-3 py-2 backdrop-blur-md">
                   <BannerClock to={s.countdownTo} />
