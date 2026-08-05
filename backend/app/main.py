@@ -17,6 +17,7 @@ from app.routers import (
     cave,
     feedback,
     games,
+    hall_of_fame,
     leaderboard,
     rooms,
     share,
@@ -61,6 +62,7 @@ app.include_router(share.router)
 app.include_router(admin.router)
 app.include_router(feedback.router)
 app.include_router(leaderboard.router)
+app.include_router(hall_of_fame.router)
 app.include_router(cave.router)
 app.include_router(tournaments.router)
 app.include_router(internal.router)
