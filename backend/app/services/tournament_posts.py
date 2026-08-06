@@ -39,6 +39,7 @@ BSKY_LIMIT = 270
 SITE = "skycave.space"
 
 KIND_DRAW = "tournament_draw"
+KIND_PLAYIN = "tournament_playin"
 KIND_LIVE = "tournament_live"
 KIND_ROUND = "tournament_round"
 KIND_CHAMPION = "tournament_champion"
@@ -132,23 +133,29 @@ def compose_draw(
     tournament_id: str,
     entrants: int,
     rounds: int,
-    first_round: list[tuple[str | None, str | None]],
-    byes: list[str],
+    round1: list[tuple[str | None, str | None]],
 ) -> list[str]:
     """The bracket is up, composed as a THREAD so every player is tagged no
     matter the field size.
 
-    The first post leads, carries the link, and (once the sidecar adds them) the
-    hashtags; continuation posts carry the remaining fixtures. Nobody is folded
-    into a "+N more" that never tags them. Returns the ordered post texts.
+    `round1` is the main-draw first round as (handle|None, handle|None); a None
+    seat is one a play-in winner will take, so it reads "vs a play-in winner"
+    rather than being dropped (which would leave that direct entrant untagged).
+    Matches where both seats are contested are omitted here - those players are
+    tagged in the play-in post instead.
     """
     lead = (
         f"THE BRACKET IS LIVE. {entrants} PLAYERS. "
         f"{rounds} {'ROUND' if rounds == 1 else 'ROUNDS'}. LET'S GO."
     )
     tail = f"BEST OF THREE EVERY ROUND.\n{bracket_url(tournament_id)}"
-    items = [f"{_at(p1)} VS {_at(p2)}" for p1, p2 in first_round if p1 and p2]
-    items += _bye_lines(byes)
+    items: list[str] = []
+    for p1, p2 in round1:
+        if p1 and p2:
+            items.append(f"{_at(p1)} VS {_at(p2)}")
+        elif p1 or p2:
+            items.append(f"{_at(p1 or p2)} VS A PLAY-IN WINNER")
+        # both contested: skip; those players are tagged in the play-in post
 
     thread: list[str] = []
 
@@ -182,6 +189,46 @@ def compose_draw(
             i += 1
         thread.append("\n".join(["MORE FIXTURES:"] + body))
 
+    return thread
+
+
+def compose_play_in(
+    *,
+    tournament_id: str,
+    matches: list[tuple[str | None, str | None]],
+) -> list[str]:
+    """The play-in, as a THREAD so everyone fighting for the last seats is
+    tagged. These are the players who registered latest; win here and you take
+    a main-draw seat."""
+    lead = "THE PLAY-IN IS SET. WIN YOUR MATCH AND YOU ARE IN THE MAIN DRAW."
+    tail = f"THE LAST TO REGISTER PLAY FOR THE LAST SEATS.\n{bracket_url(tournament_id)}"
+    items = [f"{_at(a)} VS {_at(b)}" for a, b in matches if a and b]
+
+    thread: list[str] = []
+    i, first_body = 0, []
+    while i < len(items):
+        trial = "\n\n".join([lead, "\n".join(first_body + [items[i]]), tail])
+        if len(trial) <= THREAD_FIRST_LIMIT:
+            first_body.append(items[i])
+            i += 1
+        else:
+            break
+    thread.append(
+        "\n\n".join([lead, "\n".join(first_body), tail]) if first_body else f"{lead}\n\n{tail}"
+    )
+    while i < len(items):
+        body: list[str] = []
+        while i < len(items):
+            trial = "\n".join(["MORE PLAY-IN:"] + body + [items[i]])
+            if len(trial) <= THREAD_CONT_LIMIT:
+                body.append(items[i])
+                i += 1
+            else:
+                break
+        if not body:
+            body = [items[i]]
+            i += 1
+        thread.append("\n".join(["MORE PLAY-IN:"] + body))
     return thread
 
 

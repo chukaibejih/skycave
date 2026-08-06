@@ -147,7 +147,7 @@ async def test_lock_on_read_draws_bracket() -> None:
         try:
             t.status = svc.REGISTERING
             await s.commit()
-            for i in range(5):  # 5 entrants -> bracket of 8, 3 byes, 3 rounds
+            for i in range(5):  # 5 -> main draw of 4, a 1-match play-in, no byes
                 ent = TournamentEntrant(
                     tournament_id=t.id, did=f"did:plc:draw{i}",
                     handle=f"d{i}.bsky.social", display_name=f"Drawn {i}",
@@ -162,12 +162,20 @@ async def test_lock_on_read_draws_bracket() -> None:
             assert rows, "no bracket was drawn"
 
             rounds = {m.round for m in rows}
+            r0 = [m for m in rows if m.round == 0]
             r1 = [m for m in rows if m.round == 1]
-            byes = [m for m in r1 if m.player2_did is None or m.player1_did is None]
-            print(f"5 entrants -> rounds={sorted(rounds)} r1 matches={len(r1)} byes={len(byes)}")
-            assert max(rounds) == 3, f"5 entrants needs 3 rounds, got {max(rounds)}"
-            assert len(r1) == 4, f"a bracket of 8 has 4 first-round slots, got {len(r1)}"
-            assert len(byes) == 3, f"5 in a bracket of 8 means 3 byes, got {len(byes)}"
+            contested = [m for m in r1 if m.player1_did is None or m.player2_did is None]
+            playin_players = {p for m in r0 for p in (m.player1_did, m.player2_did)}
+            print(f"5 entrants -> rounds={sorted(rounds)} playin={len(r0)} r1={len(r1)} contested={len(contested)}")
+            # Round numbers are 0 (play-in), 1, 2 - the play-in takes the first window.
+            assert rounds == {0, 1, 2}, f"5 entrants -> rounds 0,1,2, got {sorted(rounds)}"
+            assert len(r0) == 1, f"5 entrants -> one play-in match, got {len(r0)}"
+            assert len(r1) == 2, f"main draw of 4 has 2 first-round slots, got {len(r1)}"
+            assert len(contested) == 1, f"exactly one seat awaits the play-in winner, got {len(contested)}"
+            assert not any(m.status == "bye" for m in rows), "no fixture should be a bye"
+            # The play-in is the last two to register (draw3, draw4).
+            assert playin_players == {"did:plc:draw3", "did:plc:draw4"}, \
+                f"play-in must be the last registrants, got {playin_players}"
 
             for m in rows:
                 assert m.games and len(m.games) == 3, f"fixture {m.id} has no 3 games"
