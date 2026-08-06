@@ -404,3 +404,59 @@ export interface PlayerRecord {
 
 /** The signed-in player's tournament history. Guests get an empty record. */
 export const getMyRecord = () => request<PlayerRecord>("/tournaments/me/record");
+
+// ---- Hall of Fame -------------------------------------------------------
+
+export interface HofPerson {
+  did: string;
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_guest: boolean;
+}
+export interface HofChampion {
+  tournament_id: string;
+  tournament_name: string;
+  date: string | null;
+  player: HofPerson;
+}
+export interface HofTitleHolder {
+  player: HofPerson;
+  titles: number;
+}
+export interface HofStat {
+  player: HofPerson;
+  value: number;
+}
+export interface HofWinRate {
+  player: HofPerson;
+  win_rate: number; // 0..1
+  games_played: number;
+  games_won: number;
+}
+export interface HofBiggest {
+  player: HofPerson;
+  game_type: string;
+  score: number;
+}
+export interface HofFirstGame {
+  date: string;
+  game_type: string;
+  player: HofPerson;
+  opponent: HofPerson | null;
+}
+export interface HallOfFame {
+  generated_at: string;
+  champions: HofChampion[];
+  most_titles: HofTitleHolder | null;
+  most_wins: HofStat | null;
+  most_played: HofStat | null;
+  highest_total: HofStat | null;
+  best_win_rate: HofWinRate | null;
+  biggest_1v1: HofBiggest | null;
+  first_game: HofFirstGame | null;
+  first_champion: HofChampion | null;
+}
+
+/** The all-time Hall of Fame. Public; cached server-side. */
+export const getHallOfFame = () => request<HallOfFame>("/hall-of-fame");

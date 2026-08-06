@@ -158,6 +158,29 @@ export default function Home() {
               →
             </span>
           </Link>
+
+          <Link
+            href="/hall-of-fame"
+            className="mt-3 ml-2 inline-flex h-12 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-5 text-sm font-semibold text-[var(--color-text-primary)] transition-colors active:border-[var(--color-gold)]"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-gold)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="m12 2 2.4 6.9H21l-5.3 4 2 6.9-5.7-4.3L6.3 20l2-7-5.3-4h6.6L12 2Z" />
+            </svg>
+            Hall of Fame
+            <span aria-hidden className="text-[var(--color-text-secondary)]">
+              →
+            </span>
+          </Link>
         </motion.div>
 
         {/* Signal-flow hub: games stream along the wave; tap one to play. */}
