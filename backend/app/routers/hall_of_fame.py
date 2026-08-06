@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import desc, select, union_all
+from sqlalchemy import case, desc, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -28,7 +28,7 @@ from app.models.tournament import FINISHED, Tournament, TournamentEntrant
 
 router = APIRouter(tags=["hall-of-fame"])
 
-CACHE_KEY = "hall_of_fame:v2"
+CACHE_KEY = "hall_of_fame:v3"
 CACHE_TTL = 300  # 5 min; the records barely move, so a stale-ish read is fine
 MIN_RATE_GAMES = 10  # a win rate under this many games is noise, not a record
 
@@ -171,35 +171,80 @@ async def _build(db: AsyncSession) -> HallOfFame:
         if n >= 2 and (p := champ_people.get(did)):
             most_titles = TitleHolder(player=p, titles=n)
 
-    # All-time ladder, straight off the denormalized user aggregates.
-    async def _top(order_col, guard) -> User | None:
-        return (
-            await db.execute(select(User).where(guard).order_by(desc(order_col)).limit(1))
-        ).scalars().first()
+    # All-time ladder. Wins, games played, and win rate are derived from 1v1
+    # sessions only (versus + tournament), exactly like the leaderboard, so a
+    # heap of solo plays cannot dilute a competitive record - the denormalized
+    # users.games_played counts solo too, which was sinking real win rates.
+    # Highest total stays a lifetime points sum across everything, a fair
+    # reading of "total score".
+    def _lside(pid, handle):
+        return select(
+            pid.label("pid"),
+            handle.label("handle"),
+            case((GameSession.winner_id == pid, 1), else_=0).label("won"),
+        ).where(GameSession.mode.in_(HEAD_TO_HEAD_MODES), pid.like("did:%"))
 
-    mw = await _top(User.games_won, User.games_won > 0)
-    mp = await _top(User.games_played, User.games_played > 0)
-    ht = await _top(User.total_score, User.total_score > 0)
-    most_wins = StatRecord(player=_person(mw), value=mw.games_won) if mw else None
-    most_played = StatRecord(player=_person(mp), value=mp.games_played) if mp else None
-    highest_total = StatRecord(player=_person(ht), value=ht.total_score) if ht else None
+    lplays = union_all(
+        _lside(GameSession.player1_id, GameSession.player1_handle),
+        _lside(GameSession.player2_id, GameSession.player2_handle),
+    ).subquery()
+    ladder = (
+        select(
+            lplays.c.pid,
+            func.count().label("played"),
+            func.sum(lplays.c.won).label("won"),
+        )
+        .group_by(lplays.c.pid)
+        .subquery()
+    )
 
-    wr_user = (
+    mw = (
         await db.execute(
-            select(User)
-            .where(User.games_played >= MIN_RATE_GAMES)
-            .order_by(desc(User.games_won * 1.0 / User.games_played))
+            select(ladder.c.pid, ladder.c.won)
+            .where(ladder.c.won > 0)
+            .order_by(desc(ladder.c.won))
             .limit(1)
         )
+    ).first()
+    mp = (
+        await db.execute(
+            select(ladder.c.pid, ladder.c.played)
+            .order_by(desc(ladder.c.played))
+            .limit(1)
+        )
+    ).first()
+    wr = (
+        await db.execute(
+            select(ladder.c.pid, ladder.c.won, ladder.c.played)
+            .where(ladder.c.played >= MIN_RATE_GAMES)
+            .order_by(desc(ladder.c.won * 1.0 / ladder.c.played))
+            .limit(1)
+        )
+    ).first()
+    ht = (
+        await db.execute(
+            select(User).where(User.total_score > 0).order_by(desc(User.total_score)).limit(1)
+        )
     ).scalars().first()
+
+    lp = await _resolve(db, [r.pid for r in (mw, mp, wr) if r])
+    most_wins = (
+        StatRecord(player=lp[mw.pid], value=int(mw.won or 0)) if mw and mw.pid in lp else None
+    )
+    most_played = (
+        StatRecord(player=lp[mp.pid], value=int(mp.played or 0))
+        if mp and (mp.played or 0) > 0 and mp.pid in lp
+        else None
+    )
+    highest_total = StatRecord(player=_person(ht), value=ht.total_score) if ht else None
     best_win_rate = (
         WinRate(
-            player=_person(wr_user),
-            win_rate=round(wr_user.games_won / wr_user.games_played, 3),
-            games_played=wr_user.games_played,
-            games_won=wr_user.games_won,
+            player=lp[wr.pid],
+            win_rate=round(int(wr.won or 0) / int(wr.played), 3),
+            games_played=int(wr.played),
+            games_won=int(wr.won or 0),
         )
-        if wr_user and wr_user.games_played
+        if wr and wr.played and wr.pid in lp
         else None
     )
 
