@@ -160,9 +160,17 @@ async def start_round(room_id: str, round_number: int) -> None:
         if game is None:
             return
 
-        public, secret = game.new_round(round_number)
-        now = time.time()
         gs = room["game"]
+        # A game can opt into no-repeat rounds by exposing new_round_unique: it
+        # gets the prompts already served this game and returns a fresh one, so
+        # e.g. GeoGuess never shows the same place twice in a session.
+        if hasattr(game, "new_round_unique"):
+            used = gs.get("_used_prompts") or []
+            public, secret = game.new_round_unique(round_number, used)
+            gs["_used_prompts"] = used + [public.get("prompt")]
+        else:
+            public, secret = game.new_round(round_number)
+        now = time.time()
         gs["round"] = round_number
         gs["phase"] = "active"
         gs["round_data"] = public
