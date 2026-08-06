@@ -20,17 +20,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Skycave: play with anyone on Bluesky",
+  title: "Skycave: games for Bluesky, Blacksky, and beyond",
   description:
-    "Fast, casual multiplayer games. Post a link to Bluesky, your opponent taps in. No account needed.",
+    "Fast, casual multiplayer games for Bluesky, Blacksky, and beyond. Post a link, your opponent taps in. No account needed.",
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://skycave.space"
   ),
   openGraph: {
     title: "Skycave",
-    description: "Play with anyone on Bluesky. No account needed.",
+    description: "Play with anyone on Bluesky, Blacksky, and beyond. No account needed.",
     siteName: "Skycave",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Skycave",
+    description: "Play with anyone on Bluesky, Blacksky, and beyond. No account needed.",
   },
 };
 

@@ -127,8 +127,9 @@ export default function Home() {
             style={{ color: "var(--color-text-secondary)" }}
             className="mx-auto mt-5 max-w-xl text-base leading-7 lg:mx-0 lg:text-lg"
           >
-            Fast games built for Bluesky. Play solo and post your score, or
-            open a 1v1 room and let anyone tap in straight from the link.
+            Fast games for Bluesky, Blacksky, and beyond. Play solo and post
+            your score, or open a 1v1 room and let anyone tap in straight from
+            the link.
           </p>
 
           <Link
