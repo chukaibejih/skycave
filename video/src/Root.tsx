@@ -3,6 +3,7 @@ import { Composition } from "remotion";
 import { FPS, WIDTH, HEIGHT } from "./theme";
 import { WeekendCup, WEEKEND_CUP_FRAMES } from "./WeekendCup";
 import { GeoGuessUpdate, GEO_UPDATE_FRAMES } from "./GeoGuessUpdate";
+import { PlayIn, PLAYIN_FRAMES } from "./PlayIn";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -40,6 +41,25 @@ export const RemotionRoot: React.FC = () => (
       id="GeoGuessUpdateWide"
       component={GeoGuessUpdate}
       durationInFrames={GEO_UPDATE_FRAMES}
+      fps={FPS}
+      width={1920}
+      height={1080}
+    />
+
+    {/* Play-in rule explainer: byes are gone, the last to register face a
+        play-in, register early to skip it. Vertical + wide. */}
+    <Composition
+      id="PlayIn"
+      component={PlayIn}
+      durationInFrames={PLAYIN_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+    />
+    <Composition
+      id="PlayInWide"
+      component={PlayIn}
+      durationInFrames={PLAYIN_FRAMES}
       fps={FPS}
       width={1920}
       height={1080}
