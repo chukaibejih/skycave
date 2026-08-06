@@ -168,7 +168,9 @@ async def entrants(db: AsyncSession, tournament_id: str) -> list[TournamentEntra
             await db.execute(
                 select(TournamentEntrant)
                 .where(TournamentEntrant.tournament_id == tournament_id)
-                .order_by(TournamentEntrant.registered_at)
+                # Registration order drives who plays the play-in (the last to
+                # sign up), so it must be stable: id breaks a same-instant tie.
+                .order_by(TournamentEntrant.registered_at, TournamentEntrant.id)
             )
         ).scalars()
     )
@@ -315,24 +317,31 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
 
     await refresh_entrants(people)
 
+    field = len(people)
     rng = random.Random()  # a real draw; nothing reproducible about it
+    # Entrants arrive in registration order, so build_bracket sends the last to
+    # register to the play-in (round 0) and keeps the pairings random.
     fixtures = eng.build_bracket([e.did for e in people], rng)
-    eng.apply_byes(fixtures)
     eng.advance(fixtures)
 
-    rounds = eng.rounds_for(len(people))
+    rounds = eng.rounds_for(field)
+    overflow = eng.overflow_for(field)
+    has_playin = overflow > 0
+    base = 0 if has_playin else 1  # the first round number: play-in is round 0
+
     deadlines = eng.round_deadlines(
         _aware(locked.play_opens_at), _aware(locked.play_closes_at), rounds
     )
 
-    locked.bracket_size = eng.bracket_size_for(len(people))
+    locked.bracket_size = eng.main_size_for(field)
     locked.rounds = rounds
     locked.round_deadlines = [
-        {"round": i + 1, "deadline": d.isoformat()} for i, d in enumerate(deadlines)
+        {"round": base + i, "deadline": d.isoformat()} for i, d in enumerate(deadlines)
     ]
     locked.status = LOCKED
 
-    # Seat numbers make the published bracket stable to render.
+    # Seat numbers stabilise the main-draw render. Play-in players sit in their
+    # own round-0 section and need no main-draw seat (left None).
     seat_of = {}
     for fx in fixtures:
         if fx.round != 1:
@@ -356,17 +365,21 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
                 results=list(fx.results),
                 winner_did=fx.winner,
                 status=_match_status(fx),
-                deadline=deadlines[fx.round - 1],
+                # round 0 (play-in) -> the first window; round r -> window r-base.
+                deadline=deadlines[fx.round - base],
             )
         )
 
-    # The draw is news, and it is the moment every entrant most wants to be
-    # tagged. Queued inside the same transaction as the bracket itself, so a
-    # drawn tournament can never exist without its announcement owed.
+    # The draw is news, and the moment every entrant most wants to be tagged.
+    # Both posts are threads so nobody is left untagged, and both are queued in
+    # the same transaction as the bracket so a drawn tournament always owes them.
     handles = {e.did: e.handle for e in people}
+
+    def _h(did: str | None) -> str | None:
+        return handles.get(did) if did else None
+
+    r0 = [fx for fx in fixtures if fx.round == 0]
     r1 = [fx for fx in fixtures if fx.round == 1]
-    # compose_draw returns an ordered list of thread posts; store it as JSON so
-    # the drain can post them as a thread (KIND_DRAW rows carry a JSON array).
     await posts.enqueue(
         db,
         kind=posts.KIND_DRAW,
@@ -374,20 +387,21 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
         text=json.dumps(posts.compose_draw(
             name=locked.name,
             tournament_id=locked.id,
-            entrants=len(people),
+            entrants=field,
             rounds=rounds,
-            first_round=[
-                (handles.get(fx.p1 or ""), handles.get(fx.p2 or ""))
-                for fx in r1
-                if not fx.is_bye
-            ],
-            byes=[
-                handles.get(fx.p1 or fx.p2 or "", "")
-                for fx in r1
-                if fx.is_bye
-            ],
+            round1=[(_h(fx.p1), _h(fx.p2)) for fx in r1],
         )),
     )
+    if has_playin:
+        await posts.enqueue(
+            db,
+            kind=posts.KIND_PLAYIN,
+            dedupe_key=f"{locked.id}:playin",
+            text=json.dumps(posts.compose_play_in(
+                tournament_id=locked.id,
+                matches=[(_h(fx.p1), _h(fx.p2)) for fx in r0],
+            )),
+        )
     await db.commit()
     logger.info(
         "tournament %s drawn: %d entrants, bracket %d, %d rounds",
@@ -404,12 +418,12 @@ def _match_status(fx: eng.Fixture, was: str | None = None) -> str:
     players looks identical before the first game and between games), so it is
     carried forward rather than recomputed back down to `ready`.
     """
-    if fx.is_bye:
-        return M_BYE
     if fx.winner:
         return M_DONE
     if fx.p1 and fx.p2:
         return M_LIVE if was == M_LIVE else M_READY
+    # An empty seat is a contested seat awaiting its play-in winner (or a later
+    # round awaiting its feeder): pending, never a bye. Byes are gone.
     return M_PENDING
 
 
