@@ -381,9 +381,13 @@ class MyMatchOut(BaseModel):
     prompt: str = ""
 
 
-def _round_name(round: int, rounds: int) -> str:
-    """Rounds get their real names: nobody says "round 3 of 3" about a final."""
-    left = rounds - round
+def _round_name(round: int, final_round: int) -> str:
+    """Rounds get their real names. `final_round` is the round number of the
+    final (log2 of the main-draw size); round 0 is the play-in, and the main
+    draw runs 1..final_round, so nobody says "round 3 of 3" about a final."""
+    if round == 0:
+        return "Play-in"
+    left = final_round - round
     if left == 0:
         return "Final"
     if left == 1:
@@ -441,7 +445,10 @@ async def _my_match(
     is_bye = m.status == M_BYE
     checked = list(m.checked_in or [])
     won = m.winner_did == did
-    is_final = m.round == t.rounds
+    # The final is at the main-draw depth (log2 of the main-draw size), not the
+    # window count, which is one higher when there is a play-in.
+    final_round = max(1, t.bracket_size.bit_length() - 1)
+    is_final = m.round == final_round
 
     if is_bye:
         prompt = "You have a bye. You are through to the next round with nothing to play."
@@ -474,7 +481,7 @@ async def _my_match(
         run.append(
             RunStep(
                 round=row.round,
-                round_name=_round_name(row.round, t.rounds),
+                round_name=_round_name(row.round, final_round),
                 opponent=person(foe),
                 your_wins=w1 if mine_first else w2,
                 their_wins=w2 if mine_first else w1,
@@ -489,7 +496,7 @@ async def _my_match(
         tournament_status=t.status,
         round=m.round,
         slot=m.slot,
-        round_name=_round_name(m.round, t.rounds),
+        round_name=_round_name(m.round, final_round),
         status=m.status,
         you=you,
         opponent=person(other_did),

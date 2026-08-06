@@ -89,7 +89,11 @@ export function BracketView({ id }: { id: string }) {
     );
   }
 
-  const rounds = Math.max(1, t.rounds);
+  // The play-in (round 0) is a pre-draw qualifier for the overflow above the
+  // nearest power of two. It gets its own section; the main draw is rounds 1..N.
+  const playIn = t.matches.filter((m) => m.round === 0).sort((a, b) => a.slot - b.slot);
+  const hasPlayIn = playIn.length > 0;
+  const mainRounds = Math.max(1, hasPlayIn ? t.rounds - 1 : t.rounds);
   const r1Count = Math.max(1, t.bracket_size / 2);
   const byRound = (r: number) => t.matches.filter((m) => m.round === r).sort((a, b) => a.slot - b.slot);
   const deadlineFor = (r: number) => t.round_deadlines.find((d) => d.round === r)?.deadline ?? null;
@@ -122,14 +126,29 @@ export function BracketView({ id }: { id: string }) {
 
       {t.champion && <ChampionBanner player={t.champion} />}
 
-      {/* Round headers + deadlines, aligned to the columns below. */}
+      {hasPlayIn && (
+        <PlayInPanel
+          matches={playIn}
+          deadline={deadlineFor(0)}
+          live={activeRound === 0}
+          playOpen={playOpen}
+          youDid={t.you?.did ?? null}
+        />
+      )}
+
+      {/* The main draw. Round headers + deadlines, aligned to the columns below. */}
       <div className="mt-8 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <div style={{ minWidth: rounds * COL_W + (rounds - 1) * GUTTER }}>
+        {hasPlayIn && (
+          <div className="mb-3 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+            The main draw
+          </div>
+        )}
+        <div style={{ minWidth: mainRounds * COL_W + (mainRounds - 1) * GUTTER }}>
           <div
             className="mb-3 grid"
-            style={{ gridTemplateColumns: `repeat(${rounds}, ${COL_W}px)`, columnGap: GUTTER }}
+            style={{ gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px)`, columnGap: GUTTER }}
           >
-            {Array.from({ length: rounds }, (_, i) => {
+            {Array.from({ length: mainRounds }, (_, i) => {
               const r = i + 1;
               const dl = deadlineFor(r);
               const live = activeRound === r;
@@ -139,7 +158,7 @@ export function BracketView({ id }: { id: string }) {
                     className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em]"
                     style={{ color: live ? "var(--color-warm)" : "var(--color-text-secondary)" }}
                   >
-                    {roundName(r, rounds)}
+                    {roundName(r, mainRounds)}
                   </div>
                   {dl && live && playOpen && (
                     <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
@@ -155,12 +174,12 @@ export function BracketView({ id }: { id: string }) {
           <div
             className="grid"
             style={{
-              gridTemplateColumns: `repeat(${rounds}, ${COL_W}px)`,
+              gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px)`,
               gridTemplateRows: `repeat(${r1Count}, ${ROW_H}px)`,
               columnGap: GUTTER,
             }}
           >
-            {Array.from({ length: rounds }, (_, i) => i + 1).flatMap((r) =>
+            {Array.from({ length: mainRounds }, (_, i) => i + 1).flatMap((r) =>
               byRound(r).map((m) => {
                 const span = 2 ** (r - 1);
                 return (
@@ -170,8 +189,8 @@ export function BracketView({ id }: { id: string }) {
                     style={{ gridColumn: r, gridRow: `${m.slot * span + 1} / span ${span}` }}
                   >
                     {r > 1 && <InThread lit={!!(m.player1 || m.player2)} />}
-                    <MatchCard m={m} />
-                    {r < rounds && (
+                    <MatchCard m={m} emptyLabel={r === 1 && hasPlayIn ? "play-in winner" : undefined} />
+                    {r < mainRounds && (
                       <Elbow evenSlot={m.slot % 2 === 0} lit={!!m.winner_did} />
                     )}
                   </div>
@@ -336,11 +355,9 @@ function forfeitedDid(m: TournamentMatch): string | null {
   return (m.checked_in ?? []).includes(loser.did) ? null : loser.did;
 }
 
-function MatchCard({ m }: { m: TournamentMatch }) {
+function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string }) {
   const live = m.status === "live";
   const done = m.status === "done";
-  const bye = m.status === "bye";
-  const lone = m.player1 ?? m.player2;
   const [w1, w2] = seriesWins(m);
   const started = w1 + w2 > 0 || (m.results?.length ?? 0) > 0;
   const lines = gameLines(m);
@@ -368,15 +385,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
         </motion.span>
       )}
 
-      {bye ? (
-        <div className="p-2.5">
-          <Slot player={lone} winner />
-          <p className="mt-1.5 px-0.5 text-[10px] text-[var(--color-text-secondary)]">
-            Bye, straight through
-          </p>
-        </div>
-      ) : (
-        <div className="p-2.5">
+      <div className="p-2.5">
           <Slot
             player={m.player1}
             winner={done && m.winner_did === m.player1?.did}
@@ -384,6 +393,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
             wins={started ? w1 : null}
             leading={w1 > w2}
             forfeit={!!m.player1 && forfeiter === m.player1.did}
+            emptyLabel={emptyLabel}
           />
           <div className="my-1 h-px" style={{ background: "var(--color-border)" }} />
           <Slot
@@ -393,6 +403,7 @@ function MatchCard({ m }: { m: TournamentMatch }) {
             wins={started ? w2 : null}
             leading={w2 > w1}
             forfeit={!!m.player2 && forfeiter === m.player2.did}
+            emptyLabel={emptyLabel}
           />
 
           {/* The games, with their scorelines. Before this the card showed the
@@ -447,7 +458,6 @@ function MatchCard({ m }: { m: TournamentMatch }) {
             </div>
           )}
         </div>
-      )}
     </motion.div>
   );
 }
@@ -459,6 +469,7 @@ function Slot({
   wins,
   leading,
   forfeit,
+  emptyLabel,
 }: {
   player: TournamentPlayer | null | undefined;
   winner?: boolean;
@@ -468,12 +479,27 @@ function Slot({
   leading?: boolean;
   /** This player never showed and lost the fixture by walkover. */
   forfeit?: boolean;
+  /** Text for an empty seat: 'waiting' (a later round) or 'play-in winner'. */
+  emptyLabel?: string;
 }) {
   if (!player) {
+    const fromPlayIn = !!emptyLabel;
     return (
       <div className="flex h-[30px] items-center gap-2 py-0.5 pl-2.5 pr-0.5">
-        <div className="h-[22px] w-[22px] rounded-full border border-dashed" style={{ borderColor: "var(--color-border)" }} />
-        <span className="text-xs text-[var(--color-text-secondary)]">waiting</span>
+        <div
+          className="h-[22px] w-[22px] rounded-full border border-dashed"
+          style={{
+            borderColor: fromPlayIn
+              ? "color-mix(in srgb, var(--color-gold) 55%, transparent)"
+              : "var(--color-border)",
+          }}
+        />
+        <span
+          className="text-xs"
+          style={{ color: fromPlayIn ? "var(--color-gold)" : "var(--color-text-secondary)" }}
+        >
+          {emptyLabel ?? "waiting"}
+        </span>
       </div>
     );
   }
@@ -590,6 +616,118 @@ function ChampionBanner({ player }: { player: TournamentPlayer }) {
   );
 }
 
+/** A "log in / enter" glyph: an arrow stepping through a doorway. The play-in is
+ * the door into the main draw, so the section wears it. */
+function GateIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <path d="M10 17l5-5-5-5" />
+      <path d="M15 12H3" />
+    </svg>
+  );
+}
+
+/**
+ * The play-in: a distinct, gold-accented gate that sits above the main bracket
+ * rather than posing as a normal round. It says plainly who is in it and what
+ * is at stake (a seat in the main draw), highlights the viewer's own match, and
+ * shares the gold of the "play-in winner" seats below so the eye connects the
+ * qualifier to where its winners land. A power-of-two field never renders this.
+ */
+function PlayInPanel({
+  matches,
+  deadline,
+  live,
+  playOpen,
+  youDid,
+}: {
+  matches: TournamentMatch[];
+  deadline: string | null;
+  live: boolean;
+  playOpen: boolean;
+  youDid: string | null;
+}) {
+  const seats = matches.length;
+  const GOLD = "var(--color-gold)";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-6 rounded-[18px] border p-4"
+      style={{
+        borderColor: "color-mix(in srgb, var(--color-gold) 38%, transparent)",
+        background:
+          "linear-gradient(155deg, color-mix(in srgb, var(--color-gold) 9%, transparent), transparent 58%), var(--color-surface)",
+      }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div
+            className="flex items-center gap-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em]"
+            style={{ color: GOLD }}
+          >
+            <GateIcon /> Play-in
+            {live && (
+              <motion.span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: GOLD }}
+                animate={{ opacity: [1, 0.35, 1] }}
+                transition={{ duration: 1.4, repeat: Infinity }}
+              />
+            )}
+          </div>
+          <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--color-text-secondary)]">
+            The last to register play their way in. Win your match and you take
+            one of the {seats} open {seats === 1 ? "seat" : "seats"} in the main
+            draw below.
+          </p>
+        </div>
+        {deadline && live && playOpen && (
+          <div className="shrink-0 text-[11px] text-[var(--color-text-secondary)]">
+            closes in <Countdown to={deadline} compact />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        {matches.map((m) => {
+          const mine = !!youDid && (m.player1?.did === youDid || m.player2?.did === youDid);
+          return (
+            <div key={m.slot} className="relative" style={{ width: COL_W }}>
+              {mine && (
+                <span
+                  className="absolute -top-2 left-3 z-10 rounded-full px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
+                  style={{ background: GOLD, color: "#05060a" }}
+                >
+                  you
+                </span>
+              )}
+              <MatchCard m={m} />
+              <div
+                className="mt-1 flex items-center justify-center gap-1 font-[var(--font-mono)] text-[9px] uppercase tracking-[0.12em]"
+                style={{ color: "color-mix(in srgb, var(--color-gold) 85%, transparent)" }}
+              >
+                winner &rarr; a main-draw seat
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 /**
  * The one strip that answers "can I play, and when". Before the play window it
  * counts down to the start with a deactivated button. Once open, it reflects the
@@ -641,7 +779,13 @@ function PlayStrip({ t }: { t: Tournament }) {
   } else if (mine?.is_champion) {
     line = <span style={{ color: "var(--color-gold)" }}>You won the Cup.</span>;
   } else if (mine?.eliminated) {
-    line = <span style={{ color: "var(--color-text-secondary)" }}>You are out. Good run.</span>;
+    line = (
+      <span style={{ color: "var(--color-text-secondary)" }}>
+        {mine.round === 0
+          ? "You are out. The play-in was as far as it went. Good run."
+          : "You are out. Good run."}
+      </span>
+    );
   } else if (mine?.won_match || mine?.is_bye) {
     line = <span style={{ color: S }}>You are through. Next opponent still to be decided.</span>;
   } else if (mine && !mine.opponent) {
@@ -651,7 +795,16 @@ function PlayStrip({ t }: { t: Tournament }) {
       </span>
     );
   } else if (mine) {
-    line = <span style={{ color: S }}>Play is live. Go and play your match.</span>;
+    // A play-in player is fighting for a seat, not yet in the main draw - name
+    // the stakes so it reads as the qualifier it is.
+    line =
+      mine.round === 0 ? (
+        <span style={{ color: "var(--color-gold)" }}>
+          You are in the play-in. Win to reach the main draw.
+        </span>
+      ) : (
+        <span style={{ color: S }}>Play is live. Go and play your match.</span>
+      );
     canPlay = true;
   } else {
     line = <span style={{ color: S }}>Play is live.</span>;
