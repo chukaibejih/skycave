@@ -100,7 +100,9 @@ async def _aggregate(
             func.sum(plays.c.won).label("won"),
         )
         .group_by(plays.c.pid)
-        .order_by(*order_by)
+        # A trailing stable key so rows tied on the real metrics keep a fixed
+        # order between reads rather than shuffling.
+        .order_by(*order_by, plays.c.pid)
         .limit(limit)
     )
     rows = (await db.execute(agg)).all()
@@ -149,7 +151,15 @@ async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:
         await db.execute(
             select(PersonalBest)
             .where(PersonalBest.game_type == game)
-            .order_by(desc(PersonalBest.best_score))
+            # Score first; then break ties so equal scores get a fair, stable
+            # order rather than an arbitrary one that flips between reads:
+            # whoever reached the score in fewer plays ranks higher, and
+            # player_id is the final tiebreak so the ordering is deterministic.
+            .order_by(
+                desc(PersonalBest.best_score),
+                PersonalBest.plays.asc(),
+                PersonalBest.player_id.asc(),
+            )
             .limit(limit)
         )
     ).scalars().all()
