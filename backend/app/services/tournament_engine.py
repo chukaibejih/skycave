@@ -55,7 +55,27 @@ def bracket_size_for(field: int) -> int:
     return 1 << (field - 1).bit_length()
 
 
+def main_size_for(field: int) -> int:
+    """The main-draw size: the largest power of two at or *below* the field
+    (minimum 2). Everyone above this plays a play-in for the last seats, instead
+    of the old approach of padding *up* to the next power of two with byes."""
+    if field < 2:
+        return 2
+    return 1 << (field.bit_length() - 1)
+
+
+def overflow_for(field: int) -> int:
+    """Players above the main-draw size. Equals the number of play-in matches,
+    and the number of contested main-draw seats those matches feed. Zero when the
+    field is exactly a power of two (then there is no play-in at all)."""
+    return max(0, field - main_size_for(field))
+
+
 def rounds_for(field: int) -> int:
+    """The number of scheduling windows. Unchanged from the bye era on purpose:
+    a play-in simply takes over what used to be the near-empty first round, so
+    log2(main) main rounds plus one play-in window equals log2(next power of two),
+    which is exactly what a power-of-two field needs with no play-in."""
     return max(1, int(math.log2(bracket_size_for(field))))
 
 
@@ -110,16 +130,12 @@ class Fixture:
 
     @property
     def is_bye(self) -> bool:
-        """A free pass into the next round.
-
-        Only round one can hand these out: the draw is padded to a power of two
-        and the spare slots are the byes. Later on, one empty seat means the
-        feeding match has not finished yet, which is a completely different
-        thing to tell a player. Without the round check a semi-finalist waiting
-        on a quarter-final was being shown "bye, straight through", reading as
-        though they were already through to the final.
-        """
-        return self.round == 1 and (self.p1 is None) != (self.p2 is None)
+        """Byes are gone. The field is drawn *down* to a power of two with a
+        play-in for the overflow, so no fixture is ever a free pass. A round-1
+        seat left empty is a *contested* seat awaiting its play-in winner, which
+        is M_PENDING, not a bye. Kept as an always-false shim so any remaining
+        caller reads correctly; remove once every reference is gone."""
+        return False
 
     def wins(self) -> tuple[int, int]:
         w1 = sum(1 for r in self.results if r.get("winner") == self.p1)
@@ -142,11 +158,18 @@ class Fixture:
 
 
 def build_bracket(entrant_dids: list[str], rng: random.Random) -> list[Fixture]:
-    """Draw the whole bracket at once: pairings, byes, and every fixture's games.
+    """Draw the whole bracket at once: the play-in, the main draw, and every
+    fixture's games, all published from the moment registration closes.
 
-    Every round is created up front, not just round one, so the entire set of
-    games is published from the moment registration closes. Later rounds start
-    with empty player slots that advancement fills in.
+    `entrant_dids` MUST arrive in registration order (earliest first). The last
+    ``2 * overflow`` registrants play the play-in (round 0) for the contested
+    seats; everyone else is a direct entrant. Only that split is by registration
+    - the pairings within each group are random, so the draw stays impartial.
+
+    A play-in match at (round 0, slot j) feeds a main-draw seat by the ordinary
+    advance rule (slot j -> round-1 slot j//2, the p1 seat when j is even). So the
+    winners fill the first ``overflow`` main-draw seats and no special wiring is
+    needed. A field that is exactly a power of two has no overflow and no play-in.
     """
     field = len(entrant_dids)
     if field < 2:
@@ -154,42 +177,43 @@ def build_bracket(entrant_dids: list[str], rng: random.Random) -> list[Fixture]:
     if field > MAX_FIELD:
         raise ValueError(f"field {field} exceeds the {MAX_FIELD} fairness ceiling")
 
-    size = bracket_size_for(field)
-    rounds = rounds_for(field)
+    main = main_size_for(field)
+    overflow = overflow_for(field)
+    main_matches = main // 2
+    main_rounds = max(1, int(math.log2(main)))
 
-    players = list(entrant_dids)
-    rng.shuffle(players)  # the draw itself
-
-    # Spread the byes across the round-one matches rather than clustering them
-    # at one end, so the published bracket looks impartial as well as being it.
-    num_matches = size // 2
-    byes = size - field
-    bye_slots: set[int] = set()
-    if byes:
-        stride = num_matches / byes
-        bye_slots = {int(i * stride) for i in range(byes)}
-        # Rounding can collide; fill any shortfall with the next free slot.
-        i = 0
-        while len(bye_slots) < byes and i < num_matches:
-            bye_slots.add(i)
-            i += 1
+    # The split is by registration; the pairing inside each group is random.
+    direct = list(entrant_dids[: field - 2 * overflow])
+    playin = list(entrant_dids[field - 2 * overflow :])
+    rng.shuffle(direct)
+    rng.shuffle(playin)
 
     fixtures: list[Fixture] = []
-    cursor = 0
-    for slot in range(num_matches):
-        if slot in bye_slots:
-            p1, p2 = players[cursor], None
-            cursor += 1
-        else:
-            p1, p2 = players[cursor], players[cursor + 1]
-            cursor += 2
+
+    # Play-in (round 0): one match per contested seat.
+    for j in range(overflow):
         fixtures.append(
-            Fixture(round=1, slot=slot, p1=p1, p2=p2, games=draw_series(rng))
+            Fixture(round=0, slot=j, p1=playin[2 * j], p2=playin[2 * j + 1], games=draw_series(rng))
         )
 
-    # Empty shells for every later round, with their games already drawn.
-    for rnd in range(2, rounds + 1):
-        for slot in range(size >> rnd):
+    # Main-draw round 1. Seat index i maps to (slot i//2, p1 if i even else p2).
+    # The first `overflow` seats are contested (left empty for a play-in winner);
+    # the rest take the direct entrants in order.
+    seats: list[str | None] = [None] * overflow + direct  # length == main
+    for slot in range(main_matches):
+        fixtures.append(
+            Fixture(
+                round=1,
+                slot=slot,
+                p1=seats[2 * slot],
+                p2=seats[2 * slot + 1],
+                games=draw_series(rng),
+            )
+        )
+
+    # Empty shells for every later main round, with their games already drawn.
+    for rnd in range(2, main_rounds + 1):
+        for slot in range(main >> rnd):
             fixtures.append(Fixture(round=rnd, slot=slot, games=draw_series(rng)))
 
     return fixtures
@@ -262,13 +286,6 @@ def _resolve(fx: Fixture) -> None:
             return
         s1, s2 = fx.points()
         fx.winner = fx.p1 if s1 >= s2 else fx.p2
-
-
-def apply_byes(fixtures: list[Fixture]) -> None:
-    """A bye advances immediately, with no games played."""
-    for fx in fixtures:
-        if fx.round == 1 and fx.is_bye and not fx.decided():
-            fx.winner = fx.p1 if fx.p2 is None else fx.p2
 
 
 def advance(fixtures: list[Fixture]) -> bool:
