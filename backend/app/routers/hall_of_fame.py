@@ -28,7 +28,7 @@ from app.models.tournament import FINISHED, Tournament, TournamentEntrant
 
 router = APIRouter(tags=["hall-of-fame"])
 
-CACHE_KEY = "hall_of_fame:v3"
+CACHE_KEY = "hall_of_fame:v4"
 CACHE_TTL = 300  # 5 min; the records barely move, so a stale-ish read is fine
 MIN_RATE_GAMES = 10  # a win rate under this many games is noise, not a record
 
@@ -206,13 +206,6 @@ async def _build(db: AsyncSession) -> HallOfFame:
             .limit(1)
         )
     ).first()
-    mp = (
-        await db.execute(
-            select(ladder.c.pid, ladder.c.played)
-            .order_by(desc(ladder.c.played))
-            .limit(1)
-        )
-    ).first()
     wr = (
         await db.execute(
             select(ladder.c.pid, ladder.c.won, ladder.c.played)
@@ -226,15 +219,21 @@ async def _build(db: AsyncSession) -> HallOfFame:
             select(User).where(User.total_score > 0).order_by(desc(User.total_score)).limit(1)
         )
     ).scalars().first()
+    # Most games played is total activity across every mode (solo counts too), so
+    # it comes off the denormalized user counter, not the 1v1-only ladder - the
+    # most active player, not just the one who plays the most 1v1s.
+    mp_user = (
+        await db.execute(
+            select(User).where(User.games_played > 0).order_by(desc(User.games_played)).limit(1)
+        )
+    ).scalars().first()
 
-    lp = await _resolve(db, [r.pid for r in (mw, mp, wr) if r])
+    lp = await _resolve(db, [r.pid for r in (mw, wr) if r])
     most_wins = (
         StatRecord(player=lp[mw.pid], value=int(mw.won or 0)) if mw and mw.pid in lp else None
     )
     most_played = (
-        StatRecord(player=lp[mp.pid], value=int(mp.played or 0))
-        if mp and (mp.played or 0) > 0 and mp.pid in lp
-        else None
+        StatRecord(player=_person(mp_user), value=mp_user.games_played) if mp_user else None
     )
     highest_total = StatRecord(player=_person(ht), value=ht.total_score) if ht else None
     best_win_rate = (
