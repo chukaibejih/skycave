@@ -28,7 +28,7 @@ from app.models.tournament import FINISHED, Tournament, TournamentEntrant
 
 router = APIRouter(tags=["hall-of-fame"])
 
-CACHE_KEY = "hall_of_fame:v4"
+CACHE_KEY = "hall_of_fame:v5"
 CACHE_TTL = 300  # 5 min; the records barely move, so a stale-ish read is fine
 MIN_RATE_GAMES = 10  # a win rate under this many games is noise, not a record
 
@@ -93,7 +93,7 @@ class HallOfFame(BaseModel):
     most_titles: TitleHolder | None
     most_wins: StatRecord | None
     most_played: StatRecord | None
-    highest_total: StatRecord | None
+    longest_streak: StatRecord | None
     best_win_rate: WinRate | None
     biggest_1v1: BiggestScore | None
     first_game: FirstGame | None
@@ -175,8 +175,6 @@ async def _build(db: AsyncSession) -> HallOfFame:
     # sessions only (versus + tournament), exactly like the leaderboard, so a
     # heap of solo plays cannot dilute a competitive record - the denormalized
     # users.games_played counts solo too, which was sinking real win rates.
-    # Highest total stays a lifetime points sum across everything, a fair
-    # reading of "total score".
     def _lside(pid, handle):
         return select(
             pid.label("pid"),
@@ -214,11 +212,36 @@ async def _build(db: AsyncSession) -> HallOfFame:
             .limit(1)
         )
     ).first()
-    ht = (
+    # Longest win streak: the longest run of consecutive 1v1 wins a player has
+    # ever strung together. Walk every 1v1 session in chronological order and,
+    # for each participant, extend their run on a win and reset it on a loss or
+    # a draw. It's a real hot-streak record, unlike a lifetime points sum, which
+    # just rewards whoever grinds the highest-scoring game the most. Heavier than
+    # the aggregate ladder stats, but it's ~a few hundred rows behind a 5-min
+    # cache, so it runs at most once per TTL.
+    streak_rows = (
         await db.execute(
-            select(User).where(User.total_score > 0).order_by(desc(User.total_score)).limit(1)
+            select(
+                GameSession.player1_id,
+                GameSession.player2_id,
+                GameSession.winner_id,
+            )
+            .where(GameSession.mode.in_(HEAD_TO_HEAD_MODES))
+            .order_by(GameSession.created_at.asc(), GameSession.id.asc())
         )
-    ).scalars().first()
+    ).all()
+    cur_streak: Counter = Counter()
+    best_streak: Counter = Counter()
+    for p1, p2, win in streak_rows:
+        for pid in (p1, p2):
+            if not pid or not pid.startswith("did:"):
+                continue
+            if pid == win:
+                cur_streak[pid] += 1
+                if cur_streak[pid] > best_streak[pid]:
+                    best_streak[pid] = cur_streak[pid]
+            else:
+                cur_streak[pid] = 0
     # Most games played is total activity across every mode (solo counts too), so
     # it comes off the denormalized user counter, not the 1v1-only ladder - the
     # most active player, not just the one who plays the most 1v1s.
@@ -235,7 +258,14 @@ async def _build(db: AsyncSession) -> HallOfFame:
     most_played = (
         StatRecord(player=_person(mp_user), value=mp_user.games_played) if mp_user else None
     )
-    highest_total = StatRecord(player=_person(ht), value=ht.total_score) if ht else None
+    longest_streak: StatRecord | None = None
+    if best_streak:
+        # Tie-break on the DID only for determinism; the length is what matters.
+        top_pid, top_len = max(best_streak.items(), key=lambda kv: (kv[1], kv[0]))
+        if top_len >= 2:  # a streak of one isn't a streak
+            sp = (await _resolve(db, [top_pid])).get(top_pid)
+            if sp:
+                longest_streak = StatRecord(player=sp, value=int(top_len))
     best_win_rate = (
         WinRate(
             player=lp[wr.pid],
@@ -306,7 +336,7 @@ async def _build(db: AsyncSession) -> HallOfFame:
         most_titles=most_titles,
         most_wins=most_wins,
         most_played=most_played,
-        highest_total=highest_total,
+        longest_streak=longest_streak,
         best_win_rate=best_win_rate,
         biggest_1v1=biggest_1v1,
         first_game=first_game,

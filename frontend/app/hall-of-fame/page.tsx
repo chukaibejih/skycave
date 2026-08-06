@@ -40,7 +40,7 @@ export default function HallOfFamePage() {
   }
 
   const ladder = [
-    hof.highest_total && { label: "Highest total score", ...hof.highest_total },
+    hof.longest_streak && { label: "Longest win streak", ...hof.longest_streak },
     hof.most_wins && { label: "Most 1v1 wins", ...hof.most_wins },
     hof.most_played && { label: "Most games played", ...hof.most_played },
   ].filter(Boolean) as { label: string; player: HofPerson; value: number }[];

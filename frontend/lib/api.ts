@@ -451,7 +451,7 @@ export interface HallOfFame {
   most_titles: HofTitleHolder | null;
   most_wins: HofStat | null;
   most_played: HofStat | null;
-  highest_total: HofStat | null;
+  longest_streak: HofStat | null;
   best_win_rate: HofWinRate | null;
   biggest_1v1: HofBiggest | null;
   first_game: HofFirstGame | null;
