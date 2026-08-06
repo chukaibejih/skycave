@@ -55,10 +55,12 @@ export default function RulebookPage() {
           being asleep at the wrong hour.
         </Rule>
 
-        <Rule n="7" title="Byes">
-          When the field is not a power of two, some first-round players get a
-          bye straight into round two. Byes are dealt by the draw, not earned:
-          luck, not a reward, and spread across the bracket rather than clustered.
+        <Rule n="7" title="The play-in">
+          When the field is not a clean bracket size, the last players to register
+          play a play-in: a quick qualifier for the final main-draw seats. Win it
+          and you are in; lose it and that is your run. Everyone who signed up
+          earlier goes straight into the main draw. So there are no byes, and a
+          real reason to enter early.
         </Rule>
 
         <Rule n="8" title="The deadlines">
