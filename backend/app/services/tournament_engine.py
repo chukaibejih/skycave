@@ -333,15 +333,26 @@ from zoneinfo import ZoneInfo  # noqa: E402
 # is the same in July and December. Pacific shifts by an hour across DST, so
 # deriving this from a fixed UTC offset would silently drift.
 PACIFIC = ZoneInfo("America/Los_Angeles")
-CLOSE_WEEKDAY = 3   # Monday=0, so Thursday
-CLOSE_HOUR = 8      # 08:00 local
+CLOSE_WEEKDAY = 3     # Monday=0, so Thursday
+CLOSE_HOUR = 8        # registration closes 08:00 Pacific
+PLAY_OPEN_HOUR = 18   # play opens 18:00 Pacific, the same Thursday
+PLAY_CLOSE_HOUR = 18  # hard wall 18:00 Pacific, the following Sunday
 
 
 def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
     """(registration_closes, play_opens, play_closes) for the coming weekend.
 
-    Returns UTC. Play opens Friday 00:00 UTC and the hard wall is Sunday 23:59
-    UTC, so the tournament can never reach Monday.
+    Every anchor is a wall-clock Pacific time, converted to UTC, so the schedule
+    holds its local hour across DST rather than drifting like a fixed UTC offset:
+
+      registration closes  Thursday 08:00 Pacific
+      play opens           Thursday 18:00 Pacific (the same Thursday)
+      hard wall (final)     Sunday  18:00 Pacific
+
+    Thursday 6pm -> Sunday 6pm is exactly 72h, so an 8-player (3-round) bracket
+    puts each round's deadline at 6pm Pacific on its own day (Fri, Sat, Sun) and
+    the tournament can never reach Monday. Bigger fields slice the same window
+    into more rounds. 6pm Pacific = 9pm Eastern is the standard for every event.
     """
     local = now.astimezone(PACIFIC)
     # The next Thursday 08:00 Pacific strictly after `now`.
@@ -353,11 +364,13 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
         close_local += timedelta(days=7)
     closes = close_local.astimezone(timezone.utc)
 
-    # The Friday that follows that Thursday, 00:00 UTC.
-    opens = (closes + timedelta(days=1)).replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+    # Play opens the same Thursday at 18:00 Pacific; the wall is the following
+    # Sunday (Thursday + 3 days) at 18:00 Pacific. Both are built in Pacific and
+    # then converted, so DST is handled for free.
+    open_local = close_local.replace(hour=PLAY_OPEN_HOUR, minute=0, second=0, microsecond=0)
+    close_play_local = (open_local + timedelta(days=3)).replace(
+        hour=PLAY_CLOSE_HOUR, minute=0, second=0, microsecond=0
     )
-    while opens <= closes:
-        opens += timedelta(days=1)
-    play_closes = (opens + timedelta(days=2)).replace(hour=23, minute=59)
+    opens = open_local.astimezone(timezone.utc)
+    play_closes = close_play_local.astimezone(timezone.utc)
     return closes, opens, play_closes

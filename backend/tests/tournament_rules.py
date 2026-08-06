@@ -33,7 +33,9 @@ from app.services.tournament_engine import (  # noqa: E402
     rounds_for,
 )
 
-# The real weekend anchors: play opens Friday 00:00 UTC, hard wall Sunday 23:59.
+# A generic play window used to exercise the round-deadline splitter; the exact
+# bounds don't matter here, only that they bracket a weekend. (The live standard
+# is Thursday 18:00 -> Sunday 18:00 Pacific; see eng.weekend_anchors.)
 FRI = datetime(2026, 7, 24, 0, 0, tzinfo=timezone.utc)
 SUN = datetime(2026, 7, 26, 23, 59, tzinfo=timezone.utc)
 

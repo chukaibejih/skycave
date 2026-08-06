@@ -75,6 +75,17 @@ def test_deadline_holds_its_wall_clock() -> None:
         assert closes > now, f"{label}: the deadline is in the past"
         assert opens > closes, f"{label}: play opens before registration closes"
         assert play_closes > opens, f"{label}: the wall is before the window opens"
+        # The house standard: play opens Thursday 18:00 Pacific and the wall is
+        # Sunday 18:00 Pacific, whatever the season (6pm local, not a drifting
+        # UTC offset).
+        open_local = opens.astimezone(PACIFIC)
+        wall_local = play_closes.astimezone(PACIFIC)
+        assert open_local.hour == eng.PLAY_OPEN_HOUR and open_local.weekday() == eng.CLOSE_WEEKDAY, (
+            f"{label}: play opens {open_local:%a %H:%M} Pacific, not Thu {eng.PLAY_OPEN_HOUR}:00"
+        )
+        assert wall_local.hour == eng.PLAY_CLOSE_HOUR and wall_local.weekday() == 6, (
+            f"{label}: wall is {wall_local:%a %H:%M} Pacific, not Sun {eng.PLAY_CLOSE_HOUR}:00"
+        )
         # The whole event has to fit inside its weekend.
         span = play_closes - opens
         assert span.days <= 3, f"{label}: play window is {span}, longer than a weekend"

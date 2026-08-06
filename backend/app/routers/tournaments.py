@@ -629,9 +629,10 @@ async def create(
 ) -> TournamentOut:
     """Open the coming weekend's tournament.
 
-    The three anchors are derived, not passed in, so they are always Thursday
-    08:00 Pacific / Friday 00:00 UTC / Sunday 23:59 UTC and cannot be set to
-    something inconsistent by hand.
+    The three anchors are derived, not passed in, so they are always registration
+    close Thursday 08:00 Pacific, play open Thursday 18:00 Pacific, hard wall
+    Sunday 18:00 Pacific (6pm Pacific / 9pm Eastern is the house standard), and
+    cannot be set to something inconsistent by hand.
     """
     closes, opens, play_closes = eng.weekend_anchors(datetime.now(tz=None).astimezone())
     try:
