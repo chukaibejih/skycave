@@ -67,6 +67,14 @@ export default function RulebookPage() {
           next one simply gets longer; a deadline never moves earlier than
           published.
         </Rule>
+
+        <Rule n="9" title="Keep it good-natured">
+          Play hard, stay kind: everyone in the draw is a real person, and this
+          is a small room. To reach an opponent, use the nudge, which posts a
+          friendly poke to them from your own account. Keep the back and forth
+          on the timeline rather than in DMs, so it stays public, easy to follow,
+          and good-humoured for everyone watching.
+        </Rule>
       </div>
 
       <p className="mt-8 text-xs leading-5 text-[var(--color-text-secondary)]">
