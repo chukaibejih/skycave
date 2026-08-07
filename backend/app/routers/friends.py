@@ -24,7 +24,7 @@ from app.services import bluesky_auth as bsky
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
-CACHE_TTL = 300  # 5 min; the overlap barely moves between plays
+CACHE_TTL = 1800  # 30 min; the follow graph barely moves, so refetch rarely
 CACHE_VER = "v1"
 
 # The house account is not a "friend" you'd challenge, so it never shows up here
