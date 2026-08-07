@@ -317,7 +317,10 @@ function GamePicker({
               />
               <div className="min-w-0">
                 <div className="text-xs text-[var(--color-text-secondary)]">Challenge</div>
-                <div className="truncate font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">
+                <div
+                  className="truncate font-[var(--font-display)] text-base font-bold"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
                   {friend.display_name || `@${friend.handle}`}
                 </div>
               </div>
