@@ -96,16 +96,19 @@ export default function Home() {
             sky<span className="text-[var(--color-primary)]">cave</span>
           </div>
         </div>
-        {loaded && identity ? (
-          <AccountMenu identity={identity} onLogout={logout} />
-        ) : (
-          <button
-            onClick={() => setAuthOpen(true)}
-            className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 text-sm font-medium text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
-          >
-            Bluesky login
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <HeaderNav />
+          {loaded && identity ? (
+            <AccountMenu identity={identity} onLogout={logout} />
+          ) : (
+            <button
+              onClick={() => setAuthOpen(true)}
+              className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
+            >
+              Bluesky login
+            </button>
+          )}
+        </div>
       </header>
 
       <section className="py-6 lg:py-10">
@@ -114,99 +117,16 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 mx-auto max-w-3xl text-center lg:mx-0 lg:text-left"
         >
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-3 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)] shadow-[0_0_12px_var(--color-success)]" />
-            live rooms / instant invites
-          </div>
-
           <h1 className="font-[var(--font-display)] text-[clamp(2.6rem,7vw,5.5rem)] font-semibold leading-[0.95]">
             Play from the
             <span className="text-[var(--color-primary)]"> Skycave.</span>
           </h1>
           <p
             style={{ color: "var(--color-text-secondary)" }}
-            className="mx-auto mt-5 max-w-xl text-base leading-7 lg:mx-0 lg:text-lg"
+            className="mx-auto mt-5 max-w-md text-base leading-7 lg:mx-0 lg:text-lg"
           >
-            Fast games for Bluesky, Blacksky, and beyond. Play solo and post
-            your score, or open a 1v1 room and let anyone tap in straight from
-            the link.
+            Pick a game. Share the link. Your opponent shows up.
           </p>
-
-          <Link
-            href="/leaderboard"
-            className="mt-6 inline-flex h-12 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-5 text-sm font-semibold text-[var(--color-text-primary)] transition-colors active:border-[var(--color-primary)]"
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-gold)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-              <path d="M4 22h16" />
-              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-            </svg>
-            Leaderboard
-            <span aria-hidden className="text-[var(--color-text-secondary)]">
-              →
-            </span>
-          </Link>
-
-          <Link
-            href="/hall-of-fame"
-            className="mt-3 ml-2 inline-flex h-12 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-5 text-sm font-semibold text-[var(--color-text-primary)] transition-colors active:border-[var(--color-gold)]"
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-gold)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="m12 2 2.4 6.9H21l-5.3 4 2 6.9-5.7-4.3L6.3 20l2-7-5.3-4h6.6L12 2Z" />
-            </svg>
-            Hall of Fame
-            <span aria-hidden className="text-[var(--color-text-secondary)]">
-              →
-            </span>
-          </Link>
-
-          <Link
-            href="/friends"
-            className="mt-3 ml-2 inline-flex h-12 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-5 text-sm font-semibold text-[var(--color-text-primary)] transition-colors active:border-[var(--color-primary)]"
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-cyan)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Friends
-            <span aria-hidden className="text-[var(--color-text-secondary)]">
-              →
-            </span>
-          </Link>
         </motion.div>
 
         {/* Signal-flow hub: games stream along the wave; tap one to play. */}
@@ -214,24 +134,8 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.7 }}
-          className="mt-8 lg:mt-12"
+          className="mt-6 lg:mt-10"
         >
-          <div className="mb-3 flex justify-center lg:justify-start">
-            <div
-              style={{
-                borderColor: "color-mix(in srgb, var(--color-primary) 45%, transparent)",
-                background: "color-mix(in srgb, var(--color-primary) 14%, transparent)",
-              }}
-              className="inline-flex items-center gap-2 rounded-full border px-4 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-primary)]"
-            >
-              <motion.span
-                className="h-1.5 w-1.5 rounded-full bg-[var(--color-primary)] shadow-[0_0_12px_var(--color-primary)]"
-                animate={{ scale: [1, 1.6, 1], opacity: [1, 0.5, 1] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              />
-              tap a game as it flows by
-            </div>
-          </div>
           <SignalFlow games={games} onPlay={launch} />
         </motion.div>
       </section>
@@ -302,6 +206,40 @@ export default function Home() {
         }}
       />
     </main>
+  );
+}
+
+// Secondary destinations, pulled out of the hero so the headline reads straight
+// into the orbit. Icon-only to stay compact next to the account chip; labels are
+// carried by aria-label/title for reach and hover.
+function HeaderNav() {
+  const item =
+    "grid h-9 w-9 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 transition-colors active:border-[var(--color-primary)]";
+  return (
+    <nav className="flex items-center gap-1.5">
+      <Link href="/leaderboard" aria-label="Leaderboard" title="Leaderboard" className={item}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+          <path d="M4 22h16" />
+          <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+          <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+          <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+        </svg>
+      </Link>
+      <Link href="/hall-of-fame" aria-label="Hall of Fame" title="Hall of Fame" className={item}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m12 2 2.4 6.9H21l-5.3 4 2 6.9-5.7-4.3L6.3 20l2-7-5.3-4h6.6L12 2Z" />
+        </svg>
+      </Link>
+      <Link href="/friends" aria-label="Friends" title="Friends" className={item}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      </Link>
+    </nav>
   );
 }
 
