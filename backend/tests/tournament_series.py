@@ -297,6 +297,33 @@ async def test_deadline_settles_a_fixture_nobody_played() -> None:
             await _cleanup(s, t)
 
 
+async def test_deadline_tie_goes_to_whoever_checked_in_first() -> None:
+    async with async_session() as s:
+        # Window in the past, so the deadline is already blown.
+        t = await _tournament(s, players=4, window=(timedelta(hours=-72), timedelta(hours=-1)))
+        try:
+            rows = await svc.matches(s, t.id)
+            m = _contested(rows)
+            # Both show up, nobody plays. Check in player2 first, then player1 -
+            # so a raw-seed fallback (which favours player1) would give the wrong
+            # answer, and only a check-in-order rule gives it to player2.
+            first, second = m.player2_did, m.player1_did
+            await svc.check_in(s, m, first)
+            m = await svc.find_match(s, t.id, m.round, m.slot)
+            await svc.check_in(s, m, second)
+
+            await svc.apply_forfeits(s, t)
+
+            m = await svc.find_match(s, t.id, m.round, m.slot)
+            assert m.winner_did == first, (
+                f"both checked in and nobody played, but the fixture did not go "
+                f"to the first to check in: {m.winner_did}"
+            )
+            print("both checked in, nobody played: first to check in advances")
+        finally:
+            await _cleanup(s, t)
+
+
 async def test_a_whole_tournament_to_a_champion() -> None:
     """Play every fixture out properly and check one person is left standing."""
     async with async_session() as s:
@@ -344,6 +371,7 @@ async def main() -> None:
     await test_series_alternates_host_and_advances()
     await test_draw_is_replayed_on_the_same_game()
     await test_deadline_settles_a_fixture_nobody_played()
+    await test_deadline_tie_goes_to_whoever_checked_in_first()
     await test_a_whole_tournament_to_a_champion()
     print("\nPASS: check-in, rooms, series and deadlines verified end to end")
 

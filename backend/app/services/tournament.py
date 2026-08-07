@@ -834,10 +834,11 @@ async def apply_forfeits(db: AsyncSession, t: Tournament) -> bool:
 
     A knockout with a fixed wall cannot wait for someone who never turned up,
     so the deadline is the referee. In order of preference: whoever is ahead on
-    the series, then whoever actually checked in, then total points. If neither
-    player ever appeared the seat still has to go somewhere or the whole bracket
-    stalls behind an empty fixture, so it goes to the higher seed, which is at
-    least stated up front rather than decided by a coin nobody sees.
+    the series, then the one who checked in when the other didn't, then total
+    points, then whoever checked in first (rewarding showing up over raw seed).
+    If neither player ever appeared the seat still has to go somewhere or the
+    whole bracket stalls behind an empty fixture, so it goes to the higher seed,
+    which is at least stated up front rather than decided by a coin nobody sees.
 
     Returns True if anything changed.
     """
@@ -871,7 +872,20 @@ async def apply_forfeits(db: AsyncSession, t: Tournament) -> bool:
                 fx.winner = fx.p1 if fx.p1 in present else fx.p2
             else:
                 s1, s2 = fx.points()
-                fx.winner = fx.p1 if s1 >= s2 else fx.p2
+                if s1 != s2:
+                    fx.winner = fx.p1 if s1 > s2 else fx.p2
+                elif fx.p1 in present and fx.p2 in present:
+                    # Both showed up but nothing separates them (tied on wins
+                    # and points). Reward whoever checked in first - they were
+                    # ready and waiting - over raw seed. checked_in is appended
+                    # on check-in, so its order is check-in order.
+                    fx.winner = (
+                        fx.p1 if present.index(fx.p1) < present.index(fx.p2) else fx.p2
+                    )
+                else:
+                    # Neither ever appeared; the seat still has to move, so it
+                    # goes to the higher seed, stated up front.
+                    fx.winner = fx.p1
             moved = True
             logger.info(
                 "tournament %s r%ds%d timed out, awarded to %s",
