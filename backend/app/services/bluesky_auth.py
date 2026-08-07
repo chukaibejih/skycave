@@ -63,6 +63,65 @@ async def fetch_profile(actor: str) -> dict | None:
             return None
 
 
+async def fetch_follows(actor: str, max_pages: int = 15) -> list[str]:
+    """Every DID `actor` follows, via the public AppView (no auth needed).
+
+    Paginated 100/page; capped at max_pages (1,500 follows) so a account that
+    follows tens of thousands can't turn one request into a fan of calls. The
+    cap only bites the long tail - well past any realistic friends overlap.
+    """
+    dids: list[str] = []
+    cursor: str | None = None
+    async with httpx.AsyncClient(timeout=10) as client:
+        for _ in range(max_pages):
+            params: dict = {"actor": actor, "limit": 100}
+            if cursor:
+                params["cursor"] = cursor
+            try:
+                r = await client.get(
+                    f"{PUBLIC_APPVIEW}/xrpc/app.bsky.graph.getFollows", params=params
+                )
+                r.raise_for_status()
+                data = r.json()
+            except httpx.HTTPError:
+                break
+            for f in data.get("follows", []):
+                if f.get("did"):
+                    dids.append(f["did"])
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+    return dids
+
+
+async def mutuals_among(actor: str, others: list[str]) -> set[str]:
+    """Of `others`, which follow `actor` back (i.e. are mutuals).
+
+    Uses app.bsky.graph.getRelationships (max 30 subjects/call), so this is a
+    couple of calls over the small friends set, not a full followers crawl.
+    """
+    back: set[str] = set()
+    if not others:
+        return back
+    async with httpx.AsyncClient(timeout=10) as client:
+        for i in range(0, len(others), 30):
+            chunk = others[i : i + 30]
+            try:
+                r = await client.get(
+                    f"{PUBLIC_APPVIEW}/xrpc/app.bsky.graph.getRelationships",
+                    params=[("actor", actor), *[("others", o) for o in chunk]],
+                )
+                r.raise_for_status()
+                data = r.json()
+            except httpx.HTTPError:
+                continue
+            for rel in data.get("relationships", []):
+                # followedBy present => `did` follows `actor` back.
+                if rel.get("did") and rel.get("followedBy"):
+                    back.add(rel["did"])
+    return back
+
+
 async def upsert_and_tokenize(profile: dict) -> str:
     """Persist/refresh the User row and mint a Skycave JWT for them."""
     from app.core.database import AsyncSessionLocal

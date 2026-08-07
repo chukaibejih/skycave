@@ -201,6 +201,19 @@ export const joinRoom = (roomId: string) =>
 export const getInvite = (roomId: string) =>
   request<{ text: string; intent_url: string }>(`/share/invite/${roomId}`);
 
+// ── Friends ── (people you follow on Bluesky who are already on Skycave)
+export interface Friend {
+  did: string;
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  games_played: number;
+  is_mutual: boolean;
+}
+
+export const getFriends = () =>
+  request<{ generated_at: string; friends: Friend[] }>("/friends");
+
 // ── Leaderboard ──
 export interface LeaderboardEntry {
   rank: number;

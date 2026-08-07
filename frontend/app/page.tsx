@@ -182,6 +182,31 @@ export default function Home() {
               →
             </span>
           </Link>
+
+          <Link
+            href="/friends"
+            className="mt-3 ml-2 inline-flex h-12 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-5 text-sm font-semibold text-[var(--color-text-primary)] transition-colors active:border-[var(--color-primary)]"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-cyan)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Friends
+            <span aria-hidden className="text-[var(--color-text-secondary)]">
+              →
+            </span>
+          </Link>
         </motion.div>
 
         {/* Signal-flow hub: games stream along the wave; tap one to play. */}
