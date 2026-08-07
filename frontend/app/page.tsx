@@ -123,9 +123,10 @@ export default function Home() {
           </h1>
           <p
             style={{ color: "var(--color-text-secondary)" }}
-            className="mx-auto mt-5 max-w-md text-base leading-7 lg:mx-0 lg:text-lg"
+            className="mx-auto mt-5 max-w-xl text-base leading-7 lg:mx-0 lg:text-lg"
           >
-            Pick a game. Share the link. Your opponent shows up.
+            Jump into quick solo runs, 1v1, and weekend battles built for
+            Bluesky, Blacksky, and beyond.
           </p>
         </motion.div>
 

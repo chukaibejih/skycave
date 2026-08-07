@@ -143,19 +143,19 @@ export default function FriendsPage() {
 function Header() {
   return (
     <header className="flex items-center justify-between py-5">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] active:border-[var(--color-primary)]"
+      >
+        <span aria-hidden>←</span> Hub
+      </Link>
       <Link href="/" className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_0_28px_var(--color-primary-glow)]">
-          <div className="h-3 w-3 rounded-full bg-[var(--color-cyan)] shadow-[0_0_18px_var(--color-cyan)]" />
-        </div>
         <div className="font-[var(--font-display)] text-xl font-semibold">
           sky<span className="text-[var(--color-primary)]">cave</span>
         </div>
-      </Link>
-      <Link
-        href="/"
-        className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] active:border-[var(--color-primary)]"
-      >
-        ← Hub
+        <div className="grid h-9 w-9 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_0_28px_var(--color-primary-glow)]">
+          <div className="h-3 w-3 rounded-full bg-[var(--color-cyan)] shadow-[0_0_18px_var(--color-cyan)]" />
+        </div>
       </Link>
     </header>
   );
@@ -317,7 +317,7 @@ function GamePicker({
               />
               <div className="min-w-0">
                 <div className="text-xs text-[var(--color-text-secondary)]">Challenge</div>
-                <div className="truncate font-[var(--font-display)] text-base font-bold">
+                <div className="truncate font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">
                   {friend.display_name || `@${friend.handle}`}
                 </div>
               </div>
