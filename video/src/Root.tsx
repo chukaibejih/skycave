@@ -4,6 +4,7 @@ import { FPS, WIDTH, HEIGHT } from "./theme";
 import { WeekendCup, WEEKEND_CUP_FRAMES } from "./WeekendCup";
 import { GeoGuessUpdate, GEO_UPDATE_FRAMES } from "./GeoGuessUpdate";
 import { PlayIn, PLAYIN_FRAMES } from "./PlayIn";
+import { Spectate, SPECTATE_FRAMES } from "./Spectate";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -60,6 +61,25 @@ export const RemotionRoot: React.FC = () => (
       id="PlayInWide"
       component={PlayIn}
       durationInFrames={PLAYIN_FRAMES}
+      fps={FPS}
+      width={1920}
+      height={1080}
+    />
+
+    {/* Spectating announcement: watch a live tournament game + react. Shown, not
+        captioned. Vertical + wide, the same scenes reflowing off the canvas. */}
+    <Composition
+      id="Spectate"
+      component={Spectate}
+      durationInFrames={SPECTATE_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+    />
+    <Composition
+      id="SpectateWide"
+      component={Spectate}
+      durationInFrames={SPECTATE_FRAMES}
       fps={FPS}
       width={1920}
       height={1080}
