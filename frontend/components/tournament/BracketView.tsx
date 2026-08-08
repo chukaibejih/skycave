@@ -366,6 +366,7 @@ function MatchCard({
   tournamentId?: string;
 }) {
   const live = m.status === "live";
+  const inPlay = !!m.in_play; // a game is actually being played, not just checked in
   const done = m.status === "done";
   const [w1, w2] = seriesWins(m);
   const started = w1 + w2 > 0 || (m.results?.length ?? 0) > 0;
@@ -400,7 +401,8 @@ function MatchCard({
         boxShadow: live ? "0 0 18px color-mix(in srgb, var(--color-warm) 22%, transparent)" : "none",
       }}
     >
-      {live && (
+      {inPlay ? (
+        // A game is genuinely on: the pulsing solid LIVE badge.
         <motion.span
           className="absolute -top-1.5 right-3 rounded-full px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
           style={{ background: "var(--color-warm)", color: "#05060a" }}
@@ -409,7 +411,19 @@ function MatchCard({
         >
           live
         </motion.span>
-      )}
+      ) : live ? (
+        // Both checked in, but no game running yet: a calm, static chip.
+        <span
+          className="absolute -top-1.5 right-3 rounded-full border px-1.5 py-px font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-warm) 55%, transparent)",
+            background: "var(--color-surface)",
+            color: "var(--color-warm)",
+          }}
+        >
+          checking in
+        </span>
+      ) : null}
 
       <div className="p-2.5">
           <Slot

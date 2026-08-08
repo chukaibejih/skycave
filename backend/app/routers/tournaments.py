@@ -55,6 +55,10 @@ class MatchOut(BaseModel):
     winner_did: str | None = None
     deadline: datetime | None = None
     checked_in: list[str] = []
+    # True only while a leg is actually being played (an in-progress room), as
+    # opposed to just both-checked-in. Lets the bracket show "checking in"
+    # before a game starts and "live" once it's really on.
+    in_play: bool = False
 
 
 class TournamentOut(BaseModel):
@@ -87,6 +91,22 @@ def _game_name(t: str) -> str:
     return g.name if g else t
 
 
+async def _in_play(m) -> bool:
+    """Whether a leg is actually being played right now (an in-progress room),
+    as opposed to just both players having checked in. One Redis read, and only
+    for a live match."""
+    if m.status != M_LIVE:
+        return False
+    leg = svc.leg_index(m)
+    roomsl = list(m.rooms or [])
+    if leg >= len(roomsl) or not roomsl[leg]:
+        return False
+    from app.services import room_manager as rm
+
+    r = await rm.get_room(roomsl[leg])
+    return bool(r and r.get("status") == "in_progress")
+
+
 async def _serialise(
     db: AsyncSession, t: Tournament, viewer_did: str | None
 ) -> TournamentOut:
@@ -114,6 +134,7 @@ async def _serialise(
             winner_did=m.winner_did,
             deadline=m.deadline,
             checked_in=list(m.checked_in or []),
+            in_play=await _in_play(m),
         )
         for m in rows
     ]

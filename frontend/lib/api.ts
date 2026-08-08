@@ -311,6 +311,7 @@ export interface TournamentMatch {
   winner_did: string | null;
   deadline: string | null;
   checked_in: string[];
+  in_play?: boolean; // a leg is actually being played (not just both checked in)
 }
 
 export interface Tournament {
