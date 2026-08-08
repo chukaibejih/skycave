@@ -40,15 +40,34 @@ class FlagRush(BaseGame):
         return f"{score} correct · 60 seconds"
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        """A random flag. The engine prefers new_round_unique so a game never
+        repeats a flag; this is the stateless fallback (solo, etc.)."""
+        return self._round(random.choice(_countries()))
+
+    def new_round_unique(
+        self, round_number: int, used: list[str]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """A flag this game has not shown yet. `used` is the target codes already
+        served this game, so ten rounds are ten different flags. Falls back to
+        the full pool only if it were somehow exhausted (194 flags, 10 rounds -
+        it never is)."""
+        seen = set(used or [])
+        pool = [c for c in _countries() if c["code"] not in seen] or _countries()
+        return self._round(random.choice(pool))
+
+    def _round(self, target: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
         countries = _countries()
-        target = random.choice(countries)
-        # Three distractors for multiple-choice.
+        # Three distractors for multiple-choice (may recur across rounds - only
+        # the target flag is kept unique within a game).
         distractors = random.sample(
             [c for c in countries if c["code"] != target["code"]], 3
         )
         options = [{"code": c["code"], "name": c["name"]} for c in [target, *distractors]]
         random.shuffle(options)
         public = {
+            # The engine's no-repeat key. The code is already public (it renders
+            # /flags/{code}.svg), so exposing it as the prompt leaks nothing.
+            "prompt": target["code"],
             "code": target["code"],          # frontend renders /flags/{code}.svg
             "options": options,              # 4 tappable choices
             "round_time": self.round_time,
