@@ -509,24 +509,39 @@ function MatchCard({
             </div>
           ) : null}
 
-          {/* Watch: only on a live fixture, and only where we know the
-              tournament id. Drops the viewer into the read-only spectator view. */}
+          {/* Watch: present once both are in, but only enabled once a game is
+              actually on (in_play). While "checking in" it shows disabled so
+              people can see it's coming without landing on an empty room. */}
           {live && tournamentId && (
-            <Link
-              href={`/tournament/${tournamentId}/watch/${m.round}/${m.slot}`}
-              className="mt-2 flex items-center justify-center gap-1.5 rounded-[7px] border py-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] transition-[filter] active:brightness-95"
-              style={{
-                borderColor: "color-mix(in srgb, var(--color-warm) 45%, transparent)",
-                background: "color-mix(in srgb, var(--color-warm) 10%, transparent)",
-                color: "var(--color-warm)",
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Watch
-            </Link>
+            inPlay ? (
+              <Link
+                href={`/tournament/${tournamentId}/watch/${m.round}/${m.slot}`}
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-[7px] border py-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] transition-[filter] active:brightness-95"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--color-warm) 45%, transparent)",
+                  background: "color-mix(in srgb, var(--color-warm) 10%, transparent)",
+                  color: "var(--color-warm)",
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Watch
+              </Link>
+            ) : (
+              <div
+                aria-disabled
+                className="mt-2 flex cursor-not-allowed items-center justify-center gap-1.5 rounded-[7px] border py-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] opacity-45"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Watch
+              </div>
+            )
           )}
         </div>
     </motion.div>
