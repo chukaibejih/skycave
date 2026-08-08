@@ -133,6 +133,7 @@ export function BracketView({ id }: { id: string }) {
           live={activeRound === 0}
           playOpen={playOpen}
           youDid={t.you?.did ?? null}
+          tournamentId={id}
         />
       )}
 
@@ -189,7 +190,7 @@ export function BracketView({ id }: { id: string }) {
                     style={{ gridColumn: r, gridRow: `${m.slot * span + 1} / span ${span}` }}
                   >
                     {r > 1 && <InThread lit={!!(m.player1 || m.player2)} />}
-                    <MatchCard m={m} emptyLabel={r === 1 && hasPlayIn ? "play-in winner" : undefined} />
+                    <MatchCard m={m} emptyLabel={r === 1 && hasPlayIn ? "play-in winner" : undefined} tournamentId={id} />
                     {r < mainRounds && (
                       <Elbow evenSlot={m.slot % 2 === 0} lit={!!m.winner_did} />
                     )}
@@ -355,7 +356,15 @@ function forfeitedDid(m: TournamentMatch): string | null {
   return (m.checked_in ?? []).includes(loser.did) ? null : loser.did;
 }
 
-function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string }) {
+function MatchCard({
+  m,
+  emptyLabel,
+  tournamentId,
+}: {
+  m: TournamentMatch;
+  emptyLabel?: string;
+  tournamentId?: string;
+}) {
   const live = m.status === "live";
   const done = m.status === "done";
   const [w1, w2] = seriesWins(m);
@@ -485,6 +494,26 @@ function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string 
               ))}
             </div>
           ) : null}
+
+          {/* Watch: only on a live fixture, and only where we know the
+              tournament id. Drops the viewer into the read-only spectator view. */}
+          {live && tournamentId && (
+            <Link
+              href={`/tournament/${tournamentId}/watch/${m.round}/${m.slot}`}
+              className="mt-2 flex items-center justify-center gap-1.5 rounded-[7px] border py-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] transition-[filter] active:brightness-95"
+              style={{
+                borderColor: "color-mix(in srgb, var(--color-warm) 45%, transparent)",
+                background: "color-mix(in srgb, var(--color-warm) 10%, transparent)",
+                color: "var(--color-warm)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Watch
+            </Link>
+          )}
         </div>
     </motion.div>
   );
@@ -679,12 +708,14 @@ function PlayInPanel({
   live,
   playOpen,
   youDid,
+  tournamentId,
 }: {
   matches: TournamentMatch[];
   deadline: string | null;
   live: boolean;
   playOpen: boolean;
   youDid: string | null;
+  tournamentId: string;
 }) {
   const seats = matches.length;
   const GOLD = "var(--color-gold)";
@@ -741,7 +772,7 @@ function PlayInPanel({
                   you
                 </span>
               )}
-              <MatchCard m={m} />
+              <MatchCard m={m} tournamentId={tournamentId} />
               <div
                 className="mt-1 flex items-center justify-center gap-1 font-[var(--font-mono)] text-[9px] uppercase tracking-[0.12em]"
                 style={{ color: "color-mix(in srgb, var(--color-gold) 85%, transparent)" }}

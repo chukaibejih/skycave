@@ -229,6 +229,27 @@ export interface ReigningChampion {
 export const getReigningChampion = () =>
   request<ReigningChampion | null>("/tournaments/champion");
 
+// ── Spectating ── (public read: who's playing, the score, and the live room)
+export interface WatchPlayer {
+  did: string;
+  handle: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+export interface WatchState {
+  round_name: string;
+  status: "live" | "between" | "waiting" | "finished" | "pending";
+  player1: WatchPlayer | null;
+  player2: WatchPlayer | null;
+  wins: [number, number];
+  winner_did: string | null;
+  live_room_id: string | null;
+  spectators: number;
+}
+
+export const getMatchWatch = (id: string, round: number, slot: number) =>
+  request<WatchState>(`/tournaments/${id}/watch/${round}/${slot}`);
+
 // ── Leaderboard ──
 export interface LeaderboardEntry {
   rank: number;

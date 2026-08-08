@@ -10,6 +10,8 @@ pump client messages (READY / ACTION / REMATCH_REQUEST) into the game engine.
 from __future__ import annotations
 
 import logging
+import time
+from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -20,6 +22,19 @@ from app.models.game_session import SINGLE_PLAYER_MODES
 from app.websocket.manager import manager
 
 logger = logging.getLogger("skycave.ws")
+
+# The reaction palette watchers can send, and a light per-connection rate limit
+# so one watcher cannot flood the room.
+ALLOWED_REACTIONS = {"🔥", "👏", "😂", "😮", "💪", "🎉", "👀", "❤️", "🐐", "😭", "✨", "🙌"}
+_REACT_WINDOW = 5.0
+_REACT_MAX = 5
+
+
+async def _broadcast_spectator_count(room_id: str) -> None:
+    await manager.broadcast(
+        room_id,
+        events.message(events.SPECTATOR_COUNT, {"count": manager.spectator_count(room_id)}),
+    )
 
 
 def _public_room(room: dict, player_id: str) -> dict:
@@ -75,10 +90,12 @@ def _public_room(room: dict, player_id: str) -> dict:
             safe["board"] = g.turn_public(game["turn_state"])
             # Private slice (an Uno hand) goes only to the player this snapshot
             # is being built for, so a reconnect restores their cards without
-            # ever exposing the opponent's.
-            private = g.turn_private(game["turn_state"], player_id)
-            if private is not None:
-                safe["my_board"] = private
+            # ever exposing the opponent's. player_id is None for a spectator,
+            # who must only ever see the public board - never a private slice.
+            if player_id is not None:
+                private = g.turn_private(game["turn_state"], player_id)
+                if private is not None:
+                    safe["my_board"] = private
     return safe
 
 
@@ -111,6 +128,11 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, token: str | None) -> 
     await manager.send(room_id, player_id, events.message(
         events.ROOM_STATE, _public_room(room, player_id)
     ))
+    # 1b) If people are already watching, show this player the count right away.
+    if manager.spectator_count(room_id):
+        await manager.send(room_id, player_id, events.message(
+            events.SPECTATOR_COUNT, {"count": manager.spectator_count(room_id)}
+        ))
     # 2) Notify others.
     await manager.broadcast(
         room_id,
@@ -191,3 +213,58 @@ async def _handle_rematch(room_id: str, player_id: str) -> None:
         await rooms.set_status(room_id, "waiting")
         await rooms.set_game(room_id, None)
         await game_engine.start_game(room_id)
+
+
+async def spectator_endpoint(ws: WebSocket, room_id: str, token: str | None) -> None:
+    """Watch-only connection to a live room.
+
+    Anyone may watch (token optional); only a Bluesky account may react. A
+    spectator never joins the room and never counts as a player, so it cannot
+    affect the game: it rides the same public broadcast every player gets, is
+    never sent a per-player private slice (its snapshot is built with no player
+    id), and every inbound message except a rate-limited REACT is ignored.
+    """
+    identity = identity_from_token(token)  # may be None: a logged-out watcher
+    room = await rooms.get_room(room_id)
+    if room is None:
+        await ws.close(code=4404)
+        return
+    room = await room_expiry.ensure_fresh(room)
+
+    spec_id = f"spec:{uuid4().hex}"
+    await manager.connect(room_id, spec_id, ws)
+    # Public snapshot only (player_id=None => no my_board / private slice).
+    await manager.send(room_id, spec_id, events.message(
+        events.ROOM_STATE, _public_room(room, None)
+    ))
+    await _broadcast_spectator_count(room_id)
+
+    can_react = identity is not None and not identity.is_guest
+    handle = identity.handle if identity else None
+    stamps: list[float] = []
+    try:
+        while True:
+            raw = await ws.receive_json()
+            # Watch-only: the only thing a spectator can send is a reaction, and
+            # only if they are on a Bluesky account. Everything else (game moves
+            # included) is silently ignored.
+            if raw.get("type") != events.REACT or not can_react:
+                continue
+            emoji = str((raw.get("data") or {}).get("emoji", ""))
+            if emoji not in ALLOWED_REACTIONS:
+                continue
+            now = time.monotonic()
+            stamps[:] = [t for t in stamps if now - t < _REACT_WINDOW]
+            if len(stamps) >= _REACT_MAX:
+                continue  # rate-limited
+            stamps.append(now)
+            await manager.broadcast(room_id, events.message(
+                events.REACTION, {"emoji": emoji, "from": handle}
+            ))
+    except WebSocketDisconnect:
+        pass
+    except Exception:  # noqa: BLE001
+        logger.exception("spectator ws error in room %s", room_id)
+    finally:
+        manager.disconnect(room_id, spec_id, ws)
+        await _broadcast_spectator_count(room_id)

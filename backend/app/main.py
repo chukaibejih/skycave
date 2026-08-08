@@ -24,7 +24,7 @@ from app.routers import (
     share,
     users,
 )
-from app.websocket.handler import websocket_endpoint
+from app.websocket.handler import spectator_endpoint, websocket_endpoint
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,3 +78,8 @@ async def health() -> dict:
 @app.websocket("/ws/{room_id}")
 async def ws(ws: WebSocket, room_id: str, token: str | None = Query(default=None)):
     await websocket_endpoint(ws, room_id, token)
+
+
+@app.websocket("/ws/spectate/{room_id}")
+async def ws_spectate(ws: WebSocket, room_id: str, token: str | None = Query(default=None)):
+    await spectator_endpoint(ws, room_id, token)

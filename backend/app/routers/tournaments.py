@@ -21,9 +21,10 @@ from app.core.deps import AdminAuth, CurrentIdentity, OptionalIdentity
 from app.core.redis_client import get_redis
 from app.games.registry import get_game
 from app.models import User
-from app.models.tournament import FINISHED, M_BYE, REGISTERING, Tournament
+from app.models.tournament import FINISHED, M_BYE, M_LIVE, M_READY, REGISTERING, Tournament
 from app.services import tournament as svc
 from app.services import tournament_engine as eng
+from app.websocket.manager import manager
 
 REIGNING_KEY = "tournament:reigning_champion:v1"
 REIGNING_TTL = 300  # 5 min; a champion only changes once a weekend
@@ -314,6 +315,68 @@ async def reigning_champion(
     )
     await r.set(REIGNING_KEY, out.model_dump_json(), ex=REIGNING_TTL)
     return out
+
+
+class WatchOut(BaseModel):
+    round_name: str
+    status: str  # "live" | "between" | "waiting" | "finished" | "pending"
+    player1: PlayerOut | None = None
+    player2: PlayerOut | None = None
+    wins: list[int] = [0, 0]
+    winner_did: str | None = None
+    live_room_id: str | None = None
+    spectators: int = 0
+
+
+@router.get("/{tournament_id}/watch/{round}/{slot}", response_model=WatchOut)
+async def watch_match(
+    tournament_id: str,
+    round: int,
+    slot: int,
+    db: AsyncSession = Depends(get_db),
+) -> WatchOut:
+    """Public spectator view of one fixture: who is playing, the series score,
+    and the room to watch right now. `live_room_id` is the leg currently in
+    play (it advances as each leg opens), or null between legs; the spectator
+    client polls this to know which room to watch and when to hop."""
+    t = await db.get(Tournament, tournament_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="No such tournament")
+    m = await svc.find_match(db, tournament_id, round, slot)
+    if m is None:
+        raise HTTPException(status_code=404, detail="No such fixture")
+
+    people = await svc.entrants(db, tournament_id)
+    by_did = {
+        e.did: PlayerOut(
+            did=e.did, handle=e.handle, display_name=e.display_name, avatar_url=e.avatar_url
+        )
+        for e in people
+    }
+    w1 = sum(1 for r in (m.results or []) if r.get("winner") == m.player1_did)
+    w2 = sum(1 for r in (m.results or []) if r.get("winner") == m.player2_did)
+
+    live_room_id = await svc.open_room_id(m)
+    if m.winner_did:
+        status = "finished"
+    elif live_room_id:
+        status = "live"
+    elif m.status in (M_LIVE, M_READY):
+        status = "between"  # in progress, but no leg room open right now
+    else:
+        status = "pending"
+
+    final_round = max(1, t.bracket_size.bit_length() - 1)
+    return WatchOut(
+        round_name=_round_name(m.round, final_round),
+        status=status,
+        player1=by_did.get(m.player1_did or ""),
+        player2=by_did.get(m.player2_did or ""),
+        wins=[w1, w2],
+        winner_did=m.winner_did,
+        live_room_id=live_room_id,
+        spectators=manager.spectator_count(live_room_id) if live_room_id else 0,
+    )
 
 
 @router.get("/{tournament_id}", response_model=TournamentOut)

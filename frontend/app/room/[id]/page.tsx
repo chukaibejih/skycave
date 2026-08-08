@@ -10,6 +10,7 @@ import { ConnectionBadge } from "@/components/ui/ConnectionBadge";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Button } from "@/components/ui/Button";
 import { GameShell } from "@/components/games/GameShell";
+import { SpectatorLayer } from "@/components/games/SpectatorLayer";
 import { GameOver } from "@/components/games/GameOver";
 import { preloadGlobe } from "@/components/games/GlobePicker";
 import { createRoom, getInvite, getRoom, joinRoom } from "@/lib/api";
@@ -221,6 +222,7 @@ export default function RoomPage() {
       <>
         <ConnectionBadge status={status} />
         <GameShell />
+        <SpectatorLayer />
       </>
     );
   }

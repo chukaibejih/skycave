@@ -18,12 +18,15 @@ ROOM_STATE = "ROOM_STATE"                # full snapshot, sent on (re)connect fo
 GAME_STATE = "GAME_STATE"                # turn-based board update (Tile Takeover)
 GAME_PRIVATE = "GAME_PRIVATE"            # your own hidden slice of a turn game (Uno hand)
 ROOM_EXPIRED = "ROOM_EXPIRED"            # waiting room closed (no opponent joined in time)
+SPECTATOR_COUNT = "SPECTATOR_COUNT"      # how many are watching (eye icon), on change
+REACTION = "REACTION"                    # an emoji a watcher sent, floated to everyone
 ERROR = "ERROR"
 
 # --- Client -> Server ---
 READY = "READY"
 ACTION = "ACTION"                        # tap / answer / buzz
 REMATCH_REQUEST = "REMATCH_REQUEST"
+REACT = "REACT"                          # a watcher sends an emoji reaction
 
 
 def message(event: str, data: dict[str, Any] | None = None) -> dict[str, Any]:

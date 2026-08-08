@@ -77,6 +77,13 @@ export interface GameEnd {
 
 export type Feedback = "correct" | "wrong" | null;
 
+// An emoji a watcher floated. `id` is a client-unique key for the animation.
+export interface Reaction {
+  id: number;
+  emoji: string;
+  from: string | null;
+}
+
 interface RoomState {
   socket: SkycaveSocket | null;
   status: ConnectionStatus;
@@ -97,15 +104,25 @@ interface RoomState {
   roomExpired: boolean; // waiting room auto-closed (no opponent joined)
   series: Record<string, number>; // wins per player id across rematches in this room
   rematchRequestedBy: string[]; // player ids who tapped rematch on the finished screen
+  spectatorCount: number; // how many are watching this room (eye icon)
+  reactions: Reaction[]; // recent floated emoji reactions (ephemeral, capped)
+  isSpectator: boolean; // this connection is watch-only
 
   connect: (roomId: string) => void;
+  spectate: (roomId: string) => void;
   disconnect: () => void;
   sendReady: () => void;
   sendAction: (data: Record<string, unknown>) => void;
   sendRematch: () => void;
+  sendReaction: (emoji: string) => void;
   clearFeedback: () => void;
   resetTransient: () => void;
+  // Internal: attach all room event handlers to a socket (connect + spectate).
+  _wire: (socket: SkycaveSocket) => void;
 }
+
+// Client-unique key for each floated reaction, so React can animate them.
+let reactionSeq = 0;
 
 export const useRoom = create<RoomState>((set, get) => ({
   socket: null,
@@ -127,6 +144,9 @@ export const useRoom = create<RoomState>((set, get) => ({
   roomExpired: false,
   series: {},
   rematchRequestedBy: [],
+  spectatorCount: 0,
+  reactions: [],
+  isSpectator: false,
 
   connect: (roomId) => {
     // Tear down any prior socket (e.g. navigating between rooms).
@@ -138,11 +158,37 @@ export const useRoom = create<RoomState>((set, get) => ({
     // Clear the previous room's round state too, so a new room can never render
     // (or act on) the last game's prompt/deadline before its own ROUND_START.
     set({
-      socket, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, privateBoard: null,
-      roomExpired: false, series: {}, rematchRequestedBy: [],
+      socket, isSpectator: false, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, privateBoard: null,
+      roomExpired: false, series: {}, rematchRequestedBy: [], spectatorCount: 0, reactions: [],
       roundData: null, roundResult: null, roundEndsAt: null, locked: false, submitted: false,
     });
 
+    get()._wire(socket);
+    socket.connect();
+  },
+
+  // Watch-only connection to a live room. Anyone may watch (token optional); the
+  // same handlers as connect() populate the store, so the same GameShell renders
+  // read-only (a non-player meId disables every control). No joinRoom, so it
+  // never counts as a player.
+  spectate: (roomId) => {
+    get().socket?.close();
+    const token = getToken() ?? "";
+    const socket = new SkycaveSocket(roomId, token, true);
+    set({
+      socket, isSpectator: true, room: null, game: null, gameEnd: null, soloWords: [], boardState: null, privateBoard: null,
+      roomExpired: false, series: {}, rematchRequestedBy: [], spectatorCount: 0, reactions: [],
+      roundData: null, roundResult: null, roundEndsAt: null, locked: false, submitted: false,
+    });
+    get()._wire(socket);
+    socket.connect();
+  },
+
+  // Wire every room event handler onto a socket. Players and spectators share
+  // these: a spectator's socket receives the same public broadcasts, just never
+  // a per-player private slice (enforced server-side), so the same store drives
+  // the same GameShell read-only.
+  _wire: (socket: SkycaveSocket) => {
     socket.onStatus((status) => set({ status }));
 
     // Turn-based board update (Tile Takeover). Also flips the game to active on
@@ -350,17 +396,30 @@ export const useRoom = create<RoomState>((set, get) => ({
 	      }));
     });
 
-    socket.connect();
+    // Watcher count (eye icon) and floated emoji reactions - seen by players and
+    // spectators alike. Reactions are capped so the list can't grow unbounded.
+    socket.on(WS.SPECTATOR_COUNT, (d: { count?: number }) =>
+      set({ spectatorCount: d.count ?? 0 })
+    );
+    socket.on(WS.REACTION, (d: { emoji?: string; from?: string | null }) => {
+      const emoji = d.emoji;
+      if (!emoji) return;
+      const from = d.from ?? null;
+      set((s) => ({
+        reactions: [...s.reactions, { id: ++reactionSeq, emoji, from }].slice(-20),
+      }));
+    });
   },
 
   disconnect: () => {
     get().socket?.close();
-    set({ socket: null, status: "closed" });
+    set({ socket: null, status: "closed", isSpectator: false, spectatorCount: 0, reactions: [] });
   },
 
   sendReady: () => get().socket?.ready(),
   sendAction: (data) => get().socket?.action(data),
   sendRematch: () => get().socket?.rematch(),
+  sendReaction: (emoji) => get().socket?.react(emoji),
   clearFeedback: () => set({ feedback: null }),
   resetTransient: () =>
     set({

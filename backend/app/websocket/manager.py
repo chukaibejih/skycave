@@ -50,6 +50,15 @@ class ConnectionManager:
     def connected_ids(self, room_id: str) -> list[str]:
         return list(self._rooms.get(room_id, {}).keys())
 
+    # Spectators are registered under "spec:*" keys (see the WS handler), so they
+    # ride the same broadcast as players but never receive a per-player private
+    # send. The live count is derived from the registry, not stored, so it can
+    # never leak on a dropped socket.
+    def spectator_count(self, room_id: str) -> int:
+        return sum(
+            1 for k in self._rooms.get(room_id, {}) if k.startswith("spec:")
+        )
+
     async def send(self, room_id: str, player_id: str, message: dict[str, Any]) -> None:
         ws = self._rooms.get(room_id, {}).get(player_id)
         if ws is None:

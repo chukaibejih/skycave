@@ -38,9 +38,12 @@ export class SkycaveSocket {
   // something that was never coming. The same hole swallowed game moves.
   private pending: string[] = [];
 
+  // `spectate` connects to the watch-only endpoint; `token` may be empty for a
+  // logged-out watcher (anyone can watch, only Bluesky accounts can react).
   constructor(
     private roomId: string,
-    private token: string
+    private token: string,
+    private spectate = false
   ) {}
 
   connect() {
@@ -55,9 +58,10 @@ export class SkycaveSocket {
   private open() {
     this.clearTimer();
     this.setStatus(this.attempt === 0 ? "connecting" : "reconnecting");
-    const url = `${WS_BASE}/ws/${this.roomId}?token=${encodeURIComponent(
-      this.token
-    )}`;
+    const path = this.spectate ? `/ws/spectate/${this.roomId}` : `/ws/${this.roomId}`;
+    const url = this.token
+      ? `${WS_BASE}${path}?token=${encodeURIComponent(this.token)}`
+      : `${WS_BASE}${path}`;
     const ws = new WebSocket(url);
     this.ws = ws;
 
@@ -187,6 +191,10 @@ export class SkycaveSocket {
 
   rematch() {
     this.send(WS.REMATCH_REQUEST);
+  }
+
+  react(emoji: string) {
+    this.send(WS.REACT, { emoji });
   }
 
   private clearTimer() {

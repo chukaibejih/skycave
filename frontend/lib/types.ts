@@ -154,11 +154,14 @@ export const WS = {
   GAME_STATE: "GAME_STATE",
   GAME_PRIVATE: "GAME_PRIVATE",
   ROOM_EXPIRED: "ROOM_EXPIRED",
+  SPECTATOR_COUNT: "SPECTATOR_COUNT",
+  REACTION: "REACTION",
   ERROR: "ERROR",
   // client -> server
   READY: "READY",
   ACTION: "ACTION",
   REMATCH_REQUEST: "REMATCH_REQUEST",
+  REACT: "REACT",
 } as const;
 
 export type WSEvent = (typeof WS)[keyof typeof WS];
