@@ -359,10 +359,13 @@ async def watch_match(
     live_room_id = await svc.open_room_id(m)
     if m.winner_did:
         status = "finished"
+        live_room_id = None  # decided: never point spectators at a stale room
     elif live_room_id:
         status = "live"
-    elif m.status in (M_LIVE, M_READY):
+    elif m.status == M_LIVE:
         status = "between"  # in progress, but no leg room open right now
+    elif m.status == M_READY:
+        status = "waiting"  # both known, awaiting check-in / first game
     else:
         status = "pending"
 
