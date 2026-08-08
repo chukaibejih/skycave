@@ -64,9 +64,25 @@ async function imageEmbed(
     }
     const encoding = resp.headers.get("content-type") || "image/png";
     const up = await a.uploadBlob(bytes, { encoding });
+    // Tell Bluesky the true dimensions so it lays the image out edge-to-edge
+    // instead of letterboxing it into a default box. PNG carries width/height in
+    // the IHDR chunk (big-endian uint32 at byte 16/20, after the 8-byte sig).
+    let aspectRatio: { width: number; height: number } | undefined;
+    if (bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50) {
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const w = dv.getUint32(16);
+      const h = dv.getUint32(20);
+      if (w > 0 && h > 0) aspectRatio = { width: w, height: h };
+    }
     return {
       $type: "app.bsky.embed.images",
-      images: [{ alt: alt.slice(0, 280) || "Skycave", image: up.data.blob }],
+      images: [
+        {
+          alt: alt.slice(0, 280) || "Skycave",
+          image: up.data.blob,
+          ...(aspectRatio ? { aspectRatio } : {}),
+        },
+      ],
     };
   } catch (err) {
     console.error("[announce] image embed failed:", err);

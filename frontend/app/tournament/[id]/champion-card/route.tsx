@@ -15,9 +15,9 @@ const GOLD = "#f2c14e";
 
 /**
  * The shareable "champion" card for a finished tournament, posted alongside the
- * champion announcement. Mirrors the on-site ChampionMoment: gold "CHAMPION"
- * eyebrow, the winner's avatar crowned and gold-ringed, their name, and the
- * event underneath. 1200x630 so it embeds cleanly on Bluesky.
+ * champion announcement. Square (1200x1200) so it fills the Bluesky feed rather
+ * than getting letterboxed into a thin strip. Gold "CHAMPION" eyebrow, the
+ * winner's avatar crowned and gold-ringed, their name, and the event.
  */
 export async function GET(
   _req: Request,
@@ -65,7 +65,7 @@ export async function GET(
     }
   }
 
-  const AV = 240;
+  const AV = 340;
 
   return new ImageResponse(
     (
@@ -79,31 +79,32 @@ export async function GET(
           justifyContent: "center",
           background: BASE,
           position: "relative",
+          padding: 80,
         }}
       >
         {/* Gold light behind the champion */}
         <div
           style={{
             position: "absolute",
-            top: 40,
-            width: 700,
-            height: 500,
+            top: 120,
+            width: 820,
+            height: 620,
             background: GOLD,
-            opacity: 0.14,
-            filter: "blur(150px)",
+            opacity: 0.15,
+            filter: "blur(170px)",
             display: "flex",
           }}
         />
 
-        <div style={{ display: "flex", fontSize: 26, letterSpacing: 10, color: GOLD, fontWeight: 700 }}>
+        <div style={{ display: "flex", fontSize: 34, letterSpacing: 14, color: GOLD, fontWeight: 700 }}>
           CHAMPION
         </div>
 
-        {/* Crown above the avatar, gold ring around it. A column (not absolute
-            positioning) keeps the crown reliably centered over the avatar across
-            renderers. The crown is SVG (not the 👑 emoji) so it always renders. */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "20px 0 30px" }}>
-          <svg width="82" height="82" viewBox="0 0 24 24" fill={GOLD} stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+        {/* Crown above the avatar, gold ring around it. Column layout (not
+            absolute) keeps the crown reliably centered across renderers; SVG
+            crown so it never depends on an emoji fetch. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "44px 0 48px" }}>
+          <svg width="110" height="110" viewBox="0 0 24 24" fill={GOLD} stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
             <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
           </svg>
           {avatar ? (
@@ -111,7 +112,7 @@ export async function GET(
               src={avatar}
               width={AV}
               height={AV}
-              style={{ width: AV, height: AV, borderRadius: AV, border: `6px solid ${GOLD}`, objectFit: "cover" }}
+              style={{ width: AV, height: AV, borderRadius: AV, border: `8px solid ${GOLD}`, objectFit: "cover" }}
             />
           ) : (
             <div
@@ -119,13 +120,13 @@ export async function GET(
                 width: AV,
                 height: AV,
                 borderRadius: AV,
-                border: `6px solid ${GOLD}`,
+                border: `8px solid ${GOLD}`,
                 background: SURFACE,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: INK,
-                fontSize: 110,
+                fontSize: 150,
                 fontWeight: 700,
               }}
             >
@@ -134,32 +135,35 @@ export async function GET(
           )}
         </div>
 
-        <div style={{ display: "flex", fontSize: 72, fontWeight: 700, color: INK, letterSpacing: -1, maxWidth: 1040, textAlign: "center" }}>
+        <div style={{ display: "flex", fontSize: 88, fontWeight: 700, color: INK, letterSpacing: -1, maxWidth: 1000, textAlign: "center" }}>
           {name}
         </div>
         {handle ? (
-          <div style={{ display: "flex", fontSize: 30, color: MUTED, marginTop: 10 }}>{handle}</div>
+          <div style={{ display: "flex", fontSize: 36, color: MUTED, marginTop: 14 }}>{handle}</div>
         ) : null}
 
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            marginTop: 44,
+            marginTop: 56,
             border: `1px solid ${BORDER}`,
             background: SURFACE,
             borderRadius: 999,
-            padding: "10px 24px",
+            padding: "14px 30px",
             color: GOLD,
-            fontSize: 22,
-            letterSpacing: 2,
+            fontSize: 26,
+            letterSpacing: 3,
           }}
         >
           {event}
         </div>
+
+        <div style={{ position: "absolute", bottom: 48, display: "flex", fontSize: 28, color: MUTED, letterSpacing: 1 }}>
+          skycave.space
+        </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    { width: 1200, height: 1200 }
   );
 }
