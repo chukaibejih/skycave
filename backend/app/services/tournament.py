@@ -520,13 +520,6 @@ async def _queue_progress(
     if final and final.winner:
         w1, w2 = final.wins()
         score = (w1, w2) if final.winner == final.p1 else (w2, w1)
-    # Only opponents actually beaten: a bye is not a scalp, and listing one as
-    # though it were would be the kind of small lie that makes a bot untrusted.
-    beaten = []
-    for f in sorted((f for f in fixtures if f.winner == champ), key=lambda f: f.round):
-        other = f.p2 if champ == f.p1 else f.p1
-        if other and handles.get(other):
-            beaten.append(handles[other])
     await posts.enqueue(
         db,
         kind=posts.KIND_CHAMPION,
@@ -536,7 +529,6 @@ async def _queue_progress(
             tournament_id=t.id,
             champion=handles.get(champ),
             entrants=len(handles),
-            beaten=beaten,
             final_score=score,
         ),
     )

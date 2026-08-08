@@ -362,18 +362,19 @@ def compose_champion(
     tournament_id: str,
     champion: str | None,
     entrants: int,
-    beaten: list[str],
     final_score: tuple[int, int] | None = None,
 ) -> str:
-    """The one that matters. Names who they had to get through to get there."""
-    lead = f"\U0001f451 {_at(champion)} WINS THE {name.upper()}."  # 👑
-    body: list[str] = []
+    """The one that matters. Reads like a sports account calling the end of an
+    event, not a system printing results: a reusable hook ("THE CAVE HAS A
+    CHAMPION"), the winner as the story rather than a list of who they beat, and
+    a sign-off that sets up next weekend."""
+    result = f"{_at(champion)} WINS THE {name.upper()}"
     if final_score:
-        body.append(f"WENT {final_score[0]}-{final_score[1]} IN THE FINAL.")
-    if beaten:
-        body.append(f"TOOK OUT {', '.join(_at(h) for h in beaten)} ON THE WAY.")
+        result += f" WITH A {final_score[0]}-{final_score[1]} FINAL"
+    lead = f"\U0001f451 THE CAVE HAS A CHAMPION.\n\n{result}."  # 👑
+    body = [f"{entrants} ENTERED. ONE LEFT WITH THE CROWN."]
     tail = (
-        f"{entrants} ENTERED. ONE LEFT STANDING. SEE YOU NEXT WEEKEND.\n"
+        "ENJOY THE WIN. WE RESET THE BRACKET NEXT WEEKEND.\n"
         f"{bracket_url(tournament_id)}"
     )
     return _fit(lead, body, tail)

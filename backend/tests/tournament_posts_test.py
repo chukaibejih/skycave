@@ -187,24 +187,22 @@ async def test_cadence_and_limit() -> None:
                 await _cleanup(s, t.id)
 
 
-async def test_a_bye_is_never_posted_as_a_beaten_opponent() -> None:
-    """A walkover is not a scalp, and the champion post must not claim one."""
+async def test_champion_post_is_about_the_winner() -> None:
+    """The champion post celebrates the winner, not who they beat: it leads with
+    the reusable hook, names the champion, and lists no beaten opponents (that
+    line was dropped so the account reads like a sports account, not a printer)."""
     async with async_session() as s:
         t = await _run_tournament(s, 5, "bsky.social")
         try:
             rows = await _outbox(s, t.id)
             champ_post = next(r for r in rows if r.kind == posts.KIND_CHAMPION)
-            # A field of five means three byes; the champion beat at most 2 people
-            # in a bracket of eight if they had one, so the claim must be short.
-            beaten_line = [ln for ln in champ_post.text.split("\n") if ln.startswith("TOOK OUT ")]
-            if beaten_line:
-                named = beaten_line[0].count("@")
-                assert named <= t.rounds, (
-                    f"champion post claims {named} scalps in a {t.rounds}-round event"
-                )
-            assert "None" not in champ_post.text, champ_post.text
-            assert "@ " not in champ_post.text, champ_post.text
-            print("\na bye never appears as a beaten opponent")
+            text = champ_post.text
+            assert "TOOK OUT" not in text, f"champion post still lists scalps: {text}"
+            assert "THE CAVE HAS A CHAMPION" in text, text
+            assert "WINS THE" in text and "@" in text, text
+            assert "None" not in text, text
+            assert "@ " not in text, text
+            print("\nchampion post celebrates the winner and names no beaten opponents")
         finally:
             await _cleanup(s, t.id)
 
@@ -242,7 +240,7 @@ async def test_draw_post_names_the_first_round() -> None:
 
 async def main() -> None:
     await test_draw_post_names_the_first_round()
-    await test_a_bye_is_never_posted_as_a_beaten_opponent()
+    await test_champion_post_is_about_the_winner()
     await test_cadence_and_limit()
     print("\n\nPASS: cadence, character budget and dedupe verified")
 
