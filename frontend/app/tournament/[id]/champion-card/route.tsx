@@ -99,14 +99,13 @@ export async function GET(
           CHAMPION
         </div>
 
-        {/* Avatar with crown + gold ring. The crown is drawn as SVG (not the 👑
-            emoji) so it always renders, with no dependency on an emoji fetch. */}
-        <div style={{ display: "flex", position: "relative", margin: "40px 0 34px" }}>
-          <div style={{ position: "absolute", top: -62, display: "flex", width: "100%", justifyContent: "center" }}>
-            <svg width="88" height="88" viewBox="0 0 24 24" fill={GOLD} stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
-            </svg>
-          </div>
+        {/* Crown above the avatar, gold ring around it. A column (not absolute
+            positioning) keeps the crown reliably centered over the avatar across
+            renderers. The crown is SVG (not the 👑 emoji) so it always renders. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "20px 0 30px" }}>
+          <svg width="82" height="82" viewBox="0 0 24 24" fill={GOLD} stroke={GOLD} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+            <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
+          </svg>
           {avatar ? (
             <img
               src={avatar}
