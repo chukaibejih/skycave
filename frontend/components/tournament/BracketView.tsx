@@ -23,6 +23,7 @@ const ROW_H = 172; // px per round-1 match: tallest card (two players + game
                    // pills) plus breathing room, so nothing crowds or spills
 const COL_W = 216;
 const GUTTER = 26;
+const CUP_W = 156; // the trophy column the final feeds into
 
 export function BracketView({ id }: { id: string }) {
   const [t, setT] = useState<Tournament | null>(null);
@@ -144,10 +145,10 @@ export function BracketView({ id }: { id: string }) {
             The main draw
           </div>
         )}
-        <div style={{ minWidth: mainRounds * COL_W + (mainRounds - 1) * GUTTER }}>
+        <div style={{ minWidth: mainRounds * COL_W + (mainRounds - 1) * GUTTER + GUTTER + CUP_W }}>
           <div
             className="mb-3 grid"
-            style={{ gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px)`, columnGap: GUTTER }}
+            style={{ gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px) ${CUP_W}px`, columnGap: GUTTER }}
           >
             {Array.from({ length: mainRounds }, (_, i) => {
               const r = i + 1;
@@ -169,13 +170,21 @@ export function BracketView({ id }: { id: string }) {
                 </div>
               );
             })}
+            <div key="cup-hdr" className="px-1">
+              <div
+                className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em]"
+                style={{ color: t.champion ? "var(--color-gold)" : "var(--color-text-secondary)" }}
+              >
+                Cup
+              </div>
+            </div>
           </div>
 
           {/* The bracket itself. */}
           <div
             className="grid"
             style={{
-              gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px)`,
+              gridTemplateColumns: `repeat(${mainRounds}, ${COL_W}px) ${CUP_W}px`,
               gridTemplateRows: `repeat(${r1Count}, ${ROW_H}px)`,
               columnGap: GUTTER,
             }}
@@ -198,6 +207,29 @@ export function BracketView({ id }: { id: string }) {
                 );
               })
             )}
+            {/* The bracket ends at the trophy: the final feeds straight into the
+                cup, with a connector spanning the gutter into it. */}
+            <div
+              className="relative flex items-center"
+              style={{ gridColumn: mainRounds + 1, gridRow: `1 / span ${r1Count}` }}
+            >
+              <span
+                aria-hidden
+                className="pointer-events-none absolute top-1/2"
+                style={{
+                  left: -GUTTER,
+                  width: GUTTER + 12,
+                  height: t.champion ? 2 : 1,
+                  background: t.champion
+                    ? "linear-gradient(90deg, transparent, var(--color-cyan) 50%, transparent)"
+                    : "color-mix(in srgb, var(--color-border) 90%, transparent)",
+                  backgroundSize: t.champion ? "200% 100%" : "auto",
+                  animation: t.champion ? "flow-h 2.5s linear infinite" : "none",
+                  boxShadow: t.champion ? "0 0 7px var(--color-cyan)" : "none",
+                }}
+              />
+              <Cup champion={t.champion ?? null} />
+            </div>
           </div>
         </div>
       </div>
@@ -277,6 +309,58 @@ function InThread({ lit }: { lit: boolean }) {
         boxShadow: lit ? "0 0 7px var(--color-cyan)" : "none",
       }}
     />
+  );
+}
+
+/** The trophy the bracket ends at: a gold, glowing cup with the champion's name
+ * once crowned, a dim waiting cup before then - so the whole bracket visibly
+ * points at what everyone is playing for. */
+function Cup({ champion }: { champion: TournamentPlayer | null }) {
+  const lit = !!champion;
+  const gold = "var(--color-gold)";
+  return (
+    <div className="flex flex-col items-center gap-2.5" style={{ width: CUP_W - 10 }}>
+      <div
+        className="grid place-items-center rounded-full"
+        style={{
+          width: 92,
+          height: 92,
+          background: lit
+            ? "color-mix(in srgb, var(--color-gold) 12%, transparent)"
+            : "var(--color-surface)",
+          border: `1.5px solid ${lit ? "color-mix(in srgb, var(--color-gold) 60%, transparent)" : "var(--color-border)"}`,
+          boxShadow: lit ? "0 0 28px color-mix(in srgb, var(--color-gold) 42%, transparent)" : "none",
+          opacity: lit ? 1 : 0.6,
+        }}
+      >
+        <svg
+          width="46"
+          height="46"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={lit ? gold : "var(--color-text-secondary)"}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+          <path d="M4 22h16" />
+          <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+          <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+          <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+        </svg>
+      </div>
+      {lit ? (
+        <div className="max-w-full truncate px-1 text-center text-[13px] font-semibold" style={{ color: gold }}>
+          {champion!.display_name}
+        </div>
+      ) : (
+        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+          champion
+        </div>
+      )}
+    </div>
   );
 }
 
