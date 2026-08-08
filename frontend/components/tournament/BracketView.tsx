@@ -363,6 +363,23 @@ function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string 
   const lines = gameLines(m);
   const forfeiter = forfeitedDid(m);
 
+  // A seat decided without a single game on the board. A no-show is already
+  // covered by the FORFEIT badge; this is the other case - both sides checked
+  // in (or neither did) but nobody played, so the deadline awarded it on a
+  // tiebreak. The planned game list would otherwise show three dashes next to a
+  // highlighted winner, which reads as "not started" rather than "already over".
+  const noContest =
+    !!m.winner_did && m.status !== "bye" && (m.results?.length ?? 0) === 0 && !forfeiter;
+  const checkedIn = m.checked_in ?? [];
+  const bothChecked =
+    !!m.player1 &&
+    !!m.player2 &&
+    checkedIn.includes(m.player1.did) &&
+    checkedIn.includes(m.player2.did);
+  const tiebreakReason = bothChecked
+    ? "Both checked in but nobody played before the deadline, so the seat went to whoever checked in first."
+    : "Nobody checked in or played before the deadline, so the seat went to the higher seed.";
+
   return (
     <motion.div
       layout
@@ -410,7 +427,18 @@ function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string 
               three names and nothing else, so a fixture two games deep looked
               identical to one that had not started. Scores read in the same
               order as the two players above them. */}
-          {lines.length > 0 && (
+          {noContest ? (
+            <div
+              title={tiebreakReason}
+              className="mt-2 flex items-center gap-1.5 rounded-[5px] px-1.5 py-1 font-[var(--font-mono)] text-[9px] uppercase tracking-wide"
+              style={{
+                background: "color-mix(in srgb, var(--color-text-secondary) 12%, transparent)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              no games played · won on tiebreak
+            </div>
+          ) : lines.length > 0 ? (
             <div className="mt-2 flex flex-col gap-0.5">
               {lines.map((g, i) => (
                 <div
@@ -456,7 +484,7 @@ function MatchCard({ m, emptyLabel }: { m: TournamentMatch; emptyLabel?: string 
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
     </motion.div>
   );
