@@ -41,18 +41,61 @@ async function ensureAgent(): Promise<AtpAgent> {
 }
 
 /**
- * Post text as @skycave.space, resolving @mentions and links to facets.
+ * Fetch an image URL and upload it as a blob, returning an images embed. Returns
+ * undefined on any failure so the post still goes out as text-only rather than
+ * failing because the picture could not be attached.
+ */
+async function imageEmbed(
+  a: AtpAgent,
+  url: string,
+  alt: string
+): Promise<{ $type: string; [k: string]: unknown } | undefined> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`[announce] image fetch ${resp.status} for ${url}`);
+      return undefined;
+    }
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    // Bluesky rejects blobs over ~1MB; skip rather than fail the whole post.
+    if (bytes.byteLength > 1_000_000) {
+      console.error(`[announce] image too large (${bytes.byteLength}B), skipping`);
+      return undefined;
+    }
+    const encoding = resp.headers.get("content-type") || "image/png";
+    const up = await a.uploadBlob(bytes, { encoding });
+    return {
+      $type: "app.bsky.embed.images",
+      images: [{ alt: alt.slice(0, 280) || "Skycave", image: up.data.blob }],
+    };
+  } catch (err) {
+    console.error("[announce] image embed failed:", err);
+    return undefined;
+  }
+}
+
+/**
+ * Post text as @skycave.space, resolving @mentions and links to facets, and
+ * optionally attaching an image (fetched from `imageUrl` and uploaded as a blob).
  * Returns the created post's AT URI. Retries a login once if the cached session
  * has gone stale (app-password sessions expire).
  */
-export async function postAnnouncement(text: string): Promise<string> {
+export async function postAnnouncement(
+  text: string,
+  imageUrl?: string
+): Promise<string> {
+  // The alt text is the first real line of the post - the headline - which
+  // describes the card well enough for a screen reader.
+  const alt = text.split("\n").map((l) => l.trim()).find(Boolean) || "Skycave";
   const attempt = async (): Promise<string> => {
     const a = await ensureAgent();
     const rt = new RichText({ text: withTags(text) });
     await rt.detectFacets(a); // resolves @handles -> DIDs, links + #tags -> facets
+    const embed = imageUrl ? await imageEmbed(a, imageUrl, alt) : undefined;
     const res = await a.post({
       text: rt.text,
       facets: rt.facets,
+      ...(embed ? { embed } : {}),
       createdAt: new Date().toISOString(),
     });
     return res.uri;

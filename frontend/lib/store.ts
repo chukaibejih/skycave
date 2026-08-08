@@ -1,6 +1,6 @@
 // Global state: auth identity + live room/game state driven by the socket.
 import { create } from "zustand";
-import { fetchMe, getToken, logout as apiLogout } from "./api";
+import { fetchMe, getReigningChampion, getToken, logout as apiLogout } from "./api";
 import { SkycaveSocket, type ConnectionStatus } from "./websocket";
 import { WS, type Identity, type Room, type GameState } from "./types";
 
@@ -30,6 +30,30 @@ export const useAuth = create<AuthState>((set, get) => ({
     const isGuest = get().identity?.is_guest ?? true;
     await apiLogout(isGuest);
     set({ identity: null });
+  },
+}));
+
+// ── Reigning champion (the crown the Avatar draws, keyed by did or handle) ──
+interface ChampionState {
+  did: string | null;
+  handle: string | null;
+  hydrate: () => Promise<void>;
+}
+
+let championStarted = false;
+export const useChampion = create<ChampionState>((set) => ({
+  did: null,
+  handle: null,
+  // Fetched once per session; the reigning champion changes at most once a week.
+  hydrate: async () => {
+    if (championStarted) return;
+    championStarted = true;
+    try {
+      const c = await getReigningChampion();
+      if (c) set({ did: c.player.did, handle: c.player.handle });
+    } catch {
+      championStarted = false; // transient failure: let a later mount retry
+    }
   },
 }));
 

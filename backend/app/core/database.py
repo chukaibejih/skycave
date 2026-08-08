@@ -71,3 +71,9 @@ async def init_db() -> None:
                 "ADD COLUMN IF NOT EXISTS countdown_from TIMESTAMPTZ"
             )
         )
+        await conn.execute(
+            text(
+                "ALTER TABLE announcement_outbox "
+                "ADD COLUMN IF NOT EXISTS image_url VARCHAR(1024)"
+            )
+        )

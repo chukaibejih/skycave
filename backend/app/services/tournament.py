@@ -21,6 +21,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.ids import new_room_id
 from app.services.bluesky_auth import fetch_profile
 from app.models.tournament import (
@@ -520,6 +521,7 @@ async def _queue_progress(
     if final and final.winner:
         w1, w2 = final.wins()
         score = (w1, w2) if final.winner == final.p1 else (w2, w1)
+    card_url = f"{settings.frontend_url.rstrip('/')}/tournament/{t.id}/champion-card"
     await posts.enqueue(
         db,
         kind=posts.KIND_CHAMPION,
@@ -531,6 +533,7 @@ async def _queue_progress(
             entrants=len(handles),
             final_score=score,
         ),
+        image_url=card_url,
     )
 
 

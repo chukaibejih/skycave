@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { colorFor, initials } from "@/lib/avatar";
+import { useChampion } from "@/lib/store";
 
 interface Props {
   id: string;
@@ -9,12 +10,15 @@ interface Props {
   size?: number;
 }
 
-import { motion } from "framer-motion";
-
 export function Avatar({ id, name, avatarUrl, size = 56 }: Props) {
-  // MOCK: Checking if this is the reigning champion (production API not deployed)
-  const isChampion = id === "itssxjae.blacksky.app" || id === "did:plc:feg3vkiuvs54g5a7xxkl4n5c";
-  
+  // The reigning champion wears the crown wherever they appear. `id` is a DID in
+  // some call sites and a handle in others, so match on either. The store is
+  // hydrated once app-wide (ChampionInit); before that it's null and no crown
+  // shows, which is the right default.
+  const champDid = useChampion((s) => s.did);
+  const champHandle = useChampion((s) => s.handle);
+  const isChampion = !!champDid && (id === champDid || id === champHandle);
+
   const crown = isChampion && (
     <div 
       className="pointer-events-none absolute z-20 text-[var(--color-gold)] drop-shadow-md"

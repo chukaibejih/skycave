@@ -13,14 +13,20 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import AdminAuth, CurrentIdentity, OptionalIdentity
+from app.core.redis_client import get_redis
 from app.games.registry import get_game
-from app.models.tournament import M_BYE, REGISTERING, Tournament
+from app.models import User
+from app.models.tournament import FINISHED, M_BYE, REGISTERING, Tournament
 from app.services import tournament as svc
 from app.services import tournament_engine as eng
+
+REIGNING_KEY = "tournament:reigning_champion:v1"
+REIGNING_TTL = 300  # 5 min; a champion only changes once a weekend
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
 
@@ -264,6 +270,50 @@ async def my_record(
         titles=data["titles"],
         entries=entries,
     )
+
+
+class ReigningChampionOut(BaseModel):
+    tournament_id: str
+    tournament_name: str
+    player: PlayerOut
+
+
+# NOTE: this must stay above "/{tournament_id}" or FastAPI reads "champion" as an
+# id. It powers the reigning-champion crown the Avatar draws everywhere, so it is
+# a tiny cached read, not a bracket scan.
+@router.get("/champion", response_model=ReigningChampionOut | None)
+async def reigning_champion(
+    db: AsyncSession = Depends(get_db),
+) -> ReigningChampionOut | None:
+    r = get_redis()
+    cached = await r.get(REIGNING_KEY)
+    if cached is not None:
+        return None if cached == "null" else ReigningChampionOut.model_validate_json(cached)
+
+    t = (
+        await db.execute(
+            select(Tournament)
+            .where(Tournament.status == FINISHED, Tournament.champion_did.is_not(None))
+            .order_by(desc(Tournament.created_at))
+            .limit(1)
+        )
+    ).scalars().first()
+    champ = await db.get(User, t.champion_did) if t else None
+    if not t or not champ:
+        await r.set(REIGNING_KEY, "null", ex=REIGNING_TTL)
+        return None
+    out = ReigningChampionOut(
+        tournament_id=t.id,
+        tournament_name=t.name,
+        player=PlayerOut(
+            did=champ.did,
+            handle=champ.handle,
+            display_name=champ.display_name or champ.handle,
+            avatar_url=champ.avatar_url,
+        ),
+    )
+    await r.set(REIGNING_KEY, out.model_dump_json(), ex=REIGNING_TTL)
+    return out
 
 
 @router.get("/{tournament_id}", response_model=TournamentOut)

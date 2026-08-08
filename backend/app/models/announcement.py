@@ -38,6 +38,10 @@ class AnnouncementOutbox(Base):
     # when it happened, so a drain that runs hours late is still accurate.
     text: Mapped[str] = mapped_column(Text)
 
+    # Optional image to attach (a fetchable URL, e.g. the champion card). The
+    # sidecar downloads it, uploads it as a blob, and embeds it on the post.
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

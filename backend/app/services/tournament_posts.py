@@ -385,13 +385,19 @@ def compose_champion(
 # --------------------------------------------------------------------------- #
 
 async def enqueue(
-    db: AsyncSession, *, kind: str, dedupe_key: str, text: str
+    db: AsyncSession,
+    *,
+    kind: str,
+    dedupe_key: str,
+    text: str,
+    image_url: str | None = None,
 ) -> bool:
     """Owe a post. Returns False when it was already owed.
 
     Uses a savepoint so a duplicate key cannot poison the caller's transaction:
     this runs alongside the write that decided a fixture, and a lost result
-    would be a far worse bug than a missing post.
+    would be a far worse bug than a missing post. `image_url`, when set, is a
+    fetchable image the sidecar attaches to the post (e.g. the champion card).
     """
     existing = (
         await db.execute(
@@ -405,7 +411,9 @@ async def enqueue(
     try:
         async with db.begin_nested():
             db.add(
-                AnnouncementOutbox(kind=kind, dedupe_key=dedupe_key, text=text)
+                AnnouncementOutbox(
+                    kind=kind, dedupe_key=dedupe_key, text=text, image_url=image_url
+                )
             )
     except IntegrityError:
         # Another request enqueued the same event between the check and the

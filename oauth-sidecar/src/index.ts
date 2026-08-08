@@ -71,12 +71,16 @@ async function main() {
       ? req.body.posts.map((p: unknown) => String(p).trim()).filter(Boolean)
       : null;
     const text = String((req.body && req.body.text) || "").trim();
+    const imageUrl =
+      typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : "";
     if ((!posts || posts.length === 0) && !text) {
       return res.status(400).json({ error: "empty_text" });
     }
     try {
       const uri =
-        posts && posts.length ? await postThread(posts) : await postAnnouncement(text);
+        posts && posts.length
+          ? await postThread(posts)
+          : await postAnnouncement(text, imageUrl || undefined);
       return res.json({ ok: true, uri });
     } catch (err) {
       console.error("[announce] post failed:", err);

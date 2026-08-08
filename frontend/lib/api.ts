@@ -214,6 +214,21 @@ export interface Friend {
 export const getFriends = () =>
   request<{ generated_at: string; friends: Friend[] }>("/friends");
 
+// ── Reigning champion (drives the crown the Avatar draws) ──
+export interface ReigningChampion {
+  tournament_id: string;
+  tournament_name: string;
+  player: {
+    did: string;
+    handle: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
+
+export const getReigningChampion = () =>
+  request<ReigningChampion | null>("/tournaments/champion");
+
 // ── Leaderboard ──
 export interface LeaderboardEntry {
   rank: number;

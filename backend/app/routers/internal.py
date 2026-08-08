@@ -38,12 +38,17 @@ def _guard(secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
-async def _post_to_bluesky(payload: str | list[str]) -> bool:
+async def _post_to_bluesky(
+    payload: str | list[str], image_url: str | None = None
+) -> bool:
     """Hand finished text to the sidecar, which owns the credential and facets.
     A list posts as a thread (first post tagged, the rest as replies); a string
-    posts as a single announcement. Fire-and-forget in spirit: never raises."""
+    posts as a single announcement. `image_url` (single posts only) is a fetchable
+    image the sidecar attaches. Fire-and-forget in spirit: never raises."""
     url = f"{settings.oauth_sidecar_url.rstrip('/')}/internal/announce"
-    body = {"posts": payload} if isinstance(payload, list) else {"text": payload}
+    body: dict = {"posts": payload} if isinstance(payload, list) else {"text": payload}
+    if image_url and not isinstance(payload, list):
+        body["imageUrl"] = image_url
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(
@@ -183,7 +188,13 @@ async def announce_drain(
         return {
             "dry_run": True,
             "pending": [
-                {"kind": r.kind, "key": r.dedupe_key, "chars": len(r.text), "text": r.text}
+                {
+                    "kind": r.kind,
+                    "key": r.dedupe_key,
+                    "chars": len(r.text),
+                    "text": r.text,
+                    "image_url": r.image_url,
+                }
                 for r in pending
             ],
         }
@@ -191,7 +202,7 @@ async def announce_drain(
     sent, failed = 0, 0
     for row in pending:
         row.attempts += 1
-        if await _post_to_bluesky(_row_payload(row)):
+        if await _post_to_bluesky(_row_payload(row), row.image_url):
             row.posted_at = datetime.now(timezone.utc)
             row.error = None
             sent += 1

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
+import { ChampionInit } from "@/components/ChampionInit";
 import "./globals.css";
 
 const sora = Sora({
@@ -60,6 +61,7 @@ export default function RootLayout({
     >
       <body>
         {children}
+        <ChampionInit />
         <FeedbackButton />
       </body>
     </html>
