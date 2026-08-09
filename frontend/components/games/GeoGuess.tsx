@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { GlobePicker, EARTH_TEXTURE, EARTH_DAY_TEXTURE, type Marker } from "./GlobePicker";
+import { GlobePicker, EARTH_TEXTURE, EARTH_MAP_TEXTURE, type Marker } from "./GlobePicker";
 import type { RoundResult } from "@/lib/store";
 import type { PlayerSlot } from "@/lib/types";
 
@@ -44,17 +44,20 @@ export function GeoGuess({
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [submittedLocal, setSubmittedLocal] = useState(false);
 
-  // Map view preferences (saved to localStorage, defaulting to Satellite & 3D)
-  const [mapType, setMapType] = useState<"satellite" | "terrain">(() => {
-    if (typeof window === "undefined") return "satellite";
-    return (localStorage.getItem("geoguess_map_type") as "satellite" | "terrain") || "satellite";
+  // Map view preferences (saved to localStorage, defaulting to Map & 3D).
+  // Only "satellite" | "map" are valid now; Map is what welcomes the player, so
+  // anything that isn't an explicit "satellite" choice (first visit, or the old
+  // "terrain" value) resolves to Map rather than an invalid state.
+  const [mapType, setMapType] = useState<"satellite" | "map">(() => {
+    if (typeof window === "undefined") return "map";
+    return localStorage.getItem("geoguess_map_type") === "satellite" ? "satellite" : "map";
   });
   const [viewMode, setViewMode] = useState<"3d" | "2d">(() => {
     if (typeof window === "undefined") return "3d";
     return (localStorage.getItem("geoguess_view_mode") as "3d" | "2d") || "3d";
   });
 
-  const toggleMapType = (t: "satellite" | "terrain") => {
+  const toggleMapType = (t: "satellite" | "map") => {
     setMapType(t);
     try {
       localStorage.setItem("geoguess_map_type", t);
@@ -122,27 +125,28 @@ export function GeoGuess({
       <GlobePicker
         markers={markers}
         interactive={active && !submitted}
-        textureUrl={mapType === "satellite" ? EARTH_TEXTURE : EARTH_DAY_TEXTURE}
+        textureUrl={mapType === "satellite" ? EARTH_TEXTURE : EARTH_MAP_TEXTURE}
         forceFlat={viewMode === "2d"}
         onPick={(lat, lng) => active && !submitted && setPin({ lat, lng })}
       />
 
       {/* Top-left floating map tools (Google Earth style) */}
       <div className="absolute left-4 top-4 z-20 flex flex-col gap-3">
-        {/* Map Type Toggle */}
+        {/* Map Type Toggle: Satellite <-> Map */}
         <button
           type="button"
-          onClick={() => toggleMapType(mapType === "satellite" ? "terrain" : "satellite")}
+          onClick={() => toggleMapType(mapType === "satellite" ? "map" : "satellite")}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white shadow-lg backdrop-blur-md transition-all hover:scale-105 hover:bg-black/60 active:scale-95"
-          title={mapType === "satellite" ? "Switch to Terrain" : "Switch to Satellite"}
+          title={mapType === "satellite" ? "Switch to Map" : "Switch to Satellite"}
         >
           {mapType === "satellite" ? (
-            // Terrain Icon (Mountain) shown when in Satellite, to imply "Click for Terrain"
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-              <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+            // Map icon (folded map) shown when in Satellite, to imply "Click for Map"
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+              <path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z" />
+              <path d="M9 3v16M15 5v16" />
             </svg>
           ) : (
-            // Satellite Icon (Globe) shown when in Terrain, to imply "Click for Satellite"
+            // Globe icon shown when in Map, to imply "Click for Satellite"
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
               <circle cx="12" cy="12" r="10" />
               <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />

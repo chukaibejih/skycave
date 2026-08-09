@@ -2,10 +2,10 @@
 import dynamic from "next/dynamic";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FlatPicker } from "./FlatPicker";
-import { EARTH_TEXTURE, EARTH_DAY_TEXTURE, type Marker } from "./geo";
+import { EARTH_TEXTURE, EARTH_MAP_TEXTURE, type Marker } from "./geo";
 
 // Re-exported so existing call sites keep importing these from here.
-export { EARTH_TEXTURE, EARTH_DAY_TEXTURE, type Marker };
+export { EARTH_TEXTURE, EARTH_MAP_TEXTURE, type Marker };
 
 // react-globe.gl touches `window`/WebGL on import - load it client-only.
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false, loading: () => null });
@@ -31,10 +31,18 @@ export function preloadGlobe(): void {
   if (_preloaded || typeof window === "undefined") return;
   _preloaded = true;
   void import("react-globe.gl");
-  const img1 = new window.Image();
-  img1.src = EARTH_TEXTURE;
-  const img2 = new window.Image();
-  img2.src = EARTH_DAY_TEXTURE;
+  // Warm only the texture the player will actually see first (their persisted
+  // style), not every texture. On mobile this avoids downloading a ~1.5MB image
+  // the player may never switch to; the other (small) texture loads on toggle.
+  // Map is the default, so warm it unless the player explicitly chose Satellite.
+  let style = "map";
+  try {
+    style = localStorage.getItem("geoguess_map_type") === "satellite" ? "satellite" : "map";
+  } catch {
+    /* private mode; default to map */
+  }
+  const img = new window.Image();
+  img.src = style === "map" ? EARTH_MAP_TEXTURE : EARTH_TEXTURE;
 }
 
 /**

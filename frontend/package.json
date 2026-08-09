@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "gen:flags": "node scripts/generate-flags-data.mjs > lib/data/flags.json",
+    "gen:map": "node scripts/generate-map-texture.mjs",
     "fetch:assets": "node scripts/fetch-assets.mjs",
     "build:check": "NEXT_DIST_DIR=.next-check next build"
   },
