@@ -5,6 +5,7 @@ import { WeekendCup, WEEKEND_CUP_FRAMES } from "./WeekendCup";
 import { GeoGuessUpdate, GEO_UPDATE_FRAMES } from "./GeoGuessUpdate";
 import { PlayIn, PLAYIN_FRAMES } from "./PlayIn";
 import { Spectate, SPECTATE_FRAMES } from "./Spectate";
+import { SpectateThumb } from "./Thumbnail";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -84,5 +85,9 @@ export const RemotionRoot: React.FC = () => (
       width={1920}
       height={1080}
     />
+
+    {/* Spectating cover/thumbnail (still). Landscape 16:9 + vertical 9:16. */}
+    <Composition id="SpectateThumb" component={SpectateThumb} durationInFrames={1} fps={FPS} width={1920} height={1080} />
+    <Composition id="SpectateThumbVert" component={SpectateThumb} durationInFrames={1} fps={FPS} width={WIDTH} height={HEIGHT} />
   </>
 );
