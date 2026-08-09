@@ -35,8 +35,13 @@ export function GameShell() {
     roundEndsAt,
     boardState,
     sendAction,
+    isSpectator,
   } = useRoom();
   const meId = useAuth((s) => s.identity?.id);
+  // A spectator watches read-only: never send a move, and tell the boards so
+  // they drop the player-only prompts ("your move", "tap to..."). Gated on this
+  // flag, so play for the actual players is byte-for-byte unchanged.
+  const act = isSpectator ? () => {} : sendAction;
 
   if (!room || !game) return null;
 
@@ -47,7 +52,7 @@ export function GameShell() {
   // Turn-based games drive their own full-screen board, not the round-based
   // ScoreHeader flow. Pick the board component by game type.
   if (game.mode === "turn_based") {
-    const boardProps = { board: boardState, meId, players: room.players, onAction: sendAction };
+    const boardProps = { board: boardState, meId, players: room.players, onAction: act, spectator: isSpectator };
     if (game.game_type === "connect4") return <Connect4 {...boardProps} />;
     if (game.game_type === "dots_boxes") return <DotsAndBoxes {...boardProps} />;
     if (game.game_type === "uno") return <Uno {...boardProps} />;
@@ -71,7 +76,7 @@ export function GameShell() {
     players: room.players,
     meId,
     solo,
-    onAction: sendAction,
+    onAction: act,
   };
 
   return (

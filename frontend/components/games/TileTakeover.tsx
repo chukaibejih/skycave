@@ -8,12 +8,13 @@ interface Props {
   meId?: string;
   players?: PlayerSlot[];
   onAction: (data: Record<string, unknown>) => void;
+  spectator?: boolean; // read-only watcher: no "your move", no tapping
 }
 
 // Six vibrant tile colors, indexed to match the server's color indices.
 const PALETTE = ["#FF5C5C", "#5C8BFF", "#4FFFB0", "#FFE45C", "#B96CFF", "#FF9B5C"];
 
-export function TileTakeover({ board, meId, players = [], onAction }: Props) {
+export function TileTakeover({ board, meId, players = [], onAction, spectator = false }: Props) {
   // First-timer explainer: shown once (remembered), reopenable via "how to play".
   const [showIntro, setShowIntro] = useState(false);
   useEffect(() => {
@@ -70,11 +71,13 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
   const oppHome = homeCell(opp);
   const myColor = board.pcolor[me];
   const oppColor = board.pcolor[opp];
-  const myTurn = board.turn === me;
+  const myTurn = !spectator && board.turn === me;
   const oppName =
     opp === "ai"
       ? "Caver"
       : players.find((p) => p.id === opp)?.display_name ?? "opponent";
+  const nameOf = (id: string) =>
+    id === "ai" ? "Caver" : players.find((p) => p.id === id)?.display_name ?? "player";
 
   const pick = (color: number) => {
     if (!myTurn || color === myColor || color === oppColor) return;
@@ -85,11 +88,11 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       {/* Tallies + whose turn */}
       <header className="flex w-full items-center justify-between py-4">
-        <Tally color={PALETTE[myColor]} count={board.scores[me] ?? 0} label="you" active={myTurn} />
+        <Tally color={PALETTE[myColor]} count={board.scores[me] ?? 0} label={spectator ? nameOf(me) : "you"} active={board.turn === me} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-          {myTurn ? "your move" : `${oppName} is thinking`}
+          {spectator ? `${nameOf(board.turn)} to move` : myTurn ? "your move" : `${oppName} is thinking`}
         </div>
-        <Tally color={PALETTE[oppColor]} count={board.scores[opp] ?? 0} label={oppName} active={!myTurn} align="right" />
+        <Tally color={PALETTE[oppColor]} count={board.scores[opp] ?? 0} label={oppName} active={board.turn === opp} align="right" />
       </header>
 
       {/* Board */}
@@ -152,7 +155,9 @@ export function TileTakeover({ board, meId, players = [], onAction }: Props) {
       {/* Hint + color picker */}
       <div className="mt-auto w-full pt-6">
         <p className="mb-3 text-center text-xs text-[var(--color-text-secondary)]">
-          your corner has the glowing dot · flood out from it · most tiles wins ·{" "}
+          {spectator
+            ? "watching live · flood out from your corner · most tiles wins · "
+            : "your corner has the glowing dot · flood out from it · most tiles wins · "}
           <button onClick={() => setShowIntro(true)} className="underline underline-offset-2">
             how to play
           </button>

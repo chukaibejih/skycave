@@ -9,6 +9,7 @@ interface Props {
   meId?: string;
   players?: PlayerSlot[];
   onAction: (data: Record<string, unknown>) => void;
+  spectator?: boolean; // read-only watcher: no "your move", no tapping
 }
 
 const YOU = "#8b7cff"; // violet
@@ -67,7 +68,7 @@ function connect4Hint(owner: (string | null)[], cols: number, rows: number, me: 
   return choices.reduce((b, c) => (Math.abs(c - mid) < Math.abs(b - mid) ? c : b), choices[0]);
 }
 
-export function Connect4({ board, meId, players = [], onAction }: Props) {
+export function Connect4({ board, meId, players = [], onAction, spectator = false }: Props) {
   // Animate freshly dropped discs falling in (diff owner vs the previous board).
   const prevOwner = useRef<(string | null)[] | null>(null);
   const [fresh, setFresh] = useState<Set<number>>(() => new Set());
@@ -118,7 +119,9 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
   const opp = board.order.find((id) => id !== me) ?? board.order[1];
   const oppName = opp === "ai" ? "Caver" : players.find((p) => p.id === opp)?.display_name ?? "opponent";
   const isSolo = opp === "ai";
-  const myTurn = board.turn === me;
+  const myTurn = !spectator && board.turn === me;
+  const nameOf = (id: string) =>
+    id === "ai" ? "Caver" : players.find((p) => p.id === id)?.display_name ?? "opponent";
   const winCells = new Set(board.win_cells ?? []);
   const won = board.winner != null;
   const full = owner.every((o) => o !== null);
@@ -137,19 +140,23 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       {/* Turn / players */}
       <header className="flex w-full items-center justify-between py-4">
-        <Chip color={YOU} label="you" active={myTurn && !over} />
+        <Chip color={YOU} label={spectator ? nameOf(me) : "you"} active={!over && board.turn === me} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
           {over
-            ? board.winner === me
+            ? board.winner == null
+              ? "a draw"
+              : spectator
+              ? `${nameOf(board.winner)} wins`
+              : board.winner === me
               ? "you win"
-              : board.winner === opp
-              ? `${oppName} wins`
-              : "a draw"
+              : `${oppName} wins`
+            : spectator
+            ? `${nameOf(board.turn)} to move`
             : myTurn
             ? "your move"
             : `${oppName} is thinking`}
         </div>
-        <Chip color={OPP} label={oppName} active={!myTurn && !over} align="right" />
+        <Chip color={OPP} label={oppName} active={!over && board.turn === opp} align="right" />
       </header>
 
       <div className="flex w-full flex-1 flex-col items-center justify-center">
@@ -223,7 +230,7 @@ export function Connect4({ board, meId, players = [], onAction }: Props) {
         </div>
       )}
       <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
-        tap a column to drop your disc · line up four to win
+        {spectator ? "watching live · line up four to win" : "tap a column to drop your disc · line up four to win"}
       </p>
       </div>
     </main>

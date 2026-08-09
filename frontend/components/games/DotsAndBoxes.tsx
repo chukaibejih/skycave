@@ -8,6 +8,7 @@ interface Props {
   meId?: string;
   players?: PlayerSlot[];
   onAction: (data: Record<string, unknown>) => void;
+  spectator?: boolean; // read-only watcher: no "your move", no tapping
 }
 
 const YOU = "#8b7cff"; // violet
@@ -56,7 +57,7 @@ function dotsHint(h: (string | null)[], v: (string | null)[], cols: number, rows
   }, legal[0]);
 }
 
-export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
+export function DotsAndBoxes({ board, meId, players = [], onAction, spectator = false }: Props) {
   // Assist hint from null-guarded inputs so these hooks ALWAYS run before the
   // early return below. A hook sitting under `if (!board)` crashes with React
   // error #310 when board flips back to null on game end / state reset.
@@ -97,11 +98,21 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
   const opp = board.order.find((id) => id !== me) ?? board.order[1];
   const oppName = opp === "ai" ? "Caver" : players.find((p) => p.id === opp)?.display_name ?? "opponent";
   const isSolo = opp === "ai";
-  const myTurn = board.turn === me;
+  const myTurn = !spectator && board.turn === me;
   const over = boxOwner.every((o) => o !== null);
   const myScore = board.scores[me] ?? 0;
   const oppScore = board.scores[opp] ?? 0;
-  const outcome = over ? (myScore > oppScore ? "you win" : oppScore > myScore ? `${oppName} wins` : "a draw") : null;
+  const nameOf = (id: string) =>
+    id === "ai" ? "Caver" : players.find((p) => p.id === id)?.display_name ?? "player";
+  const outcome = over
+    ? myScore === oppScore
+      ? "a draw"
+      : spectator
+      ? `${nameOf(myScore > oppScore ? me : opp)} wins`
+      : myScore > oppScore
+      ? "you win"
+      : `${oppName} wins`
+    : null;
 
   const color = (o: string | null) => (o === me ? YOU : o === opp ? OPP : null);
   const dx = (c: number) => P + c * S;
@@ -132,11 +143,11 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       <header className="flex w-full items-center justify-between py-4">
-        <Chip color={YOU} label="you" score={myScore} active={myTurn && !over} />
+        <Chip color={YOU} label={spectator ? nameOf(me) : "you"} score={myScore} active={!over && board.turn === me} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-          {outcome ?? (myTurn ? "your move" : `${oppName} is thinking`)}
+          {outcome ?? (spectator ? `${nameOf(board.turn)} to move` : myTurn ? "your move" : `${oppName} is thinking`)}
         </div>
-        <Chip color={OPP} label={oppName} score={oppScore} active={!myTurn && !over} align="right" />
+        <Chip color={OPP} label={oppName} score={oppScore} active={!over && board.turn === opp} align="right" />
       </header>
 
       <div className="flex w-full flex-1 flex-col items-center justify-center">
@@ -217,7 +228,9 @@ export function DotsAndBoxes({ board, meId, players = [], onAction }: Props) {
         </div>
       )}
       <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
-        tap a line between two dots · close the 4th side of a box to claim it and go again
+        {spectator
+          ? "watching live · close the 4th side of a box to claim it and go again"
+          : "tap a line between two dots · close the 4th side of a box to claim it and go again"}
       </p>
       </div>
     </main>

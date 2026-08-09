@@ -9,6 +9,7 @@ interface Props {
   meId?: string;
   players?: PlayerSlot[];
   onAction: (data: Record<string, unknown>) => void;
+  spectator?: boolean; // read-only watcher: no "your move", no tapping
 }
 
 // Seeds are pale ivory beads, the same for both sides (as on a real board);
@@ -56,7 +57,7 @@ function sowPath(fromPit: number, seeds: number, oppStore: number): number[] {
   return path;
 }
 
-export function Mancala({ board, meId, players = [], onAction }: Props) {
+export function Mancala({ board, meId, players = [], onAction, spectator = false }: Props) {
   const order = board?.order ?? [];
   const me = meId && order.includes(meId) ? meId : order[0] ?? "";
   const sides = useMemo(() => sidesFor(order, me), [order, me]);
@@ -179,8 +180,10 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
 
   const opp = order.find((id) => id !== me) ?? order[1];
   const oppName = opp === "ai" ? "Caver" : players.find((p) => p.id === opp)?.display_name ?? "opponent";
-  const myTurn = board.turn === me && !animating;
+  const myTurn = !spectator && board.turn === me && !animating;
   const over = !!board.done;
+  const nameOf = (id: string) =>
+    id === "ai" ? "Caver" : players.find((p) => p.id === id)?.display_name ?? "player";
   const captured = new Set(board.captured ?? []);
   const myScore = display[sides.myStore];
   const oppScore = display[sides.oppStore];
@@ -217,21 +220,29 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
     });
   };
 
-  const banner = over
-    ? board.winner === me
-      ? "You win"
-      : board.winner === opp
-        ? `${oppName} wins`
-        : "A dead heat"
-    : animating && sowingActor === opp
-      ? `${oppName} is sowing`
-      : animating && sowingActor === me
-        ? "sowing..."
-        : board.turn === me
-          ? board.extra
-            ? "Again! your move"
-            : "Your move"
-          : `${oppName} is thinking`;
+  const banner = spectator
+    ? over
+      ? board.winner == null
+        ? "A dead heat"
+        : `${nameOf(board.winner)} wins`
+      : animating && sowingActor
+        ? `${nameOf(sowingActor)} is sowing`
+        : `${nameOf(board.turn)}${board.extra ? " again" : ""} to move`
+    : over
+      ? board.winner === me
+        ? "You win"
+        : board.winner === opp
+          ? `${oppName} wins`
+          : "A dead heat"
+      : animating && sowingActor === opp
+        ? `${oppName} is sowing`
+        : animating && sowingActor === me
+          ? "sowing..."
+          : board.turn === me
+            ? board.extra
+              ? "Again! your move"
+              : "Your move"
+            : `${oppName} is thinking`;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-3 pb-[max(env(safe-area-inset-bottom),16px)]">
@@ -324,7 +335,7 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
           <Store
             seeds={myScore}
             color={YOU}
-            label="you"
+            label={spectator ? nameOf(me) : "you"}
             mine
             innerRef={(el) => (pitRefs.current[sides.myStore] = el)}
             captured={captured.has(sides.myStore)}
@@ -348,12 +359,14 @@ export function Mancala({ board, meId, players = [], onAction }: Props) {
         </div>
 
         <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
-          tap one of your pits · seeds sow counterclockwise · land in your store to go again
+          {spectator
+            ? "watching live · seeds sow counterclockwise · land in your store to go again"
+            : "tap one of your pits · seeds sow counterclockwise · land in your store to go again"}
         </p>
       </div>
 
       <footer className="flex items-center justify-between py-3">
-        <PlayerTag name="You" color={YOU} active={board.turn === me && !over} />
+        <PlayerTag name={spectator ? nameOf(me) : "You"} color={YOU} active={board.turn === me && !over} />
         <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
           {myScore} - {oppScore}
         </div>

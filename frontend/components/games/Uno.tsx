@@ -9,6 +9,9 @@ interface Props {
   meId?: string;
   players: PlayerSlot[];
   onAction: (data: Record<string, unknown>) => void;
+  // A spectator's meId is never a player, so turn/hand logic already reads as
+  // read-only; accepted here only so the shared boardProps spread typechecks.
+  spectator?: boolean;
 }
 
 const SUIT: Record<string, string> = {
