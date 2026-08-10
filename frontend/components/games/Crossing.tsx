@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
 
 interface Props {
@@ -18,16 +18,17 @@ const EMPTY_FILL = "#ffffff";
 const EMPTY_STROKE = "#94a3b8";
 
 type Piece = { key: string; pid: string; node: number };
+type Ripple = { id: string; n: number; color: string };
 
 export function Crossing({ board, meId, players = [], onAction, spectator = false }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
 
   // Track pieces across moves so the one that moved SLIDES rather than popping.
-  // Exactly one piece changes node per turn; match unchanged nodes first, then
-  // carry the leftover previous piece to the newly occupied node.
   const piecesRef = useRef<Piece[]>([]);
   const [pieces, setPieces] = useState<Piece[]>([]);
+  const [ripples, setRipples] = useState<Ripple[]>([]);
   const seq = useRef(0);
+
   useEffect(() => {
     if (!board?.occ) return;
     const curByPid: Record<string, number[]> = {};
@@ -35,6 +36,8 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
     const prev = piecesRef.current;
     const next: Piece[] = [];
     const used = new Set<string>();
+    const movedToNodes: { n: number; pid: string }[] = [];
+
     for (const pid of Object.keys(curByPid)) {
       const remaining = [...curByPid[pid]];
       const mine = prev.filter((p) => p.pid === pid);
@@ -49,12 +52,26 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
       const leftover = mine.filter((pp) => !used.has(pp.key));
       for (const node of remaining) {
         const pp = leftover.shift();
+        if (pp) movedToNodes.push({ n: node, pid });
         next.push(pp ? { key: pp.key, pid, node } : { key: `p${seq.current++}`, pid, node });
       }
     }
     piecesRef.current = next;
     setPieces(next);
-  }, [board?.occ]);
+
+    // Trigger impact ripples for newly occupied nodes (skip on initial render)
+    if (movedToNodes.length > 0 && prev.length > 0) {
+      const newRips = movedToNodes.map(m => ({
+        id: `r-${Date.now()}-${m.n}`,
+        n: m.n,
+        color: C[board.order[0] === m.pid ? 0 : 1]
+      }));
+      setRipples(r => [...r, ...newRips]);
+      setTimeout(() => {
+        setRipples(r => r.filter(rip => !newRips.find(nr => nr.id === rip.id)));
+      }, 1000);
+    }
+  }, [board?.occ, board?.order]);
 
   // Clear a stale selection whenever the position or turn changes.
   useEffect(() => setSelected(null), [board?.moves, board?.turn]);
@@ -129,6 +146,21 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
         {/* The white "paper" board — deliberately unlike the dark app surface. */}
         <div className="w-full max-w-[420px] rounded-[20px] bg-white p-3 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
           <svg viewBox={vb} style={{ width: "100%", height: "auto", display: "block" }}>
+            
+            {/* Shaded Target Zones: solidifying the home vs away feeling */}
+            {order.map((pid) => {
+              const tNodes = board.targets?.[pid] ?? [];
+              if (tNodes.length === 0) return null;
+              return (
+                <g key={`tz${pid}`}>
+                  {tNodes.map(n => {
+                    const p = pos(n);
+                    return <circle key={`tc${n}`} cx={p[0]} cy={p[1]} r={14} fill={C[idxOf(pid)]} opacity={0.06} />;
+                  })}
+                </g>
+              );
+            })}
+
             {/* target rings: faint markers of where each side is heading */}
             {order.map((pid) =>
               (board.targets?.[pid] ?? []).map((n) => {
@@ -139,17 +171,26 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                 );
               })
             )}
-            {/* edges */}
+
+            {/* edges with glowing path trails */}
             {(board.edges ?? []).map(([a, b], i) => {
               const pa = pos(a);
               const pb = pos(b);
               const hot = selected != null && ((a === selected && destSet.has(b)) || (b === selected && destSet.has(a)));
               return (
-                <line key={`e${i}`} x1={pa[0]} y1={pa[1]} x2={pb[0]} y2={pb[1]}
-                  stroke={hot ? C[idxOf(me)] : EDGE} strokeOpacity={hot ? 0.7 : 0.55}
-                  strokeWidth={hot ? 1.8 : 1.2} strokeLinecap="round" />
+                <g key={`e${i}`}>
+                  <line x1={pa[0]} y1={pa[1]} x2={pb[0]} y2={pb[1]}
+                    stroke={hot ? C[idxOf(me)] : EDGE} strokeOpacity={hot ? 0.3 : 0.55}
+                    strokeWidth={hot ? 2 : 1.2} strokeLinecap="round" />
+                  {hot && (
+                    <motion.line x1={pa[0]} y1={pa[1]} x2={pb[0]} y2={pb[1]}
+                      stroke={C[idxOf(me)]} strokeOpacity={0.9} strokeWidth={1.8} strokeLinecap="round" strokeDasharray="4 4"
+                      animate={{ strokeDashoffset: [16, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                  )}
+                </g>
               );
             })}
+
             {/* empty nodes + legal-destination highlights */}
             {nodesEntries.map(([id, p]) => {
               const n = Number(id);
@@ -166,22 +207,44 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                 </g>
               );
             })}
-            {/* pieces — slide from their old node to the new one */}
+
+            {/* Impact ripples */}
+            <AnimatePresence>
+              {ripples.map(r => {
+                const p = pos(r.n);
+                return (
+                  <motion.circle key={r.id} cx={p[0]} cy={p[1]} fill={r.color}
+                    initial={{ r: 4, opacity: 0.8 }}
+                    animate={{ r: 18, opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    style={{ pointerEvents: "none" }}
+                  />
+                );
+              })}
+            </AnimatePresence>
+
+            {/* pieces — slide from their old node to the new one with pick up effect */}
             {pieces.map((pc) => {
               const p = pos(pc.node);
               const isMine = pc.pid === me;
               const isSel = selected === pc.node && isMine;
               const dim = over && board.winner != null && pc.pid !== board.winner;
               return (
-                <motion.g key={pc.key} initial={false} animate={{ x: p[0], y: p[1] }}
+                <motion.g key={pc.key} initial={false} 
+                  animate={{ x: p[0], y: p[1], scale: isSel ? 1.25 : 1 }}
                   transition={{ type: "spring", stiffness: 320, damping: 30 }}
-                  style={{ cursor: isMine && myTurn ? "pointer" : "default" }}>
+                  style={{ 
+                    cursor: isMine && myTurn ? "pointer" : "default",
+                    filter: isSel ? "drop-shadow(0 4px 5px rgba(0,0,0,0.3))" : "none"
+                  }}>
                   {isSel && <circle r={6.2} fill="none" stroke={C[idxOf(pc.pid)]} strokeWidth={1.4} />}
                   <circle r={4.3} fill={C[idxOf(pc.pid)]} fillOpacity={dim ? 0.4 : 1}
                     stroke="#ffffff" strokeWidth={1} />
                 </motion.g>
               );
             })}
+
             {/* generous tap targets on every node, on top */}
             {nodesEntries.map(([id, p]) => (
               <circle key={`h${id}`} cx={p[0]} cy={p[1]} r={7} fill="transparent"
