@@ -410,15 +410,15 @@ def compose_nudge(
     who = " ".join(_at(h) for h in targets)
     mins = max(5, 5 * ((minutes_left + 2) // 5))
     left = f"ABOUT {mins} MINUTES"
-    matchref = f"{label.upper()} MATCH"
+    matchref = label.upper()
     if opp and len(targets) == 1:
         matchref += f" VS {_at(opp)}"
     if tier == "last":
         head = f"{who} LAST CALL."
-        body = f"YOUR {matchref} CLOSES IN {left}. MAKE YOUR MOVE OR IT GOES TO THE CLOCK."
+        body = f"{matchref} CLOSES IN {left}. MAKE YOUR MOVE OR IT GOES TO THE CLOCK."
     else:
         head = f"{who} YOU'RE ON THE CLOCK."
-        body = f"YOUR {matchref} CLOSES IN {left}. WRAP IT UP."
+        body = f"{matchref} CLOSES IN {left}. WRAP IT UP."
     return f"{head}\n{body}\n{bracket_url(tournament_id)}"
 
 
