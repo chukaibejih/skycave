@@ -118,25 +118,49 @@ def _shape(name, points, k=4):
             "a": sorted(by_x[:3]), "b": sorted(by_x[-3:])}
 
 
-_RING = [
-    (round(50 + 38 * math.cos(2 * math.pi * i / 12), 1),
-     round(50 + 38 * math.sin(2 * math.pi * i / 12), 1))
-    for i in range(12)
-] + [(35, 50), (65, 50), (50, 50)]
+def _wire(name, points, edges):
+    """A board with hand-placed nodes and an EXPLICIT edge list (unlike _shape's
+    nearest-neighbour wiring). For deliberate topologies - forks, lanes - where
+    auto-wiring would blur the intended shape. Three left-most nodes are A's
+    start, three right-most B's; keep the layout mirror-symmetric about x=50 so
+    the two triples are exact mirrors and neither side has a positional edge."""
+    pos = {i: [float(x), float(y)] for i, (x, y) in enumerate(points)}
+    by_x = sorted(pos, key=lambda n: (pos[n][0], pos[n][1]))
+    return {"name": name, "pos": pos,
+            "edges": [[int(a), int(b)] for a, b in edges],
+            "a": sorted(by_x[:3]), "b": sorted(by_x[-3:])}
 
-# Five deliberately DIFFERENT shapes, each self-play vetted (balanced, decisive,
+
+# Forks: two three-tooth combs facing each other, joined through a central
+# two-lane diamond (the crossing lines in the reference board). The teeth are the
+# start/target triples; pieces funnel down a comb's spine, cross the middle, and
+# climb the far comb. Hand-wired so the fork shape stays crisp.
+_FORK_PTS = [
+    (10, 22), (10, 50), (10, 78),   # 0,1,2   A teeth (left tips)
+    (32, 22), (32, 50), (32, 78),   # 3,4,5   left spine / tooth bases
+    (50, 36), (50, 64),             # 6,7     centre lanes
+    (68, 22), (68, 50), (68, 78),   # 8,9,10  right spine / tooth bases
+    (90, 22), (90, 50), (90, 78),   # 11,12,13 B teeth (right tips)
+]
+_FORK_EDGES = [
+    (0, 3), (1, 4), (2, 5),                 # left teeth
+    (3, 4), (4, 5),                         # left spine
+    (3, 6), (4, 6), (4, 7), (5, 7),         # left -> centre (crossing)
+    (6, 7),                                 # lane link
+    (8, 6), (9, 6), (9, 7), (10, 7),        # centre -> right (crossing)
+    (8, 9), (9, 10),                        # right spine
+    (11, 8), (12, 9), (13, 10),             # right teeth
+]
+
+# Three deliberately DIFFERENT boards, each self-play vetted (balanced, decisive,
 # draws rare). Board 0 stays the rectangular lattice (the unit tests pin its node
-# ids); 1-4 are distinct outlines - a loop, a round disc, a pointed chevron, a
-# hexagon - so no two boards read the same.
+# ids); the others are a pointed chevron and the hand-wired forks - purpose-built
+# shapes with real breathing room, so no two boards read the same.
 BOARDS = {
     0: _board("Lattice", [[10, 30, 50, 70, 90], [20, 40, 60, 80], [10, 30, 50, 70, 90]]),
-    1: _shape("Ring", _RING),
-    2: _shape("Disc", _rows([(14, [50]), (28, [30, 50, 70]), (43, [22, 40, 60, 78]),
-                             (57, [22, 40, 60, 78]), (72, [30, 50, 70]), (86, [50])])),
-    3: _shape("Chevron", _rows([(10, [35, 65]), (30, [25, 50, 75]), (50, [15, 40, 60, 85]),
+    1: _shape("Chevron", _rows([(10, [35, 65]), (30, [25, 50, 75]), (50, [15, 40, 60, 85]),
                                (70, [25, 50, 75]), (90, [35, 65])]), k=3),
-    4: _shape("Hexagon", _rows([(10, [40, 60]), (30, [28, 50, 72]), (50, [18, 39, 61, 82]),
-                               (70, [28, 50, 72]), (90, [40, 60])])),
+    2: _wire("Forks", _FORK_PTS, _FORK_EDGES),
 }
 
 
