@@ -895,7 +895,14 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
     player = room["players"][0]
     pid = player["id"]
     score = gs["scores"].get(pid, 0)
-    metric = game.solo_metric(score, gs) if game else f"{score:,} pts"
+    # A game's solo_metric must never break end_game (the whole reason this
+    # function promises not to raise). Guard it: a bad metric line falls back to
+    # a bare score rather than aborting the broadcast and stranding the players.
+    try:
+        metric = game.solo_metric(score, gs) if game else f"{score:,} pts"
+    except Exception:  # noqa: BLE001
+        logger.exception("solo_metric failed for %s", room["game_type"])
+        metric = f"{score:,} pts"
 
     # Did the player beat the Caver? Only meaningful for the vs-Caver turn games
     # (two scores in play); pure solo games (one score) leave it null. The client
