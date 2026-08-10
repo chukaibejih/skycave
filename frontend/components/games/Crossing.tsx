@@ -213,15 +213,16 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
             })}
 
             {/* empty nodes + legal-destination highlights */}
-            {nodesEntries.map(([id, p]) => {
+            {nodesEntries.map(([id]) => {
               const n = Number(id);
               if (board.occ?.[id]) return null; // occupied nodes drawn as pieces below
+              const pp = pos(n);
               const legal = destSet.has(n);
               return (
                 <g key={`n${id}`}>
-                  <circle cx={p[0]} cy={p[1]} r={2.8} fill={EMPTY_FILL} stroke={EMPTY_STROKE} strokeWidth={0.8} />
+                  <circle cx={pp[0]} cy={pp[1]} r={2.8} fill={EMPTY_FILL} stroke={EMPTY_STROKE} strokeWidth={0.8} />
                   {legal && (
-                    <motion.circle cx={p[0]} cy={p[1]} r={4.6} fill={C[idxOf(me)]} fillOpacity={0.18}
+                    <motion.circle cx={pp[0]} cy={pp[1]} r={4.6} fill={C[idxOf(me)]} fillOpacity={0.18}
                       stroke={C[idxOf(me)]} strokeWidth={1} initial={{ opacity: 0.5 }}
                       animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity }} />
                   )}
@@ -279,11 +280,14 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
               );
             })}
 
-            {/* generous tap targets on every node, on top */}
-            {nodesEntries.map(([id, p]) => (
-              <circle key={`h${id}`} cx={p[0]} cy={p[1]} r={7} fill="transparent"
-                onClick={() => tap(Number(id))} style={{ cursor: myTurn ? "pointer" : "default" }} />
-            ))}
+            {/* generous tap targets on every node, on top (projected positions) */}
+            {nodesEntries.map(([id]) => {
+              const pp = pos(Number(id));
+              return (
+                <circle key={`h${id}`} cx={pp[0]} cy={pp[1]} r={7} fill="transparent"
+                  onClick={() => tap(Number(id))} style={{ cursor: myTurn ? "pointer" : "default" }} />
+              );
+            })}
           </svg>
         </div>
 
