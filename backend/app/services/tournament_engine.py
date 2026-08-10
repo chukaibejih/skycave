@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 # The pool for tournament fixtures. GeoGuess, Flag Rush and Outline Quiz are out
 # for the first event; Reaction Grid and Mad Math are out until they have been
@@ -334,9 +334,9 @@ from zoneinfo import ZoneInfo  # noqa: E402
 # deriving this from a fixed UTC offset would silently drift.
 PACIFIC = ZoneInfo("America/Los_Angeles")
 CLOSE_WEEKDAY = 3     # Monday=0, so Thursday
-CLOSE_HOUR = 8        # registration closes 08:00 Pacific
-PLAY_OPEN_HOUR = 18   # play opens 18:00 Pacific, the same Thursday
-PLAY_CLOSE_HOUR = 18  # hard wall 18:00 Pacific, the following Sunday
+CLOSE_HOUR = 12       # registration closes 12:00 Pacific (noon), Thursday
+PLAY_OPEN_HOUR = 14   # earliest a round can open: 14:00 Pacific (the Thursday slot)
+PLAY_CLOSE_HOUR = 19  # hard wall (final closes) 19:00 Pacific = 10pm Eastern, Sunday
 
 
 def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
@@ -345,17 +345,18 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
     Every anchor is a wall-clock Pacific time, converted to UTC, so the schedule
     holds its local hour across DST rather than drifting like a fixed UTC offset:
 
-      registration closes  Thursday 08:00 Pacific
-      play opens           Thursday 18:00 Pacific (the same Thursday)
-      hard wall (final)     Sunday  18:00 Pacific
+      registration closes  Thursday 12:00 Pacific (noon)
+      play opens           Thursday 14:00 Pacific (the earliest a round can open)
+      hard wall (final)     Sunday  19:00 Pacific (= 10pm Eastern)
 
-    Thursday 6pm -> Sunday 6pm is exactly 72h, so an 8-player (3-round) bracket
-    puts each round's deadline at 6pm Pacific on its own day (Fri, Sat, Sun) and
-    the tournament can never reach Monday. Bigger fields slice the same window
-    into more rounds. 6pm Pacific = 9pm Eastern is the standard for every event.
+    These three only frame the week. The per-round windows come from
+    ``round_windows``, which drops each round into a named daily slot so no match
+    is ever pulled into someone's night; ``play_opens`` here is the earliest that
+    slot grid can start (the Thursday evening slot a full 64 field uses), and the
+    draw resets ``play_opens_at`` to the field's actual first round.
     """
     local = now.astimezone(PACIFIC)
-    # The next Thursday 08:00 Pacific strictly after `now`.
+    # The next Thursday 12:00 Pacific strictly after `now`.
     ahead = (CLOSE_WEEKDAY - local.weekday()) % 7
     close_local = (local + timedelta(days=ahead)).replace(
         hour=CLOSE_HOUR, minute=0, second=0, microsecond=0
@@ -364,8 +365,8 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
         close_local += timedelta(days=7)
     closes = close_local.astimezone(timezone.utc)
 
-    # Play opens the same Thursday at 18:00 Pacific; the wall is the following
-    # Sunday (Thursday + 3 days) at 18:00 Pacific. Both are built in Pacific and
+    # Play opens the same Thursday at 14:00 Pacific; the wall is the following
+    # Sunday (Thursday + 3 days) at 19:00 Pacific. Both are built in Pacific and
     # then converted, so DST is handled for free.
     open_local = close_local.replace(hour=PLAY_OPEN_HOUR, minute=0, second=0, microsecond=0)
     close_play_local = (open_local + timedelta(days=3)).replace(
@@ -374,3 +375,68 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
     opens = open_local.astimezone(timezone.utc)
     play_closes = close_play_local.astimezone(timezone.utc)
     return closes, opens, play_closes
+
+
+# --------------------------------------------------------------------------- #
+# Per-round day-slot schedule (v5)
+# --------------------------------------------------------------------------- #
+#
+# Rounds no longer slice the play window evenly; each one lands in a named daily
+# slot, so a round never opens in the middle of somebody's night and a match
+# never goes live while a player is asleep. Two slot shapes, both Pacific wall
+# clock:
+#
+#   EVENING  14:00-19:00 PT  (5pm-10pm ET)   the night's decisive round
+#   MORNING  08:00-13:00 PT  (11am-4pm ET)   a weekend day's earlier round
+#
+# 08:00 PT is the earliest anything opens; every evening closes at 19:00 PT,
+# which is 10pm Eastern, the latest timezone, so that wall is a reasonable hour
+# for everyone in the US. On a two-round day the morning round hands to the
+# evening round with a one-hour buffer (13:00 -> 14:00). The final is always the
+# Sunday evening slot; smaller fields use fewer days, spreading Friday to Sunday,
+# and only a full 33-64 field (six rounds) reaches back to the Thursday slot.
+EVENING = (14, 19)
+MORNING = (8, 13)
+
+# Day offset from the anchoring Thursday: Thu 0, Fri 1, Sat 2, Sun 3. Ordered by
+# priority - the final's slot first, then each earlier slot in the order it is
+# added as the field grows. Taking the first ``rounds`` of these and sorting them
+# chronologically yields the schedule for any field size, so an 8-player (three
+# round) event runs Fri/Sat/Sun one-a-night while a full bracket fills Thu-Sun.
+_SLOT_PRIORITY: tuple[tuple[int, tuple[int, int]], ...] = (
+    (3, EVENING),  # Sun evening  - the final
+    (2, EVENING),  # Sat evening
+    (1, EVENING),  # Fri evening
+    (3, MORNING),  # Sun morning
+    (2, MORNING),  # Sat morning
+    (0, EVENING),  # Thu evening  - only a full six-round field reaches this far
+)
+
+
+def round_windows(play_opens_at: datetime, rounds: int) -> list[tuple[datetime, datetime]]:
+    """(open, close) in UTC for each round, earliest first.
+
+    ``play_opens_at`` supplies only the calendar week: any day in it is snapped
+    back to that week's Thursday, which the slots hang off, so this stays correct
+    even after the draw resets ``play_opens_at`` to the field's actual first
+    round. Slots are built in Pacific wall clock and converted to UTC, so every
+    window holds its local hour across a daylight-saving change.
+    """
+    if rounds < 1:
+        return []
+    if rounds > len(_SLOT_PRIORITY):
+        raise ValueError(f"{rounds} rounds exceeds the {len(_SLOT_PRIORITY)}-slot schedule")
+
+    d = play_opens_at.astimezone(PACIFIC).date()
+    thursday = d - timedelta(days=(d.weekday() - CLOSE_WEEKDAY) % 7)
+
+    chosen = sorted(_SLOT_PRIORITY[:rounds], key=lambda s: (s[0], s[1][0]))
+    windows: list[tuple[datetime, datetime]] = []
+    for day_offset, (open_hour, close_hour) in chosen:
+        day = thursday + timedelta(days=day_offset)
+        open_local = datetime.combine(day, time(open_hour), tzinfo=PACIFIC)
+        close_local = datetime.combine(day, time(close_hour), tzinfo=PACIFIC)
+        windows.append(
+            (open_local.astimezone(timezone.utc), close_local.astimezone(timezone.utc))
+        )
+    return windows

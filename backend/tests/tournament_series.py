@@ -67,6 +67,18 @@ async def _tournament(session, *, players: int, window: tuple) -> Tournament:
         )
     await svc.lock_and_draw(session, t)
     t.status = IN_PROGRESS
+    # lock_and_draw derives opens_at/deadline from the real weekend schedule, but
+    # a test wants the deterministic window it asked for. Restamp it and open
+    # every seated fixture whose window has arrived (the open-gating is exercised
+    # on its own elsewhere), so these play-half tests stay about play.
+    real_now = datetime.now(timezone.utc)
+    rows = await svc.matches(session, t.id)
+    for m in rows:
+        m.opens_at = now + opens
+        m.deadline = now + closes
+        if m.player1_did and m.player2_did and m.winner_did is None and m.status != svc.M_LIVE:
+            m.status = svc.M_READY if (now + opens) <= real_now else svc.M_SCHEDULED
+    t.play_opens_at = now + opens
     await session.commit()
     return t
 

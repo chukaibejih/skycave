@@ -43,6 +43,7 @@ KIND_PLAYIN = "tournament_playin"
 KIND_LIVE = "tournament_live"
 KIND_ROUND = "tournament_round"
 KIND_CHAMPION = "tournament_champion"
+KIND_PREOPEN = "tournament_preopen"
 
 
 def _at(handle: str | None) -> str:
@@ -289,8 +290,13 @@ def compose_round(
     round: int,
     rounds: int,
     results: list[tuple[str | None, str | None, int, int]],
+    next_opens_phrase: str | None = None,
 ) -> list[str]:
     """A round is done. `results` is (winner, loser, winner_wins, loser_wins).
+
+    `next_opens_phrase`, when given, is the pre-built line telling players when
+    the next round opens (e.g. "THE SEMI-FINALS OPEN IN ABOUT 5 HOURS ...");
+    it replaces the bare "UP NEXT" hint so nobody has to guess the schedule.
 
     Returns an ordered list of thread posts. A round down to one or two fixtures
     is a single post that tells the story with the scoreline. A wider round names
@@ -309,8 +315,11 @@ def compose_round(
         lead = f"{label.upper()} DONE."
         tail = ""
         if round < rounds:
-            nxt, _ = round_label(round + 1, rounds)
-            tail = f"{nxt.upper()} UP NEXT.\n"
+            if next_opens_phrase:
+                tail = f"{next_opens_phrase}.\n"
+            else:
+                nxt, _ = round_label(round + 1, rounds)
+                tail = f"{nxt.upper()} UP NEXT.\n"
         tail += bracket_url(tournament_id)
         body = [f"{_at(w)} TOOK IT {a}-{b} AGAINST {_at(l)}" for w, l, a, b in played]
         return [_fit(lead, body, tail)]
@@ -319,8 +328,11 @@ def compose_round(
     lead = f"{label.upper()} WRAPPED."
     tail = ""
     if round < rounds:
-        nxt, _ = round_label(round + 1, rounds)
-        tail = f"{nxt.upper()} NEXT.\n"
+        if next_opens_phrase:
+            tail = f"{next_opens_phrase}.\n"
+        else:
+            nxt, _ = round_label(round + 1, rounds)
+            tail = f"{nxt.upper()} NEXT.\n"
     tail += bracket_url(tournament_id)
     survivors = [_at(w) for w, _, _, _ in results if w]
 
@@ -354,6 +366,27 @@ def compose_round(
         thread.append("STILL STANDING: " + ", ".join(names))
 
     return thread
+
+
+def compose_preopen(
+    *,
+    tournament_id: str,
+    round: int,
+    rounds: int,
+    opens_phrase: str,
+) -> str:
+    """The heads-up an hour before a new day's first round opens.
+
+    `opens_phrase` is the when clause ("IN ABOUT 1 HOUR (2pm PT / 5pm ET)"). A
+    single untagged post: it is a call to the whole field to come back, not a
+    per-player ping, so it never fans out into a tagging thread.
+    """
+    label, _plural = round_label(round, rounds)
+    return (
+        f"{label.upper()} OPENS {opens_phrase}.\n"
+        "CHECK IN THE MOMENT IT DOES, THE CLOCK STARTS THEN.\n"
+        f"{bracket_url(tournament_id)}"
+    )
 
 
 def compose_champion(

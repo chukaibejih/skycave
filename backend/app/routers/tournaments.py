@@ -53,6 +53,7 @@ class MatchOut(BaseModel):
     game_names: list[str] = []
     results: list[dict] = []
     winner_did: str | None = None
+    opens_at: datetime | None = None
     deadline: datetime | None = None
     checked_in: list[str] = []
     # True only while a leg is actually being played (an in-progress room), as
@@ -74,6 +75,7 @@ class TournamentOut(BaseModel):
     play_closes_at: datetime
     bracket_size: int
     rounds: int
+    round_opens: list[dict] = []
     round_deadlines: list[dict] = []
     champion: PlayerOut | None = None
     # The full pool, so the registration page can show what might come up.
@@ -132,6 +134,7 @@ async def _serialise(
             game_names=[_game_name(g) for g in (m.games or [])],
             results=list(m.results or []),
             winner_did=m.winner_did,
+            opens_at=m.opens_at,
             deadline=m.deadline,
             checked_in=list(m.checked_in or []),
             in_play=await _in_play(m),
@@ -151,6 +154,7 @@ async def _serialise(
         play_closes_at=t.play_closes_at,
         bracket_size=t.bracket_size,
         rounds=t.rounds,
+        round_opens=list(t.round_opens or []),
         round_deadlines=list(t.round_deadlines or []),
         champion=by_did.get(t.champion_did or ""),
         game_pool=list(eng.GAME_POOL),
@@ -507,8 +511,12 @@ class MyMatchOut(BaseModel):
     won_match: bool = False
     is_champion: bool = False
     deadline: datetime | None = None
-    # When the play window opens. Until then the bracket is drawn but nobody may
-    # play, so the client shows a disabled "play opens in..." button.
+    # When this fixture's own round window opens. Until then it is scheduled but
+    # not playable, so the client shows a "round opens in..." countdown even
+    # though the event itself is already under way.
+    opens_at: datetime | None = None
+    # When the tournament's play window opens (its first round). Until then the
+    # bracket is drawn but nobody may play.
     play_opens_at: datetime
     # Every fixture the viewer has played in this event, earliest first. It is
     # what makes winning feel earned: a champion sees the whole climb, not just
@@ -656,6 +664,7 @@ async def _my_match(
         won_match=won,
         is_champion=t.champion_did == did,
         deadline=m.deadline,
+        opens_at=m.opens_at,
         play_opens_at=t.play_opens_at,
         run=run,
         prompt=prompt,

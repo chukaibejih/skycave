@@ -16,6 +16,7 @@ import json
 import logging
 import random
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +34,7 @@ from app.models.tournament import (
     M_LIVE,
     M_PENDING,
     M_READY,
+    M_SCHEDULED,
     REGISTERING,
     Tournament,
     TournamentEntrant,
@@ -245,7 +247,28 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
     if t.status in (LOCKED, IN_PROGRESS):
         await apply_forfeits(db, t)
 
+    if t.status == IN_PROGRESS:
+        await _open_due_rounds(db, t, now)
+
     return t
+
+
+async def _open_due_rounds(db: AsyncSession, t: Tournament, now: datetime) -> None:
+    """Flip scheduled fixtures to ready once their window has opened.
+
+    A round opening is a wall-clock event, not a bracket change, so it needs its
+    own comparison-on-read pass: sync_fixtures only runs when a result or forfeit
+    moves the bracket, and a round whose feeders finished hours ago would sit in
+    `scheduled` forever without this.
+    """
+    rows = await matches(db, t.id)
+    changed = False
+    for m in rows:
+        if m.status == M_SCHEDULED and m.opens_at is not None and now >= _aware(m.opens_at):
+            m.status = M_READY
+            changed = True
+    if changed:
+        await db.commit()
 
 
 # The draw waits this long, in total, for every entrant's profile to come back.
@@ -330,15 +353,22 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     has_playin = overflow > 0
     base = 0 if has_playin else 1  # the first round number: play-in is round 0
 
-    deadlines = eng.round_deadlines(
-        _aware(locked.play_opens_at), _aware(locked.play_closes_at), rounds
-    )
+    # One schedule, read once, feeds both the published windows and the enforced
+    # per-match deadlines, so the open a player sees and the wall the engine
+    # answers to can never drift apart. Snaps off play_opens_at's Thursday.
+    windows = eng.round_windows(_aware(locked.play_opens_at), rounds)
 
     locked.bracket_size = eng.main_size_for(field)
     locked.rounds = rounds
-    locked.round_deadlines = [
-        {"round": base + i, "deadline": d.isoformat()} for i, d in enumerate(deadlines)
+    locked.round_opens = [
+        {"round": base + i, "open": o.isoformat()} for i, (o, _c) in enumerate(windows)
     ]
+    locked.round_deadlines = [
+        {"round": base + i, "deadline": c.isoformat()} for i, (_o, c) in enumerate(windows)
+    ]
+    # The field's real first round may be later than the Thursday template start
+    # (a small field spreads Fri-Sun), so anchor the play-open gate to it.
+    locked.play_opens_at = windows[0][0]
     locked.status = LOCKED
 
     # Seat numbers stabilise the main-draw render. Play-in players sit in their
@@ -354,7 +384,10 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     for e in people:
         e.seat = seat_of.get(e.did)
 
+    now = _now()
     for fx in fixtures:
+        # round 0 (play-in) -> the first window; round r -> window r-base.
+        w_open, w_close = windows[fx.round - base]
         db.add(
             TournamentMatch(
                 tournament_id=locked.id,
@@ -365,9 +398,9 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
                 games=list(fx.games),
                 results=list(fx.results),
                 winner_did=fx.winner,
-                status=_match_status(fx),
-                # round 0 (play-in) -> the first window; round r -> window r-base.
-                deadline=deadlines[fx.round - base],
+                status=_match_status(fx, w_open, now),
+                opens_at=w_open,
+                deadline=w_close,
             )
         )
 
@@ -411,18 +444,32 @@ async def lock_and_draw(db: AsyncSession, t: Tournament) -> Tournament:
     return locked
 
 
-def _match_status(fx: eng.Fixture, was: str | None = None) -> str:
+def _match_status(
+    fx: eng.Fixture,
+    opens_at: datetime | None = None,
+    now: datetime | None = None,
+    was: str | None = None,
+) -> str:
     """The fixture's state, without demoting one already under way.
 
     `was` is the status on the row. A series that has started is `live`, and
     that is not derivable from the fixture alone (an undecided fixture with two
     players looks identical before the first game and between games), so it is
     carried forward rather than recomputed back down to `ready`.
+
+    A fixture with both players known is not playable until its round window
+    opens: it is `scheduled` until `opens_at`, then `ready`. This is what stops
+    a round going live the instant its feeder finished, hours before its time.
     """
     if fx.winner:
         return M_DONE
     if fx.p1 and fx.p2:
-        return M_LIVE if was == M_LIVE else M_READY
+        if was == M_LIVE:
+            return M_LIVE
+        open_at = _aware(opens_at)
+        if open_at is not None and (now or _now()) < open_at:
+            return M_SCHEDULED
+        return M_READY
     # An empty seat is a contested seat awaiting its play-in winner (or a later
     # round awaiting its feeder): pending, never a bye. Byes are gone.
     return M_PENDING
@@ -448,6 +495,7 @@ async def sync_fixtures(
     db: AsyncSession, t: Tournament, rows: list[TournamentMatch], fixtures: list[eng.Fixture]
 ) -> None:
     """Write engine state back, advancing winners and crowning a champion."""
+    now = _now()
     by_key = {(f.round, f.slot): f for f in fixtures}
     for m in rows:
         fx = by_key.get((m.round, m.slot))
@@ -457,7 +505,9 @@ async def sync_fixtures(
         m.player2_did = fx.p2
         m.results = list(fx.results)
         m.winner_did = fx.winner
-        m.status = _match_status(fx, m.status)
+        # A newly-seated fixture whose window is still ahead becomes scheduled,
+        # not ready: winners feeding in early do not open the next round early.
+        m.status = _match_status(fx, m.opens_at, now, m.status)
 
     champ = eng.champion(fixtures)
     if champ and t.status != FINISHED:
@@ -466,6 +516,33 @@ async def sync_fixtures(
 
     await _queue_progress(db, t, fixtures, champ)
     await db.commit()
+
+
+_EASTERN = ZoneInfo("America/New_York")
+
+
+def _round_open_map(t: Tournament) -> dict[int, datetime]:
+    """round number -> that round's open, from the published windows."""
+    out: dict[int, datetime] = {}
+    for e in t.round_opens or []:
+        try:
+            out[int(e["round"])] = _aware(datetime.fromisoformat(e["open"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return out
+
+
+def _opens_when(when: datetime, now: datetime) -> str:
+    """A short, timezone-fair 'when' clause: 'in about 5 hours (2pm PT / 5pm ET)'
+    for a same-day gap, or 'sunday 2pm PT / 5pm ET' for an overnight one."""
+    pac = when.astimezone(eng.PACIFIC)
+    est = when.astimezone(_EASTERN)
+    clock = f"{pac.strftime('%-I%p').lower()} PT / {est.strftime('%-I%p').lower()} ET"
+    hours = (when - now).total_seconds() / 3600
+    if hours <= 4:
+        n = max(1, round(hours))
+        return f"IN ABOUT {n} HOUR{'S' if n != 1 else ''} ({clock})"
+    return f"{pac.strftime('%A').upper()} {clock}"
 
 
 async def _queue_progress(
@@ -482,6 +559,8 @@ async def _queue_progress(
     rounds = max((f.round for f in fixtures), default=0)
     if not rounds:
         return
+    open_map = _round_open_map(t)
+    now = _now()
 
     for rnd in range(1, rounds + 1):
         in_round = [f for f in fixtures if f.round == rnd]
@@ -502,6 +581,14 @@ async def _queue_progress(
                 (handles.get(f.winner), handles.get(loser or "") if loser else None,
                  wins, losses)
             )
+        # The end-of-round post names when the next round opens, so nobody has to
+        # guess whether to keep playing tonight or come back tomorrow.
+        next_open = open_map.get(rnd + 1)
+        opens_phrase = None
+        if next_open is not None:
+            lbl, plural = posts.round_label(rnd + 1, rounds)
+            verb = "OPEN" if plural else "OPENS"
+            opens_phrase = f"{lbl.upper()} {verb} {_opens_when(next_open, now)}"
         # compose_round returns a list of thread posts (a wide round tags every
         # survivor across the thread); store it as JSON like the draw.
         await posts.enqueue(
@@ -509,7 +596,8 @@ async def _queue_progress(
             kind=posts.KIND_ROUND,
             dedupe_key=f"{t.id}:round:{rnd}",
             text=json.dumps(posts.compose_round(
-                tournament_id=t.id, round=rnd, rounds=rounds, results=results
+                tournament_id=t.id, round=rnd, rounds=rounds, results=results,
+                next_opens_phrase=opens_phrase,
             )),
         )
 
@@ -637,6 +725,8 @@ async def check_in(db: AsyncSession, m: TournamentMatch, did: str) -> Tournament
         raise MatchError("not_yours", "This is not your fixture.")
     if locked.winner_did is not None:
         raise MatchError("decided", "This fixture is already decided.")
+    if locked.opens_at is not None and _now() < _aware(locked.opens_at):
+        raise MatchError("scheduled", "This round has not opened yet.")
     present = list(locked.checked_in or [])
     if did not in present:
         present.append(did)
@@ -677,6 +767,8 @@ async def open_leg(
 
     if locked.winner_did is not None:
         raise MatchError("decided", "This fixture is already decided.")
+    if locked.opens_at is not None and _now() < _aware(locked.opens_at):
+        raise MatchError("scheduled", "This round has not opened yet.")
     if not (locked.player1_did and locked.player2_did):
         raise MatchError("waiting", "Your opponent has not come through yet.")
     present = list(locked.checked_in or [])

@@ -73,6 +73,18 @@ async def init_db() -> None:
         )
         await conn.execute(
             text(
+                "ALTER TABLE tournaments "
+                "ADD COLUMN IF NOT EXISTS round_opens JSON"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE tournament_matches "
+                "ADD COLUMN IF NOT EXISTS opens_at TIMESTAMPTZ"
+            )
+        )
+        await conn.execute(
+            text(
                 "ALTER TABLE announcement_outbox "
                 "ADD COLUMN IF NOT EXISTS image_url VARCHAR(1024)"
             )

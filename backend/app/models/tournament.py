@@ -35,7 +35,8 @@ FINISHED = "finished"         # champion decided
 
 # Match lifecycle.
 M_PENDING = "pending"         # waiting on players (earlier round unresolved)
-M_READY = "ready"             # both players known, awaiting check-in
+M_SCHEDULED = "scheduled"     # both players known, but the round's window hasn't opened yet
+M_READY = "ready"             # window open, both players known, awaiting check-in
 M_LIVE = "live"               # series under way
 M_DONE = "done"
 M_BYE = "bye"                 # no opponent, advances free
@@ -63,9 +64,11 @@ class Tournament(Base):
     # Derived at lock time from the final field size.
     bracket_size: Mapped[int] = mapped_column(Integer, default=0)
     rounds: Mapped[int] = mapped_column(Integer, default=0)
-    # Published round deadlines, [{"round": 1, "deadline": iso}, ...]. Written
-    # once at lock and never moved earlier, so an early finish lengthens the
-    # next round rather than shortening it.
+    # Published round windows, written once at lock from the same day-slot
+    # schedule, so the open a player sees and the deadline the engine enforces
+    # can never drift apart. round_opens:     [{"round": 1, "open": iso}, ...]
+    #                        round_deadlines: [{"round": 1, "deadline": iso}, ...]
+    round_opens: Mapped[list] = mapped_column(JSON, default=list)
     round_deadlines: Mapped[list] = mapped_column(JSON, default=list)
 
     champion_did: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -147,6 +150,12 @@ class TournamentMatch(Base):
     rooms: Mapped[list] = mapped_column(JSON, default=list)
 
     winner_did: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # The round's scheduled window. `opens_at` gates play (the room cannot open
+    # before it), `deadline` is the wall the forfeit rules answer to. Both come
+    # from the one schedule at draw time.
+    opens_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     deadline: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

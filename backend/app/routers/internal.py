@@ -24,8 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.announcement import AnnouncementOutbox
-from app.models.tournament import FINISHED, Tournament
+from app.models.tournament import FINISHED, IN_PROGRESS, LOCKED, Tournament
 from app.services import announce, tournament as svc, tournament_engine as eng
+from app.services import tournament_posts as posts
 
 logger = logging.getLogger("skycave.internal")
 
@@ -211,6 +212,66 @@ async def announce_drain(
             failed += 1
     await db.commit()
     return {"sent": sent, "failed": failed, "considered": len(pending)}
+
+
+@router.post("/tournaments/announce-preopen")
+async def announce_preopen(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Queue a heads-up an hour before each new day's first round opens.
+
+    Driven by a host cron every few minutes (a dedicated timer, so it fires even
+    if no player happens to be polling at that minute). Dedupe-keyed per round,
+    so running it across the whole hour queues the post exactly once. Only the
+    round that opens a Pacific calendar day gets one; same-day rounds are covered
+    by the previous round's end-of-round post instead.
+    """
+    _guard(x_internal_secret)
+    now = datetime.now(timezone.utc)
+
+    t = (
+        await db.execute(
+            select(Tournament)
+            .where(Tournament.status.in_((LOCKED, IN_PROGRESS)))
+            .order_by(Tournament.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if t is None:
+        return {"status": "no_active", "queued": 0}
+
+    await svc.ensure_fresh(db, t)
+    opens = svc._round_open_map(t)
+    if not opens:
+        return {"status": "not_drawn", "queued": 0}
+
+    # The first round on each Pacific calendar day is the one that gets a heads-up.
+    day_first: dict = {}
+    for rnd, when in opens.items():
+        day = when.astimezone(eng.PACIFIC).date()
+        if day not in day_first or when < day_first[day][1]:
+            day_first[day] = (rnd, when)
+
+    queued = 0
+    for rnd, when in day_first.values():
+        if when - timedelta(hours=1) <= now < when:
+            ok = await posts.enqueue(
+                db,
+                kind=posts.KIND_PREOPEN,
+                dedupe_key=f"{t.id}:preopen:{rnd}",
+                text=posts.compose_preopen(
+                    tournament_id=t.id,
+                    round=rnd,
+                    rounds=t.rounds,
+                    opens_phrase=svc._opens_when(when, now),
+                ),
+            )
+            if ok:
+                queued += 1
+    if queued:
+        await db.commit()
+    return {"status": "ok", "queued": queued}
 
 
 @router.post("/tournaments/rotate")
