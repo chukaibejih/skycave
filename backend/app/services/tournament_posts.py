@@ -409,16 +409,20 @@ def compose_nudge(
     label, _plural = round_label(round, rounds)
     who = " ".join(_at(h) for h in targets)
     mins = max(5, 5 * ((minutes_left + 2) // 5))
-    left = f"ABOUT {mins} MINUTES"
-    matchref = label.upper()
+    left = f"about {mins} minutes"
+    # round_label carries its own article ("the final"); capitalise it to open
+    # the sentence. A nudge is a personal poke, so it stays in plain sentence
+    # case, not the all-caps voice the bracket-wide posts use.
+    ref = label
     if opp and len(targets) == 1:
-        matchref += f" VS {_at(opp)}"
+        ref += f" vs {_at(opp)}"
+    ref = ref[0].upper() + ref[1:]
     if tier == "last":
-        head = f"{who} LAST CALL."
-        body = f"{matchref} CLOSES IN {left}. MAKE YOUR MOVE OR IT GOES TO THE CLOCK."
+        head = f"{who} last call."
+        body = f"{ref} closes in {left}. Make your move or it goes to the clock."
     else:
-        head = f"{who} YOU'RE ON THE CLOCK."
-        body = f"{matchref} CLOSES IN {left}. WRAP IT UP."
+        head = f"{who} you're on the clock."
+        body = f"{ref} closes in {left}. Wrap it up."
     return f"{head}\n{body}\n{bracket_url(tournament_id)}"
 
 
