@@ -399,6 +399,9 @@ export interface MyMatch {
   won_match: boolean;
   is_champion: boolean;
   deadline: string | null;
+  // When this fixture's own round window opens. Play is gated on it, not just on
+  // the whole event opening; null on pre-v5 matches (fall back to play_opens_at).
+  opens_at: string | null;
   play_opens_at: string;
   run: RunStep[];
   prompt: string;

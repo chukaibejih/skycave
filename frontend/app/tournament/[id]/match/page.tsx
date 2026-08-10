@@ -299,9 +299,12 @@ function Action({
   if (!m.opponent) {
     return <Waiting>Waiting on the match that feeds yours</Waiting>;
   }
-  // The bracket is drawn, but nobody plays until the play window opens.
-  if (Date.now() < new Date(m.play_opens_at).getTime()) {
-    return <PlayOpensSoon iso={m.play_opens_at} />;
+  // The bracket is drawn, but this fixture cannot be played until its own round
+  // window opens - not merely when the event does. A round that finished early
+  // waits here for the next window rather than going live in the small hours.
+  const opensAt = m.opens_at ?? m.play_opens_at;
+  if (Date.now() < new Date(opensAt).getTime()) {
+    return <PlayOpensSoon iso={opensAt} />;
   }
   if (!m.you_checked_in) {
     return (
@@ -426,9 +429,11 @@ function NudgeOpponent({ m }: { m: MyMatch }) {
 }
 
 /**
- * The bracket is up but play has not started. A deactivated play button with a
- * live countdown to the opening, so a player knows they are in and exactly when
- * to come back, rather than a check-in button that would only be refused.
+ * The fixture is drawn but its round window has not opened. A deactivated play
+ * button with a live countdown to the opening, so a player knows they are in and
+ * exactly when to come back, rather than a check-in button that would only be
+ * refused. Covers both the first round (the event opening) and a later round
+ * that opens on its own day.
  */
 function PlayOpensSoon({ iso }: { iso: string }) {
   return (
@@ -440,7 +445,7 @@ function PlayOpensSoon({ iso }: { iso: string }) {
         color: "var(--color-text-secondary)",
       }}
     >
-      Play opens in
+      Round opens in
       <span className="tabular-nums text-[var(--color-text-primary)]">
         <Countdown to={iso} compact />
       </span>
