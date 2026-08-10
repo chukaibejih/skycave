@@ -36,6 +36,10 @@ class BaseGame:
     result_delay: float = 2.5
     mode: str = RACE
     points_per_round: int = 1
+    # Shown in the hub game catalogue. An unlisted game is fully registered and
+    # playable by direct link (/play/<slug>, invites, results), just hidden from
+    # the hub - used to soft-test a new game before its public launch.
+    listed: bool = True
 
     # ---- single-player ----
     # Whether this game supports a solo mode (all six built games do).

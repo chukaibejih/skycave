@@ -20,6 +20,7 @@ _GAMES: list[GameInfo] = [
         mode=g.mode,
     )
     for g in reversed(all_games())
+    if g.listed
 ]
 
 
