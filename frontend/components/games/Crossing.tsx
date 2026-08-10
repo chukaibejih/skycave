@@ -138,7 +138,7 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
   const proj = nodesEntries.map(([, p]) => project(p));
   const pxs = proj.map((p) => p[0]);
   const pys = proj.map((p) => p[1]);
-  const M = 9;
+  const M = 16;
   const vb = `${Math.min(...pxs) - M} ${Math.min(...pys) - M} ${Math.max(...pxs) - Math.min(...pxs) + 2 * M} ${Math.max(...pys) - Math.min(...pys) + 2 * M}`;
 
   return (
@@ -164,9 +164,11 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
       </header>
 
       <div className="flex w-full flex-1 flex-col items-center justify-center">
-        {/* The white "paper" board — deliberately unlike the dark app surface. */}
-        <div className="w-full max-w-[420px] rounded-[20px] bg-white p-3 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
-          <svg viewBox={vb} style={{ width: "100%", height: "auto", display: "block" }}>
+        {/* The white "paper" board — deliberately unlike the dark app surface.
+            flex-1 lets it grow into the free vertical space; the svg fits inside
+            (preserveAspectRatio) so a bigger card just means a bigger board. */}
+        <div className="w-full max-w-[520px] min-h-0 flex-1 rounded-[24px] bg-white p-4 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+          <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" className="h-full w-full" style={{ display: "block" }}>
             
             {/* Shaded Target Zones: solidifying the home vs away feeling */}
             {order.map((pid) => {
@@ -176,7 +178,7 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                 <g key={`tz${pid}`}>
                   {tNodes.map(n => {
                     const p = pos(n);
-                    return <circle key={`tc${n}`} cx={p[0]} cy={p[1]} r={14} fill={C[idxOf(pid)]} opacity={0.06} />;
+                    return <circle key={`tc${n}`} cx={p[0]} cy={p[1]} r={11} fill={C[idxOf(pid)]} opacity={0.06} />;
                   })}
                 </g>
               );
@@ -187,8 +189,8 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
               (board.targets?.[pid] ?? []).map((n) => {
                 const p = pos(n);
                 return (
-                  <circle key={`t${pid}${n}`} cx={p[0]} cy={p[1]} r={5.6} fill="none"
-                    stroke={C[idxOf(pid)]} strokeOpacity={0.28} strokeWidth={0.7} strokeDasharray="1.6 1.6" />
+                  <circle key={`t${pid}${n}`} cx={p[0]} cy={p[1]} r={4.6} fill="none"
+                    stroke={C[idxOf(pid)]} strokeOpacity={0.28} strokeWidth={0.6} strokeDasharray="1.4 1.4" />
                 );
               })
             )}
@@ -202,10 +204,10 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                 <g key={`e${i}`}>
                   <line x1={pa[0]} y1={pa[1]} x2={pb[0]} y2={pb[1]}
                     stroke={hot ? C[idxOf(me)] : EDGE} strokeOpacity={hot ? 0.3 : 0.55}
-                    strokeWidth={hot ? 2 : 1.2} strokeLinecap="round" />
+                    strokeWidth={hot ? 1.6 : 0.9} strokeLinecap="round" />
                   {hot && (
                     <motion.line x1={pa[0]} y1={pa[1]} x2={pb[0]} y2={pb[1]}
-                      stroke={C[idxOf(me)]} strokeOpacity={0.9} strokeWidth={1.8} strokeLinecap="round" strokeDasharray="4 4"
+                      stroke={C[idxOf(me)]} strokeOpacity={0.9} strokeWidth={1.4} strokeLinecap="round" strokeDasharray="4 4"
                       animate={{ strokeDashoffset: [16, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
                   )}
                 </g>
@@ -220,10 +222,10 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
               const legal = destSet.has(n);
               return (
                 <g key={`n${id}`}>
-                  <circle cx={pp[0]} cy={pp[1]} r={2.8} fill={EMPTY_FILL} stroke={EMPTY_STROKE} strokeWidth={0.8} />
+                  <circle cx={pp[0]} cy={pp[1]} r={2.2} fill={EMPTY_FILL} stroke={EMPTY_STROKE} strokeWidth={0.7} />
                   {legal && (
-                    <motion.circle cx={pp[0]} cy={pp[1]} r={4.6} fill={C[idxOf(me)]} fillOpacity={0.18}
-                      stroke={C[idxOf(me)]} strokeWidth={1} initial={{ opacity: 0.5 }}
+                    <motion.circle cx={pp[0]} cy={pp[1]} r={3.8} fill={C[idxOf(me)]} fillOpacity={0.18}
+                      stroke={C[idxOf(me)]} strokeWidth={0.9} initial={{ opacity: 0.5 }}
                       animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity }} />
                   )}
                 </g>
@@ -236,8 +238,8 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                 const p = pos(r.n);
                 return (
                   <motion.circle key={r.id} cx={p[0]} cy={p[1]} fill={r.color}
-                    initial={{ r: 4, opacity: 0.8 }}
-                    animate={{ r: 18, opacity: 0 }}
+                    initial={{ r: 3, opacity: 0.8 }}
+                    animate={{ r: 14, opacity: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.6, ease: "easeOut" }}
                     style={{ pointerEvents: "none" }}
@@ -267,15 +269,15 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
                   style={{
                     cursor: isMine && myTurn ? "pointer" : "default",
                     filter: isWinner
-                      ? `drop-shadow(0 0 5px ${col})`
-                      : isSel ? "drop-shadow(0 4px 5px rgba(0,0,0,0.3))" : "none",
+                      ? `drop-shadow(0 0 4px ${col})`
+                      : isSel ? "drop-shadow(0 3px 4px rgba(0,0,0,0.3))" : "none",
                   }}>
                   {isWinner && (
-                    <motion.circle r={6.6} fill="none" stroke={col} strokeWidth={1.2}
+                    <motion.circle r={5.4} fill="none" stroke={col} strokeWidth={1}
                       animate={{ opacity: [0.7, 0.12, 0.7] }} transition={{ duration: 0.7, repeat: Infinity }} />
                   )}
-                  {isSel && <circle r={6.2} fill="none" stroke={col} strokeWidth={1.4} />}
-                  <circle r={4.3} fill={col} fillOpacity={dim ? 0.4 : 1} stroke="#ffffff" strokeWidth={1} />
+                  {isSel && <circle r={5.2} fill="none" stroke={col} strokeWidth={1.2} />}
+                  <circle r={3.5} fill={col} fillOpacity={dim ? 0.4 : 1} stroke="#ffffff" strokeWidth={0.9} />
                 </motion.g>
               );
             })}
