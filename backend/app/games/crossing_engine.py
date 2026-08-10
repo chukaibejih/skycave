@@ -25,6 +25,7 @@ Engine surface (all pure, never mutate their inputs):
 """
 from __future__ import annotations
 
+import math
 from collections import deque
 
 # A game can never sanely need more than this many plies; the backstop that
@@ -91,15 +92,51 @@ def _board(name, rows_xs):
     }
 
 
-# All five are wide, triangulated meshes: the family self-play proved plays
-# cleanly (balanced, decisive, winnable both ways). They vary in size and shape
-# so each feels distinct, matching the physical boards' triangulated look.
+def _knn(pos, k=4):
+    """Undirected edges connecting each node to its k nearest neighbours. Auto-
+    triangulates any point layout, so a board is defined purely by its shape."""
+    ids = list(pos)
+    edges = set()
+    for a in ids:
+        near = sorted((math.dist(tuple(pos[a]), tuple(pos[b])), b) for b in ids if b != a)
+        for _, b in near[:k]:
+            edges.add((min(a, b), max(a, b)))
+    return sorted(edges)
+
+
+def _rows(cols):
+    return [(x, y) for x, ys in cols for y in ys]
+
+
+def _shape(name, points, k=4):
+    """A board from an arbitrary point cloud (an outline), wired by _knn. The
+    three left-most nodes are A's start, the three right-most B's; every layout
+    is mirror-symmetric about x=50, so those triples are exact mirrors."""
+    pos = {i: [float(x), float(y)] for i, (x, y) in enumerate(points)}
+    by_x = sorted(pos, key=lambda n: (pos[n][0], pos[n][1]))
+    return {"name": name, "pos": pos, "edges": [list(e) for e in _knn(pos, k)],
+            "a": sorted(by_x[:3]), "b": sorted(by_x[-3:])}
+
+
+_RING = [
+    (round(50 + 38 * math.cos(2 * math.pi * i / 12), 1),
+     round(50 + 38 * math.sin(2 * math.pi * i / 12), 1))
+    for i in range(12)
+] + [(35, 50), (65, 50), (50, 50)]
+
+# Five deliberately DIFFERENT shapes, each self-play vetted (balanced, decisive,
+# draws rare). Board 0 stays the rectangular lattice (the unit tests pin its node
+# ids); 1-4 are distinct outlines - a loop, a round disc, a pointed chevron, a
+# hexagon - so no two boards read the same.
 BOARDS = {
     0: _board("Lattice", [[10, 30, 50, 70, 90], [20, 40, 60, 80], [10, 30, 50, 70, 90]]),
-    1: _board("Field", [[10, 30, 50, 70, 90], [10, 30, 50, 70, 90], [10, 30, 50, 70, 90]]),
-    2: _board("Hex", [[20, 40, 60, 80], [8, 25, 42, 58, 75, 92], [20, 40, 60, 80]]),
-    3: _board("Reach", [[15, 38, 62, 85], [10, 30, 50, 70, 90], [15, 38, 62, 85]]),
-    4: _board("Wide", [[10, 26, 42, 58, 74, 90], [18, 34, 50, 66, 82], [10, 26, 42, 58, 74, 90]]),
+    1: _shape("Ring", _RING),
+    2: _shape("Disc", _rows([(14, [50]), (28, [30, 50, 70]), (43, [22, 40, 60, 78]),
+                             (57, [22, 40, 60, 78]), (72, [30, 50, 70]), (86, [50])])),
+    3: _shape("Chevron", _rows([(10, [35, 65]), (30, [25, 50, 75]), (50, [15, 40, 60, 85]),
+                               (70, [25, 50, 75]), (90, [35, 65])]), k=3),
+    4: _shape("Hexagon", _rows([(10, [40, 60]), (30, [28, 50, 72]), (50, [18, 39, 61, 82]),
+                               (70, [28, 50, 72]), (90, [40, 60])])),
 }
 
 
@@ -238,6 +275,10 @@ def apply_move(state, mv):
     key = normalize(new)
     new["hist"][key] = new["hist"].get(key, 0) + 1
     if new["hist"][key] >= REPEAT_LIMIT or new["moves"] >= MOVE_CAP:
+        new["draw"] = True
+    elif not legal_moves(new):
+        # The side to move is stalemated (all three pieces boxed in). A rare
+        # terminal that would otherwise hang the game with no move to make.
         new["draw"] = True
     return new
 
