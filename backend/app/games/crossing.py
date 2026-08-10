@@ -26,7 +26,7 @@ class Crossing(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
-    listed = False  # unlisted while we test; flip to True (or drop this) to launch
+    listed = True  # live on the hub
 
     # ---- lifecycle ----
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:

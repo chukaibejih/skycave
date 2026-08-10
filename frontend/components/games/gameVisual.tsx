@@ -44,13 +44,19 @@ export function GameGlyph({ type, color }: { type: string; color: string }) {
   const common = { fill: "none", stroke: color, strokeWidth: 2 } as const;
   switch (type) {
     case "crossing":
+      // two three-tooth forks racing toward the middle: your three pieces (solid)
+      // funnel across to the far fork (hollow) - the board itself, in miniature.
       return (
-        <svg width="34" height="34" viewBox="0 0 24 24" {...common}>
-          <path d="M5 6L19 18M5 18L19 6" />
-          <circle cx="5" cy="6" r="2" />
-          <circle cx="19" cy="6" r="2" />
-          <circle cx="5" cy="18" r="2" />
-          <circle cx="19" cy="18" r="2" />
+        <svg width="34" height="34" viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 5l5.5 7L5 19M5 12h5.5" />
+          <path d="M19 5l-5.5 7L19 19M19 12h-5.5" />
+          <path d="M10.5 12h3" />
+          <circle cx="5" cy="5" r="1.7" fill={color} />
+          <circle cx="5" cy="12" r="1.7" fill={color} />
+          <circle cx="5" cy="19" r="1.7" fill={color} />
+          <circle cx="19" cy="5" r="1.7" />
+          <circle cx="19" cy="12" r="1.7" />
+          <circle cx="19" cy="19" r="1.7" />
         </svg>
       );
     case "geoguess":
