@@ -44,6 +44,7 @@ KIND_LIVE = "tournament_live"
 KIND_ROUND = "tournament_round"
 KIND_CHAMPION = "tournament_champion"
 KIND_PREOPEN = "tournament_preopen"
+KIND_NUDGE = "tournament_nudge"
 
 
 def _at(handle: str | None) -> str:
@@ -387,6 +388,38 @@ def compose_preopen(
         "CHECK IN THE MOMENT IT DOES, THE CLOCK STARTS THEN.\n"
         f"{bracket_url(tournament_id)}"
     )
+
+
+def compose_nudge(
+    *,
+    tournament_id: str,
+    round: int,
+    rounds: int,
+    targets: list[str],
+    opp: str | None,
+    minutes_left: int,
+    tier: str,
+) -> str:
+    """A fixture is running out of time. `targets` are the handles who still owe
+    a move (someone yet to check in, or the player whose turn it is); `opp` is
+    the other player when there is a single clear target. tier is 'warn' (first
+    heads-up) or 'last' (final call). One tagged post, so it lands on the right
+    person's timeline without a thread.
+    """
+    label, _plural = round_label(round, rounds)
+    who = " ".join(_at(h) for h in targets)
+    mins = max(5, 5 * ((minutes_left + 2) // 5))
+    left = f"ABOUT {mins} MINUTES"
+    matchref = f"{label.upper()} MATCH"
+    if opp and len(targets) == 1:
+        matchref += f" VS {_at(opp)}"
+    if tier == "last":
+        head = f"{who} LAST CALL."
+        body = f"YOUR {matchref} CLOSES IN {left}. MAKE YOUR MOVE OR IT GOES TO THE CLOCK."
+    else:
+        head = f"{who} YOU'RE ON THE CLOCK."
+        body = f"YOUR {matchref} CLOSES IN {left}. WRAP IT UP."
+    return f"{head}\n{body}\n{bracket_url(tournament_id)}"
 
 
 def compose_champion(

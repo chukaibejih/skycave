@@ -214,18 +214,18 @@ async def announce_drain(
     return {"sent": sent, "failed": failed, "considered": len(pending)}
 
 
-@router.post("/tournaments/announce-preopen")
-async def announce_preopen(
+@router.post("/tournaments/tick")
+async def tournament_tick(
     x_internal_secret: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Queue a heads-up an hour before each new day's first round opens.
+    """The time-based heartbeat for a live tournament, driven by a host cron.
 
-    Driven by a host cron every few minutes (a dedicated timer, so it fires even
-    if no player happens to be polling at that minute). Dedupe-keyed per round,
-    so running it across the whole hour queues the post exactly once. Only the
-    round that opens a Pacific calendar day gets one; same-day rounds are covered
-    by the previous round's end-of-round post instead.
+    Two jobs, both dedupe-keyed so running every few minutes is safe:
+      - a heads-up an hour before each new day's first round opens;
+      - a nudge to the player on the clock as a fixture nears its deadline
+        (T-90m and T-25m).
+    A dedicated timer, so both fire even if no player happens to be polling.
     """
     _guard(x_internal_secret)
     now = datetime.now(timezone.utc)
@@ -239,21 +239,21 @@ async def announce_preopen(
         )
     ).scalar_one_or_none()
     if t is None:
-        return {"status": "no_active", "queued": 0}
+        return {"status": "no_active", "preopen": 0, "nudges": 0}
 
     await svc.ensure_fresh(db, t)
     opens = svc._round_open_map(t)
     if not opens:
-        return {"status": "not_drawn", "queued": 0}
+        return {"status": "not_drawn", "preopen": 0, "nudges": 0}
 
-    # The first round on each Pacific calendar day is the one that gets a heads-up.
+    # 1. The first round on each Pacific calendar day gets a one-hour heads-up.
     day_first: dict = {}
     for rnd, when in opens.items():
         day = when.astimezone(eng.PACIFIC).date()
         if day not in day_first or when < day_first[day][1]:
             day_first[day] = (rnd, when)
 
-    queued = 0
+    preopen = 0
     for rnd, when in day_first.values():
         if when - timedelta(hours=1) <= now < when:
             ok = await posts.enqueue(
@@ -268,10 +268,14 @@ async def announce_preopen(
                 ),
             )
             if ok:
-                queued += 1
-    if queued:
+                preopen += 1
+    if preopen:
         await db.commit()
-    return {"status": "ok", "queued": queued}
+
+    # 2. Nudge whoever is on the clock as a fixture nears its deadline.
+    nudges = await svc.queue_due_nudges(db, t, now)
+
+    return {"status": "ok", "preopen": preopen, "nudges": nudges}
 
 
 @router.post("/tournaments/rotate")

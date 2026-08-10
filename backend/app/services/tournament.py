@@ -15,7 +15,7 @@ import asyncio
 import json
 import logging
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
@@ -543,6 +543,103 @@ def _opens_when(when: datetime, now: datetime) -> str:
         n = max(1, round(hours))
         return f"IN ABOUT {n} HOUR{'S' if n != 1 else ''} ({clock})"
     return f"{pac.strftime('%A').upper()} {clock}"
+
+
+async def _current_room(m: TournamentMatch) -> dict | None:
+    """The live room for the leg in play, or None if none is open yet."""
+    from app.services import room_manager as rm
+
+    leg = leg_index(m)
+    open_rooms = list(m.rooms or [])
+    if leg < len(open_rooms) and open_rooms[leg]:
+        return await rm.get_room(open_rooms[leg])
+    return None
+
+
+def _owes_move(m: TournamentMatch, room: dict | None) -> list[str]:
+    """Who still has to act on this fixture, in priority order.
+
+    A player who has not checked in owes that first. Once both are in, a
+    turn-based game (its live room carries whose turn it is) pins the single
+    player on the clock - the Rose case, asleep on her move. Anything else (a
+    simultaneous game, or no room open yet) owes to both.
+    """
+    p1, p2 = m.player1_did, m.player2_did
+    present = list(m.checked_in or [])
+    missing = [d for d in (p1, p2) if d and d not in present]
+    if missing:
+        return missing
+    if room is not None:
+        game = room.get("game") or {}
+        if game.get("mode") == "turn_based":
+            turn = (game.get("turn_state") or {}).get("turn")
+            if turn in (p1, p2):
+                return [turn]
+    return [d for d in (p1, p2) if d]
+
+
+def _nudge_tier(remaining: timedelta) -> str | None:
+    """Which nudge a fixture is due, by how long is left on its deadline."""
+    if remaining <= timedelta(minutes=25):
+        return "last"
+    if remaining <= timedelta(minutes=90):
+        return "warn"
+    return None
+
+
+async def queue_due_nudges(db: AsyncSession, t: Tournament, now: datetime) -> int:
+    """Nudge the player on the clock as a fixture nears its deadline.
+
+    Two tiers, T-90m and T-25m, dedupe-keyed per fixture per tier so each match
+    gets at most one of each. Only open, undecided fixtures with both players
+    seated are ever nudged; the moment one is decided it drops out.
+    """
+    if t.status != IN_PROGRESS:
+        return 0
+    rows = await matches(db, t.id)
+    handles = {e.did: e.handle for e in await entrants(db, t.id)}
+    queued = 0
+    for m in rows:
+        if m.winner_did is not None or not (m.player1_did and m.player2_did):
+            continue
+        if m.opens_at is None or now < _aware(m.opens_at):
+            continue  # the round has not opened yet
+        if m.deadline is None:
+            continue
+        remaining = _aware(m.deadline) - now
+        if remaining <= timedelta(0):
+            continue  # past the wall; the forfeit rules take it, not a nudge
+        tier = _nudge_tier(remaining)
+        if tier is None:
+            continue
+        room = await _current_room(m)
+        owe = _owes_move(m, room)
+        targets = [handles[d] for d in owe if d in handles]
+        if not targets:
+            continue
+        opp = None
+        if len(owe) == 1:
+            other = m.player2_did if owe[0] == m.player1_did else m.player1_did
+            opp = handles.get(other or "")
+        ok = await posts.enqueue(
+            db,
+            kind=posts.KIND_NUDGE,
+            dedupe_key=f"{t.id}:nudge:{m.round}:{m.slot}:{tier}",
+            text=posts.compose_nudge(
+                tournament_id=t.id,
+                round=m.round,
+                rounds=t.rounds,
+                targets=targets,
+                opp=opp,
+                minutes_left=int(remaining.total_seconds() // 60),
+                tier=tier,
+            ),
+        )
+        if ok:
+            queued += 1
+    if queued:
+        await db.commit()
+    return queued
 
 
 async def _queue_progress(
