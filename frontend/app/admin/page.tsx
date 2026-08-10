@@ -44,6 +44,7 @@ const GAME_NAME: Record<string, string> = {
   clay: "Clay",
   uno: "Uno",
   mancala: "Mancala",
+  crossing: "Crossing",
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 
