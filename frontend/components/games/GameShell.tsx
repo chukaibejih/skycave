@@ -22,6 +22,7 @@ const DotsAndBoxes = dynamic(() => import("./DotsAndBoxes").then((m) => m.DotsAn
 const Clay = dynamic(() => import("./Clay").then((m) => m.Clay), { ssr: false });
 const Uno = dynamic(() => import("./Uno").then((m) => m.Uno), { ssr: false });
 const Mancala = dynamic(() => import("./Mancala").then((m) => m.Mancala), { ssr: false });
+const Crossing = dynamic(() => import("./Crossing").then((m) => m.Crossing), { ssr: false });
 
 export function GameShell() {
   const {
@@ -57,6 +58,7 @@ export function GameShell() {
     if (game.game_type === "dots_boxes") return <DotsAndBoxes {...boardProps} />;
     if (game.game_type === "uno") return <Uno {...boardProps} />;
     if (game.game_type === "mancala") return <Mancala {...boardProps} />;
+    if (game.game_type === "crossing") return <Crossing {...boardProps} />;
     return <TileTakeover {...boardProps} />;
   }
 

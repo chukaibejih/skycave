@@ -38,7 +38,7 @@ function shortDate(): string {
 // Games that are won or lost, not scored. A bare count ("34 tiles") or a plain
 // "beat the Caver" reads oddly under "beat my score", so these get a first-person
 // brag instead of the score format.
-const WINLOSS_GAMES = new Set(["connect4", "uno", "tile_takeover", "dots_boxes"]);
+const WINLOSS_GAMES = new Set(["connect4", "uno", "tile_takeover", "dots_boxes", "crossing"]);
 
 export function soloShareText(opts: {
   gameName: string;

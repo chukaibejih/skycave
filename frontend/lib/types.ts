@@ -106,6 +106,17 @@ export interface BoardState {
   last_pit?: number | null;
   captured?: number[];
   extra?: boolean;
+  // Crossing only (present on crossing boards). A graph race: 3 pieces a side
+  // slide along edges to the far side's start nodes. The board layout travels
+  // with the state so the client renders whichever of the boards loaded.
+  layout?: number;
+  nodes?: Record<string, [number, number]>; // node id -> [x, y] in a 0..100 box
+  edges?: number[][]; // [a, b] undirected
+  occ?: Record<string, string>; // node id -> player id occupying it
+  targets?: Record<string, number[]>; // player id -> the nodes it must reach
+  legal?: number[][]; // [from, to] legal moves for the side to move
+  moves?: number;
+  draw?: boolean;
 }
 
 // ── Uno ──

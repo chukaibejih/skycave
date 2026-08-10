@@ -9,6 +9,7 @@ from app.games.base import BaseGame
 from app.games.clay import Clay
 from app.games.color_clash import ColorClash
 from app.games.connect4 import Connect4
+from app.games.crossing import Crossing
 from app.games.dots_boxes import DotsAndBoxes
 from app.games.flag_rush import FlagRush
 from app.games.geoguesss import GeoGuess
@@ -38,6 +39,7 @@ _GAMES: dict[str, BaseGame] = {
         Clay(),
         Uno(),
         Mancala(),
+        Crossing(),
     )
 }
 

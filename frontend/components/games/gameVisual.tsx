@@ -18,6 +18,7 @@ export const GAME_ACCENT: Record<string, string> = {
   clay: "var(--color-warm)",
   uno: "var(--color-primary)",
   mancala: "var(--color-gold)",
+  crossing: "var(--color-primary)",
 };
 
 export const GAME_META: Record<string, { code: string; stat: string }> = {
@@ -35,12 +36,23 @@ export const GAME_META: Record<string, { code: string; stat: string }> = {
   dots_boxes: { code: "D&B", stat: "boxes" },
   clay: { code: "CLY", stat: "pottery" },
   mancala: { code: "MNC", stat: "seeds" },
+  crossing: { code: "CRX", stat: "race" },
 };
 
 // Lightweight inline glyph per game (no icon dependency).
 export function GameGlyph({ type, color }: { type: string; color: string }) {
   const common = { fill: "none", stroke: color, strokeWidth: 2 } as const;
   switch (type) {
+    case "crossing":
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" {...common}>
+          <path d="M5 6L19 18M5 18L19 6" />
+          <circle cx="5" cy="6" r="2" />
+          <circle cx="19" cy="6" r="2" />
+          <circle cx="5" cy="18" r="2" />
+          <circle cx="19" cy="18" r="2" />
+        </svg>
+      );
     case "geoguess":
       return (
         <svg width="34" height="34" viewBox="0 0 24 24" {...common}>
