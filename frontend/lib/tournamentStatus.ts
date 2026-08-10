@@ -10,16 +10,28 @@ import type { Tournament } from "@/lib/api";
  * the final, gold once it is won.
  */
 /**
- * The tournament world's own warmth. Everywhere else in Skycave is cool and
- * violet; the tournament is amber into coral, so stepping into it feels like
- * stepping somewhere else. The chrome (tabs, buttons, hero glow) always wears
- * this; only the status label shifts colour to carry the state of the event.
+ * The tournament world's own look, themed per season. Everywhere else in Skycave
+ * is cool and violet; the tournament wears its own palette so stepping into it
+ * feels like stepping somewhere else. The chrome (tabs, buttons, hero glow, the
+ * hub card) always wears this; only the status label shifts colour to carry the
+ * state of the event. Swapping the whole world for a new week is this one object.
+ *
+ * This week: ocean / beach - turquoise water into warm sand, a sun over the sea.
+ * (Week one was orange; keep past palettes in the git history, not here.)
  */
 export const TOURNEY = {
-  accent: "#ff8a3d", // the world's signature warm orange
-  accentSoft: "#ffab5c", // a lighter tone for text on dark
-  gradient: "linear-gradient(135deg, #ffb64d 0%, #ff7a3c 52%, #ff5b5b 100%)",
-  ink: "#2a1400", // dark text that holds contrast on the warm gradient
+  accent: "#0fb5c9", // ocean turquoise, the world's signature (chrome on dark pages)
+  accentSoft: "#5fe6da", // a lighter aqua for text and pips on dark chrome
+  gradient: "linear-gradient(135deg, #17b9c9 0%, #46d6c6 46%, #ffe1a8 100%)", // sea into sand, for buttons
+  ink: "#053244", // deep teal-navy text, holds on the bright scene and gradient
+
+  // The hub card is a bright beach scene, not a dark glass card. These build it.
+  sky: "linear-gradient(180deg, #8ad9ee 0%, #cdeef0 62%, #eaf6ec 100%)",
+  sea: "linear-gradient(180deg, #4bd0cb 0%, #12a0bd 100%)",
+  sand: "linear-gradient(180deg, #ffe7ba 0%, #f2d18c 100%)",
+  sun: "#ffce6a", // the low sun
+  sunCore: "#fff6d8", // its bright centre
+  coral: "#e5533d", // warm highlight / urgency on the bright scene
 } as const;
 
 export type TournamentPhase = "open" | "live" | "finals" | "finished";

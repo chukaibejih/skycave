@@ -4,8 +4,9 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BlueskyLogo } from "@/components/ui/BlueskyLogo";
-import { Countdown, LocalTime, Scoreboard, Weekday, clockIsLive } from "@/components/tournament/Countdown";
+import { LocalTime } from "@/components/tournament/Countdown";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
+import { TournamentHero } from "@/components/tournament/TournamentHero";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { GameGlyph, GAME_ACCENT } from "@/components/games/gameVisual";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
@@ -122,7 +123,7 @@ export default function TournamentPage() {
 
   return (
     <TournamentShell active="now">
-      <Hero t={t} />
+      <TournamentHero t={t} />
 
       <AnimatePresence mode="wait">
         {t.you_registered && t.you ? (
@@ -141,7 +142,7 @@ export default function TournamentPage() {
                   background: open ? TOURNEY.gradient : "var(--color-surface)",
                   color: open ? TOURNEY.ink : "var(--color-text-secondary)",
                   border: open ? "none" : "1px solid var(--color-border)",
-                  boxShadow: open ? "0 10px 30px rgba(255,110,60,0.28)" : "none",
+                  boxShadow: open ? "0 10px 30px rgba(15,181,201,0.30)" : "none",
                 }}
               >
                 {!open ? (
@@ -193,97 +194,6 @@ export default function TournamentPage() {
         title="Log in to enter the Cup"
       />
     </TournamentShell>
-  );
-}
-
-/* ── Hero: title, status centrepiece, dramatic clock ────────────────────── */
-
-function Hero({ t }: { t: Tournament }) {
-  const s = statusMeta(t);
-  return (
-    <div className="relative overflow-hidden rounded-[22px] border px-5 py-8 text-center"
-         style={{
-           borderColor: `color-mix(in srgb, ${TOURNEY.accent} 32%, var(--color-border))`,
-           // The tournament world is warm even in the chrome: a low amber wash
-           // over the surface so the hero feels like an occasion, not a form.
-           background: `linear-gradient(165deg, color-mix(in srgb, ${TOURNEY.accent} 14%, var(--color-surface)), var(--color-surface) 60%)`,
-         }}>
-      {/* A hairline of warm light along the top edge. */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${TOURNEY.accent}, transparent)`, opacity: 0.8 }}
-      />
-      {/* Slow-drifting warm light, so the hero is never static. */}
-      <Aura color={TOURNEY.accent} />
-
-      <div className="relative">
-        <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.24em] text-[var(--color-text-secondary)]">
-          Weekend event
-        </span>
-        <h1 className="mt-2 font-[var(--font-display)] text-[clamp(2rem,8vw,3rem)] font-bold leading-[1.02]">
-          {t.name}
-        </h1>
-
-        {/* The status is the loudest thing after the title, and it wears the
-            colour of the moment. */}
-        <div className="mt-5 flex items-center justify-center gap-2.5">
-          {(s.phase === "live" || s.phase === "finals") && (
-            <motion.span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ background: s.color, boxShadow: `0 0 12px ${s.color}` }}
-              animate={{ opacity: [1, 0.35, 1] }}
-              transition={{ duration: 1.3, repeat: Infinity }}
-            />
-          )}
-          <span
-            className="font-[var(--font-display)] text-2xl font-bold sm:text-3xl"
-            style={{ color: s.color }}
-          >
-            {s.label}
-          </span>
-        </div>
-
-        {s.countdownTo ? (
-          <div className="mt-7">
-            {s.countdownCaption && (
-              <p className="mb-3 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-                {s.countdownCaption}
-              </p>
-            )}
-            <Scoreboard to={s.countdownTo} accent={s.color} />
-            <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-              Bracket goes up at <LocalTime iso={t.registration_closes_at} />
-            </p>
-          </div>
-        ) : (
-          <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            {s.phase === "finished"
-              ? "One weekend, one champion. See the whole run."
-              : "Play your rounds before the weekend is out."}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Aura({ color }: { color: string }) {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <motion.div
-        className="absolute -left-10 -top-16 h-52 w-52 rounded-full blur-3xl"
-        style={{ background: color, opacity: 0.22 }}
-        animate={{ x: [-8, 26, -8], y: [-6, 12, -6] }}
-        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute -bottom-20 right-0 h-56 w-56 rounded-full blur-3xl"
-        style={{ background: "#ff5b5b", opacity: 0.16 }}
-        animate={{ x: [10, -20, 10], y: [8, -10, 8] }}
-        transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-      />
-    </div>
   );
 }
 
@@ -367,7 +277,7 @@ function YouAreIn({ t }: { t: Tournament }) {
           <Link href={`/tournament/${t.id}/match`} className="mt-5 block">
             <span
               className="flex h-[52px] w-full items-center justify-center rounded-[14px] text-base font-bold"
-              style={{ background: TOURNEY.gradient, color: TOURNEY.ink, boxShadow: "0 10px 30px rgba(255,110,60,0.28)" }}
+              style={{ background: TOURNEY.gradient, color: TOURNEY.ink, boxShadow: "0 10px 30px rgba(15,181,201,0.30)" }}
             >
               Go to your fixture →
             </span>
