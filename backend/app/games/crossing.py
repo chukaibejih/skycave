@@ -96,14 +96,17 @@ class Crossing(BaseGame):
 
     # ---- results / share copy ----
     def _outcome(self, state: dict[str, Any]) -> str:
-        """win / loss / draw from the solo human's perspective (order[0])."""
-        w = state.get("winner")
-        human = state["order"][0]
-        if w == human:
-            return "win"
-        if w:
-            return "loss"
-        return "draw"
+        """win / loss / draw from the solo human's perspective (order[0]).
+
+        Accepts either the turn_state itself (has `order`/`winner`) or the room
+        game-state that nests it under `turn_state` - the platform passes the
+        latter to solo_metric, so read through both."""
+        ts = state.get("turn_state", state)
+        w = ts.get("winner")
+        order = ts.get("order") or []
+        if not w:
+            return "draw"
+        return "win" if order and w == order[0] else "loss"
 
     def turn_metric(self, score: int, state: dict[str, Any]) -> str:
         return {"win": "beat the Caver", "loss": "lost to the Caver",

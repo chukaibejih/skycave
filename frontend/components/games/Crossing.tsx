@@ -95,7 +95,27 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
   const myTurn = !spectator && board.turn === me && !over;
 
   const nodesEntries = Object.entries(board.nodes) as [string, [number, number]][];
-  const pos = (n: number) => board.nodes![String(n)];
+
+  // Render from the local player's perspective: rotate the board to vertical and
+  // put "me" at the bottom, advancing UP to my target row at the top. Each client
+  // does this for its own side, so both players sit at the bottom of their own
+  // screen (like facing each other across a real board). It also turns the wide
+  // layout portrait, filling the tall phone with more board room.
+  const meIsA = me === order[0];
+  const rxs = nodesEntries.map(([, p]) => p[0]);
+  const rys = nodesEntries.map(([, p]) => p[1]);
+  const xmin = Math.min(...rxs);
+  const xspan = Math.max(...rxs) - xmin || 1;
+  const ymin = Math.min(...rys);
+  const yspan = Math.max(...rys) - ymin || 1;
+  const project = (raw: [number, number]): [number, number] => {
+    const t = (raw[0] - xmin) / xspan; // 0 = A side, 1 = B side
+    const h = (raw[1] - ymin) / yspan; // across
+    const v = meIsA ? 1 - t : t; // my start -> bottom, my target -> top
+    const hh = meIsA ? h : 1 - h;
+    return [hh * yspan, v * xspan]; // width = perpendicular span, height = advance span
+  };
+  const pos = (n: number) => project(board.nodes![String(n)]);
   const dests =
     selected != null && myTurn
       ? (board.legal ?? []).filter((m) => m[0] === selected).map((m) => m[1])
@@ -114,11 +134,12 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
     }
   };
 
-  // Tight view box around the node cloud, with a margin.
-  const xs = nodesEntries.map(([, p]) => p[0]);
-  const ys = nodesEntries.map(([, p]) => p[1]);
+  // Tight view box around the PROJECTED node cloud, with a margin.
+  const proj = nodesEntries.map(([, p]) => project(p));
+  const pxs = proj.map((p) => p[0]);
+  const pys = proj.map((p) => p[1]);
   const M = 9;
-  const vb = `${Math.min(...xs) - M} ${Math.min(...ys) - M} ${Math.max(...xs) - Math.min(...xs) + 2 * M} ${Math.max(...ys) - Math.min(...ys) + 2 * M}`;
+  const vb = `${Math.min(...pxs) - M} ${Math.min(...pys) - M} ${Math.max(...pxs) - Math.min(...pxs) + 2 * M} ${Math.max(...pys) - Math.min(...pys) + 2 * M}`;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
@@ -229,18 +250,31 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
               const p = pos(pc.node);
               const isMine = pc.pid === me;
               const isSel = selected === pc.node && isMine;
+              const isWinner = over && board.winner != null && pc.pid === board.winner;
               const dim = over && board.winner != null && pc.pid !== board.winner;
+              const col = C[idxOf(pc.pid)];
               return (
-                <motion.g key={pc.key} initial={false} 
-                  animate={{ x: p[0], y: p[1], scale: isSel ? 1.25 : 1 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 30 }}
-                  style={{ 
+                <motion.g key={pc.key} initial={false}
+                  animate={{ x: p[0], y: p[1], scale: isWinner ? [1, 1.28, 1] : isSel ? 1.25 : 1 }}
+                  transition={{
+                    x: { type: "spring", stiffness: 320, damping: 30 },
+                    y: { type: "spring", stiffness: 320, damping: 30 },
+                    scale: isWinner
+                      ? { duration: 0.7, repeat: Infinity, ease: "easeInOut" }
+                      : { type: "spring", stiffness: 320, damping: 30 },
+                  }}
+                  style={{
                     cursor: isMine && myTurn ? "pointer" : "default",
-                    filter: isSel ? "drop-shadow(0 4px 5px rgba(0,0,0,0.3))" : "none"
+                    filter: isWinner
+                      ? `drop-shadow(0 0 5px ${col})`
+                      : isSel ? "drop-shadow(0 4px 5px rgba(0,0,0,0.3))" : "none",
                   }}>
-                  {isSel && <circle r={6.2} fill="none" stroke={C[idxOf(pc.pid)]} strokeWidth={1.4} />}
-                  <circle r={4.3} fill={C[idxOf(pc.pid)]} fillOpacity={dim ? 0.4 : 1}
-                    stroke="#ffffff" strokeWidth={1} />
+                  {isWinner && (
+                    <motion.circle r={6.6} fill="none" stroke={col} strokeWidth={1.2}
+                      animate={{ opacity: [0.7, 0.12, 0.7] }} transition={{ duration: 0.7, repeat: Infinity }} />
+                  )}
+                  {isSel && <circle r={6.2} fill="none" stroke={col} strokeWidth={1.4} />}
+                  <circle r={4.3} fill={col} fillOpacity={dim ? 0.4 : 1} stroke="#ffffff" strokeWidth={1} />
                 </motion.g>
               );
             })}
