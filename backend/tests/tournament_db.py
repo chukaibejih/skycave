@@ -20,6 +20,7 @@ from app.core.database import AsyncSessionLocal as async_session
 from app.models.announcement import AnnouncementOutbox
 from app.models.tournament import Tournament, TournamentEntrant, TournamentMatch
 from app.services import tournament as svc
+from app.services import tournament_engine as eng
 
 
 def _uid() -> str:
@@ -27,16 +28,24 @@ def _uid() -> str:
 
 
 async def _fresh(session, *, cap: int, closes_in: timedelta) -> Tournament:
-    """A tournament open for registration, closing at a controllable moment."""
+    """A tournament open for registration, closing at a controllable moment.
+
+    Registration close is controllable (so a test can put it in the past to
+    trigger the lock-on-read draw), but play_opens is a real upcoming Thursday
+    from the weekend anchors: the draw derives its per-round windows off that
+    Thursday, and a made-up mid-week play_opens would land them in the past and
+    forfeit the whole bracket on the first read.
+    """
     now = datetime.now(timezone.utc)
+    _closes, opens, play_closes = eng.weekend_anchors(now)
     t = Tournament(
         id=f"t{_uid()}",
         name="Test Cup",
         status=svc.REGISTERING,
         max_players=cap,
         registration_closes_at=now + closes_in,
-        play_opens_at=now + closes_in + timedelta(hours=1),
-        play_closes_at=now + closes_in + timedelta(hours=73),
+        play_opens_at=opens,
+        play_closes_at=play_closes,
     )
     session.add(t)
     await session.commit()
