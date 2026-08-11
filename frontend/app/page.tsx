@@ -437,10 +437,15 @@ function ModeChooser({
                       onClick={() => launchSolo(l)}
                       className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors active:border-[var(--color-primary)]"
                     >
-                      <span className="font-[var(--font-display)] text-base font-bold capitalize text-[var(--color-text-primary)]">
+                      <span
+                        className="font-[var(--font-display)] text-base font-bold capitalize"
+                        style={{ color: "var(--color-text-primary)" }}
+                      >
                         {l}
                       </span>
-                      <span className="text-[11px] text-[var(--color-text-secondary)]">{DIFF_DESC[l]}</span>
+                      <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                        {DIFF_DESC[l]}
+                      </span>
                     </button>
                   ))}
                 </div>
