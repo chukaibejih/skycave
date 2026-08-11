@@ -124,12 +124,16 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
   const xspan = Math.max(...rxs) - xmin || 1;
   const ymin = Math.min(...rys);
   const yspan = Math.max(...rys) - ymin || 1;
+  // Stretch the advance (vertical) axis so the portrait board fills the tall card
+  // instead of floating in the top with dead space below. Marks keep a fixed
+  // radius, so only the spacing grows - the pieces stay round.
+  const ADV = 1.7;
   const project = (raw: [number, number]): [number, number] => {
     const t = (raw[0] - xmin) / xspan; // 0 = A side, 1 = B side
     const h = (raw[1] - ymin) / yspan; // across
     const v = meIsA ? 1 - t : t; // my start -> bottom, my target -> top
     const hh = meIsA ? h : 1 - h;
-    return [hh * yspan, v * xspan]; // width = perpendicular span, height = advance span
+    return [hh * yspan, v * xspan * ADV]; // width = perpendicular, height = advance
   };
   const pos = (n: number) => project(board.nodes![String(n)]);
   const dests =
@@ -183,8 +187,8 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
         {/* The white "paper" board — deliberately unlike the dark app surface.
             flex-1 lets it grow into the free vertical space; the svg fits inside
             (preserveAspectRatio) so a bigger card just means a bigger board. */}
-        <div className="w-full max-w-[520px] min-h-0 flex-1 rounded-[24px] bg-white p-4 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
-          <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" className="h-full w-full" style={{ display: "block" }}>
+        <div className="flex w-full min-h-0 max-w-[520px] flex-1 flex-col rounded-[24px] bg-white p-4 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+          <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" className="min-h-0 w-full flex-1" style={{ display: "block" }}>
             
             {/* Shaded Target Zones: solidifying the home vs away feeling */}
             {order.map((pid) => {
