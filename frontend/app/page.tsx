@@ -363,20 +363,31 @@ function ModeChooser({
   onClose: () => void;
   onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily", difficulty?: "easy" | "normal" | "hard") => void;
 }) {
-  const [diff, setDiff] = useState<"easy" | "normal" | "hard">("normal");
+  const [step, setStep] = useState<"mode" | "difficulty">("mode");
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const s = localStorage.getItem("skycave_caver_diff");
-    if (s === "easy" || s === "normal" || s === "hard") setDiff(s);
+    setStep("mode"); // reset whenever a new game opens the chooser
   }, [game]);
-  const pickSolo = () => {
+  const onSolo = () => {
+    if (!game) return;
+    if (game.supports_difficulty) {
+      setStep("difficulty"); // ask the Caver level as a second step
+      return;
+    }
+    onChoose(game, "solo", "normal");
+  };
+  const launchSolo = (level: "easy" | "normal" | "hard") => {
     if (!game) return;
     try {
-      localStorage.setItem("skycave_caver_diff", diff);
+      localStorage.setItem("skycave_caver_diff", level);
     } catch {
       /* private mode; fine */
     }
-    onChoose(game, "solo", diff);
+    onChoose(game, "solo", level);
+  };
+  const DIFF_DESC: Record<"easy" | "normal" | "hard", string> = {
+    easy: "Gentle · good for learning",
+    normal: "A real match",
+    hard: "Sharp · never blunders",
   };
   return (
     <AnimatePresence>
@@ -399,40 +410,46 @@ function ModeChooser({
             <h2 className="mb-5 text-center font-[var(--font-display)] text-xl font-bold">
               {game.name}
             </h2>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => onChoose(game, "versus")}
-                className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
-              >
-                1v1
-              </button>
-              <button
-                onClick={pickSolo}
-                className="flex h-28 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
-              >
-                Solo
-              </button>
-            </div>
-            {game.supports_difficulty && (
-              <div className="mt-4">
-                <p className="mb-2 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
-                  Caver · solo difficulty
+            {step === "mode" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => onChoose(game, "versus")}
+                  className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
+                >
+                  1v1
+                </button>
+                <button
+                  onClick={onSolo}
+                  className="flex h-28 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
+                >
+                  Solo
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-3 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+                  Caver difficulty
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-2">
                   {(["easy", "normal", "hard"] as const).map((l) => (
                     <button
                       key={l}
-                      onClick={() => setDiff(l)}
-                      className={`h-10 rounded-full border text-sm font-semibold capitalize transition-colors ${
-                        diff === l
-                          ? "border-transparent bg-[var(--color-primary)] text-white"
-                          : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
-                      }`}
+                      onClick={() => launchSolo(l)}
+                      className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors active:border-[var(--color-primary)]"
                     >
-                      {l}
+                      <span className="font-[var(--font-display)] text-base font-bold capitalize text-[var(--color-text-primary)]">
+                        {l}
+                      </span>
+                      <span className="text-[11px] text-[var(--color-text-secondary)]">{DIFF_DESC[l]}</span>
                     </button>
                   ))}
                 </div>
+                <button
+                  onClick={() => setStep("mode")}
+                  className="mt-3 w-full text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]"
+                >
+                  back
+                </button>
               </div>
             )}
           </motion.div>
