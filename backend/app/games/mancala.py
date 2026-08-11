@@ -21,6 +21,7 @@ Board, 14 pits indexed 0-13, seeds sown counterclockwise (index order):
 """
 from __future__ import annotations
 
+import random
 from typing import Any
 
 from app.games.base import TURN_BASED, BaseGame
@@ -31,6 +32,16 @@ TOTAL_PITS = 14  # 6 + store + 6 + store
 STORE_A = 6
 STORE_B = 13
 AI_DEPTH = 8  # minimax lookahead for the Caver
+
+# Solo Caver strength by difficulty: (search depth, blunder rate). Normal is the
+# long-standing depth-8 bot (no regression); Easy is shallow and blunders often.
+# Hard only reaches depth 9 - deeper is too slow here (d10 ~900ms). See the
+# caver-difficulty pattern.
+DIFFICULTY = {
+    "easy": (3, 0.30),
+    "normal": (AI_DEPTH, 0.0),
+    "hard": (9, 0.0),
+}
 
 
 def _own_pits(p: int) -> range:
@@ -161,6 +172,7 @@ class Mancala(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    supports_difficulty = True  # solo Caver has Easy / Normal / Hard
 
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
         a, b = player_ids[0], player_ids[1]
@@ -259,5 +271,8 @@ class Mancala(BaseGame):
         legal = [pit for pit in _own_pits(p) if state["pits"][pit] > 0]
         if not legal:
             return None
-        _, pit = _minimax(state["pits"], p, p, AI_DEPTH, -(10 ** 9), 10 ** 9)
+        depth, eps = DIFFICULTY.get(difficulty, DIFFICULTY["normal"])
+        if eps and random.random() < eps:
+            return {"pit": random.choice(legal)}
+        _, pit = _minimax(state["pits"], p, p, depth, -(10 ** 9), 10 ** 9)
         return {"pit": pit if pit is not None else legal[0]}

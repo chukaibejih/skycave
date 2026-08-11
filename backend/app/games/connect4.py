@@ -9,6 +9,7 @@ lowest empty row of its column.
 """
 from __future__ import annotations
 
+import random
 from typing import Any
 
 from app.games.base import TURN_BASED, BaseGame
@@ -16,6 +17,15 @@ from app.games.base import TURN_BASED, BaseGame
 COLS = 7
 ROWS = 6
 AI_DEPTH = 5  # minimax lookahead for the Caver (fast at 7 wide)
+
+# Solo Caver strength by difficulty: (search depth, blunder rate). Normal is the
+# long-standing depth-5 bot (no regression); Easy is shallow and blunders often;
+# Hard looks one ply deeper. See the caver-difficulty pattern.
+DIFFICULTY = {
+    "easy": (2, 0.30),
+    "normal": (AI_DEPTH, 0.0),
+    "hard": (6, 0.0),
+}
 
 
 def _idx(r: int, c: int) -> int:
@@ -144,6 +154,7 @@ class Connect4(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    supports_difficulty = True  # solo Caver has Easy / Normal / Hard
 
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
         a, b = player_ids[0], player_ids[1]
@@ -217,6 +228,9 @@ class Connect4(BaseGame):
         legal = [c for c in range(COLS) if owner[c] is None]
         if not legal:
             return None
+        depth, eps = DIFFICULTY.get(difficulty, DIFFICULTY["normal"])
+        if eps and random.random() < eps:
+            return {"col": random.choice(legal)}
         opp = self._opponent(state, player_id)
-        _, col = _minimax(owner, player_id, opp, player_id, AI_DEPTH, -(10 ** 9), 10 ** 9)
+        _, col = _minimax(owner, player_id, opp, player_id, depth, -(10 ** 9), 10 ** 9)
         return {"col": col if col is not None else legal[0]}
