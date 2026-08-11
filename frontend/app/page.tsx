@@ -365,7 +365,10 @@ function ModeChooser({
 }) {
   const [step, setStep] = useState<"mode" | "difficulty">("mode");
   useEffect(() => {
-    setStep("mode"); // reset whenever a new game opens the chooser
+    // Solo-only games with a Caver open straight into the difficulty step.
+    setStep(
+      game && game.versus_enabled === false && game.supports_difficulty ? "difficulty" : "mode",
+    );
   }, [game]);
   const onSolo = () => {
     if (!game) return;
@@ -411,13 +414,15 @@ function ModeChooser({
               {game.name}
             </h2>
             {step === "mode" ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => onChoose(game, "versus")}
-                  className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
-                >
-                  1v1
-                </button>
+              <div className={`grid gap-3 ${game.versus_enabled === false ? "grid-cols-1" : "grid-cols-2"}`}>
+                {game.versus_enabled !== false && (
+                  <button
+                    onClick={() => onChoose(game, "versus")}
+                    className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
+                  >
+                    1v1
+                  </button>
+                )}
                 <button
                   onClick={onSolo}
                   className="flex h-28 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
@@ -450,10 +455,10 @@ function ModeChooser({
                   ))}
                 </div>
                 <button
-                  onClick={() => setStep("mode")}
+                  onClick={() => (game.versus_enabled === false ? onClose() : setStep("mode"))}
                   className="mt-3 w-full text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]"
                 >
-                  back
+                  {game.versus_enabled === false ? "close" : "back"}
                 </button>
               </div>
             )}

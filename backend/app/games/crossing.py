@@ -36,6 +36,7 @@ class Crossing(BaseGame):
     mode = TURN_BASED
     solo_enabled = True
     listed = True  # live on the hub
+    versus_enabled = False  # solo-only for now (no 1v1)
     supports_difficulty = True  # solo Caver has Easy / Normal / Hard
 
     # ---- lifecycle ----

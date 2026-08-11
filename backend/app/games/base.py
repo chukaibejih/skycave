@@ -40,6 +40,9 @@ class BaseGame:
     # playable by direct link (/play/<slug>, invites, results), just hidden from
     # the hub - used to soft-test a new game before its public launch.
     listed: bool = True
+    # Whether this game offers 1v1. Solo-only games set False; the client hides
+    # the 1v1 choice and the server coerces any versus request to solo.
+    versus_enabled: bool = True
 
     # ---- single-player ----
     # Whether this game supports a solo mode (all six built games do).

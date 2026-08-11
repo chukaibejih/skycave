@@ -69,6 +69,9 @@ async def create_room(
     if game is None:
         raise HTTPException(status_code=400, detail="Unknown game type")
     mode = body.mode if body.mode in ("versus", "solo", "daily") else "versus"
+    # Solo-only games (e.g. Crossing) never open a 1v1 room, even if asked.
+    if mode == "versus" and not game.versus_enabled:
+        mode = "solo"
 
     # Daily Pot: one per UTC day for logged-in players (guests aren't tracked).
     if mode == "daily" and not identity.id.startswith("guest:"):

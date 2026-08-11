@@ -36,6 +36,7 @@ export interface GameInfo {
   mode: "race" | "simultaneous" | "turn_based";
   min_players: number;
   max_players: number;
+  versus_enabled?: boolean; // false = solo-only (no 1v1)
   supports_difficulty?: boolean; // solo Caver offers Easy / Normal / Hard
 }
 

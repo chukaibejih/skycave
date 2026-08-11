@@ -40,6 +40,7 @@ class GameInfo(BaseModel):
     mode: str  # "race" | "simultaneous"
     min_players: int = 2
     max_players: int = 2
+    versus_enabled: bool = True  # False = solo-only (no 1v1)
     supports_difficulty: bool = False  # solo Caver offers Easy / Normal / Hard
 
 
