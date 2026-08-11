@@ -102,7 +102,7 @@ def test_winning():
     # B wins in reverse (target = [0,5,9]).
     tB = eng.target_of(0, eng.B)
     nb2 = next(n for n in eng._ADJ[0][tB[2]] if n not in (tB[0], tB[1]))
-    stb = mk(0, [1, 2, 3], [tB[0], tB[1], nb2], turn=eng.B)
+    stb = mk(0, [6, 7, 8], [tB[0], tB[1], nb2], turn=eng.B)
     stb2 = eng.apply_move(stb, (nb2, tB[2]))
     assert eng.check_winner(stb2) == eng.B
     print("winning: A and B each win on full target occupation; partial does not")

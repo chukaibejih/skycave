@@ -25,7 +25,6 @@ Engine surface (all pure, never mutate their inputs):
 """
 from __future__ import annotations
 
-import math
 from collections import deque
 
 # A game can never sanely need more than this many plies; the backstop that
@@ -41,82 +40,12 @@ _OTHER = {A: B, B: A}
 # --------------------------------------------------------------------------- #
 # Boards
 # --------------------------------------------------------------------------- #
-# Each board: positions {node: (x, y)} in a 0..100 box (render only), an
-# undirected edge list, and the two start triples. a_start is Player A's start
-# and Player B's target; b_start is the reverse. Every board is mirror-symmetric
-# (x -> 100-x maps A onto B) so neither side has a positional edge. Wide and
-# triangulated on purpose: plenty of open nodes keeps movement free and draws
-# rare (the concern with tight 9-node boards).
-
-def _mesh(rows_xs):
-    """Triangular lattice from N rows of x-positions (y spread evenly 20..80).
-
-    Rows are wired horizontally, and each node is tied to its nearest one or two
-    nodes in the row below, giving the triangulated, hand-drawn look of the
-    physical boards. Returns (positions, edges).
-    """
-    R = len(rows_xs)
-    ys = [50.0] if R == 1 else [round(20 + 60 * i / (R - 1), 1) for i in range(R)]
-    pos, ids, n = {}, [], 0
-    for xs, y in zip(rows_xs, ys):
-        row = []
-        for x in xs:
-            pos[n] = (float(x), y)
-            row.append(n)
-            n += 1
-        ids.append(row)
-    edges = set()
-    for row in ids:  # horizontal
-        for a, b in zip(row, row[1:]):
-            edges.add((a, b))
-    for up, lo in zip(ids, ids[1:]):  # between adjacent rows
-        for u in up:
-            ux = pos[u][0]
-            for l in sorted(lo, key=lambda l: abs(pos[l][0] - ux))[:2]:
-                edges.add((min(u, l), max(u, l)))
-    return pos, sorted(edges)
-
-
-def _board(name, rows_xs):
-    """A board from a mesh. The three left-most nodes are A's start (and B's
-    target); the three right-most are B's. Every row layout here is left-right
-    symmetric, so those two triples are exact mirrors and the game is fair."""
-    pos, edges = _mesh(rows_xs)
-    by_x = sorted(pos, key=lambda n: (pos[n][0], pos[n][1]))
-    return {
-        "name": name,
-        "pos": {k: list(v) for k, v in pos.items()},
-        "edges": [list(e) for e in edges],
-        "a": sorted(by_x[:3]),
-        "b": sorted(by_x[-3:]),
-    }
-
-
-def _knn(pos, k=4):
-    """Undirected edges connecting each node to its k nearest neighbours. Auto-
-    triangulates any point layout, so a board is defined purely by its shape."""
-    ids = list(pos)
-    edges = set()
-    for a in ids:
-        near = sorted((math.dist(tuple(pos[a]), tuple(pos[b])), b) for b in ids if b != a)
-        for _, b in near[:k]:
-            edges.add((min(a, b), max(a, b)))
-    return sorted(edges)
-
-
-def _rows(cols):
-    return [(x, y) for x, ys in cols for y in ys]
-
-
-def _shape(name, points, k=4):
-    """A board from an arbitrary point cloud (an outline), wired by _knn. The
-    three left-most nodes are A's start, the three right-most B's; every layout
-    is mirror-symmetric about x=50, so those triples are exact mirrors."""
-    pos = {i: [float(x), float(y)] for i, (x, y) in enumerate(points)}
-    by_x = sorted(pos, key=lambda n: (pos[n][0], pos[n][1]))
-    return {"name": name, "pos": pos, "edges": [list(e) for e in _knn(pos, k)],
-            "a": sorted(by_x[:3]), "b": sorted(by_x[-3:])}
-
+# Each board: positions {node: [x, y]} in a 0..100 box (render only), an explicit
+# edge list, and the two start triples. a_start (the three left-most nodes) is
+# Player A's start and Player B's target; b_start (three right-most) is the
+# reverse. Every board is mirror-symmetric (x -> 100-x maps A onto B) so neither
+# side has a positional edge. All boards are the "fork" family, hand-wired via
+# _wire so the deliberate shapes stay crisp.
 
 def _wire(name, points, edges):
     """A board with hand-placed nodes and an EXPLICIT edge list (unlike _shape's
@@ -152,15 +81,86 @@ _FORK_EDGES = [
     (11, 8), (12, 9), (13, 10),             # right teeth
 ]
 
-# Three deliberately DIFFERENT boards, each self-play vetted (balanced, decisive,
-# draws rare). Board 0 stays the rectangular lattice (the unit tests pin its node
-# ids); the others are a pointed chevron and the hand-wired forks - purpose-built
-# shapes with real breathing room, so no two boards read the same.
+# WideFork: three parallel lanes through a tall centre column - the roomiest fork.
+_WIDE_PTS = [
+    (10, 18), (10, 50), (10, 82), (30, 18), (30, 50), (30, 82),
+    (50, 25), (50, 50), (50, 75), (70, 18), (70, 50), (70, 82),
+    (90, 18), (90, 50), (90, 82),
+]
+_WIDE_EDGES = [
+    (0, 3), (1, 4), (2, 5), (12, 9), (13, 10), (14, 11),
+    (3, 4), (4, 5), (9, 10), (10, 11),
+    (3, 6), (4, 7), (5, 8), (4, 6), (4, 8), (6, 7), (7, 8),
+    (9, 6), (10, 7), (11, 8), (10, 6), (10, 8),
+]
+
+# ArrowFork: teeth angled to points, giving an arrow/chevron silhouette.
+_ARROW_PTS = [
+    (12, 20), (6, 50), (12, 80), (30, 25), (24, 50), (30, 75),
+    (50, 38), (50, 62), (70, 25), (76, 50), (70, 75), (88, 20), (94, 50), (88, 80),
+]
+_ARROW_EDGES = [
+    (0, 3), (1, 4), (2, 5), (11, 8), (12, 9), (13, 10),
+    (3, 4), (4, 5), (8, 9), (9, 10),
+    (3, 6), (4, 6), (4, 7), (5, 7), (6, 7), (8, 6), (9, 6), (9, 7), (10, 7),
+]
+
+# TwinFork: two separate roads (a high lane and a low lane), no centre crossing.
+_TWIN_PTS = [
+    (10, 22), (10, 50), (10, 78), (30, 22), (30, 50), (30, 78),
+    (50, 30), (50, 70), (70, 22), (70, 50), (70, 78), (90, 22), (90, 50), (90, 78),
+]
+_TWIN_EDGES = [
+    (0, 3), (1, 4), (2, 5), (11, 8), (12, 9), (13, 10),
+    (3, 4), (4, 5), (8, 9), (9, 10),
+    (3, 6), (4, 6), (6, 8), (6, 9), (4, 7), (5, 7), (7, 9), (7, 10),
+]
+
+# Combs: two three-tooth combs (each tooth-row joined by a bar) meeting at a
+# two-lane middle. From a player's own sketch.
+_COMBS_PTS = [
+    (10, 22), (10, 50), (10, 78), (28, 22), (28, 50), (28, 78),
+    (50, 36), (50, 64), (72, 22), (72, 50), (72, 78), (90, 22), (90, 50), (90, 78),
+]
+_COMBS_EDGES = [
+    (0, 3), (1, 4), (2, 5), (11, 8), (12, 9), (13, 10),
+    (3, 4), (4, 5), (8, 9), (9, 10),
+    (3, 6), (4, 6), (5, 7), (4, 7), (6, 7), (8, 6), (9, 6), (10, 7), (9, 7),
+]
+
+# Diamonds: a double-diamond chain up the centre, teeth fed into both diamonds so
+# neither side gets a first-mover edge. From a player's own sketch.
+_DIA_PTS = [
+    (6, 28), (6, 50), (6, 72), (24, 50), (38, 30), (38, 70), (50, 50),
+    (62, 30), (62, 70), (76, 50), (94, 28), (94, 50), (94, 72),
+]
+_DIA_EDGES = [
+    (0, 3), (1, 3), (2, 3), (10, 9), (11, 9), (12, 9),
+    (3, 4), (3, 5), (4, 6), (5, 6), (6, 7), (6, 8), (7, 9), (8, 9),
+    (3, 6), (6, 9), (1, 4), (1, 5), (11, 7), (11, 8),
+]
+
+# Kite: a triangulated bowtie. From a player's own sketch.
+_KITE_PTS = [
+    (10, 20), (10, 50), (10, 80), (32, 35), (32, 65), (50, 25),
+    (50, 75), (68, 35), (68, 65), (90, 20), (90, 50), (90, 80),
+]
+_KITE_EDGES = [
+    (0, 3), (1, 3), (1, 4), (2, 4), (3, 4), (3, 5), (4, 6), (3, 6), (4, 5),
+    (5, 6), (5, 7), (6, 8), (5, 8), (6, 7), (7, 8), (9, 7), (10, 7), (10, 8), (11, 8),
+]
+
+# Seven fork-family boards, each self-play vetted (balanced, decisive, ~0% draws).
+# Board 0 (Forks) is pinned by the unit tests; the rest are distinct fork shapes -
+# three built by us and three from players' sketches - so no two read the same.
 BOARDS = {
-    0: _board("Lattice", [[10, 30, 50, 70, 90], [20, 40, 60, 80], [10, 30, 50, 70, 90]]),
-    1: _shape("Chevron", _rows([(10, [35, 65]), (30, [25, 50, 75]), (50, [15, 40, 60, 85]),
-                               (70, [25, 50, 75]), (90, [35, 65])]), k=3),
-    2: _wire("Forks", _FORK_PTS, _FORK_EDGES),
+    0: _wire("Forks", _FORK_PTS, _FORK_EDGES),
+    1: _wire("WideFork", _WIDE_PTS, _WIDE_EDGES),
+    2: _wire("ArrowFork", _ARROW_PTS, _ARROW_EDGES),
+    3: _wire("TwinFork", _TWIN_PTS, _TWIN_EDGES),
+    4: _wire("Combs", _COMBS_PTS, _COMBS_EDGES),
+    5: _wire("Diamonds", _DIA_PTS, _DIA_EDGES),
+    6: _wire("Kite", _KITE_PTS, _KITE_EDGES),
 }
 
 
