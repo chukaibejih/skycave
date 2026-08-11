@@ -18,6 +18,11 @@ from app.games.base import TURN_BASED, BaseGame
 # lock; Phase-5 tuning can deepen with a time budget if wanted.
 AI_DEPTH = 3
 
+# Solo only: a little exploration so the Caver is beatable and doesn't lock every
+# game into a perfect eternal block. The negamax base keeps it a real challenge on
+# the other ~82% of moves; 1v1 is human-vs-human and never touches this.
+AI_EPSILON = 0.18
+
 
 class Crossing(BaseGame):
     type = "crossing"  # internal slug; the public name is decided separately
@@ -89,9 +94,13 @@ class Crossing(BaseGame):
         st = eng.deserialize(state)
         if st["turn"] != player_id or eng.is_over(st):
             return None
-        mv = eng.best_move(st, depth=AI_DEPTH)
-        if mv is None:
+        moves = eng.legal_moves(st)
+        if not moves:
             return None
+        if random.random() < AI_EPSILON:
+            mv = random.choice(moves)
+        else:
+            mv = eng.best_move(st, depth=AI_DEPTH) or random.choice(moves)
         return {"from": mv[0], "to": mv[1]}
 
     # ---- results / share copy ----

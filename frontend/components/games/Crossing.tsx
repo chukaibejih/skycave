@@ -23,6 +23,22 @@ type Ripple = { id: string; n: number; color: string };
 export function Crossing({ board, meId, players = [], onAction, spectator = false }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
 
+  // First-timer explainer: shown once (remembered), reopenable via the "?" button.
+  const [showIntro, setShowIntro] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("skycave_crossing_intro")) {
+      setShowIntro(true);
+    }
+  }, []);
+  const dismissIntro = () => {
+    setShowIntro(false);
+    try {
+      localStorage.setItem("skycave_crossing_intro", "1");
+    } catch {
+      /* private mode; fine */
+    }
+  };
+
   // Track pieces across moves so the one that moved SLIDES rather than popping.
   const piecesRef = useRef<Piece[]>([]);
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -293,16 +309,64 @@ export function Crossing({ board, meId, players = [], onAction, spectator = fals
           </svg>
         </div>
 
-        <p className="mt-4 text-center text-xs text-[var(--color-text-secondary)]">
-          {spectator
-            ? "watching live · first to fill the far side wins"
-            : selected != null
-              ? "tap a highlighted node to move there"
-              : myTurn
-                ? "tap one of your pieces, then a connected open node"
-                : "get all three pieces to the far side · no jumping"}
-        </p>
+        <div className="mt-4 flex w-full items-center justify-center gap-2">
+          <p className="text-center text-xs text-[var(--color-text-secondary)]">
+            {spectator
+              ? "watching live · first to fill the far side wins"
+              : selected != null
+                ? "tap a highlighted node to move there"
+                : myTurn
+                  ? "tap one of your pieces, then a connected open node"
+                  : "get all three pieces to the far side · no jumping"}
+          </p>
+          <button
+            onClick={() => setShowIntro(true)}
+            aria-label="how to play"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--color-border)] text-[11px] font-bold leading-none text-[var(--color-text-secondary)]"
+          >
+            ?
+          </button>
+        </div>
       </div>
+
+      {/* First-timer explainer, reopenable via the "?" button */}
+      <AnimatePresence>
+        {showIntro && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={dismissIntro}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-4 pb-8 sm:items-center"
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-[20px] border border-[var(--color-border)] bg-[var(--color-elevated)] p-6"
+            >
+              <h2 className="font-[var(--font-display)] text-xl font-bold">How to play</h2>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--color-text-secondary)]">
+                <li>
+                  <span className="text-[var(--color-text-primary)]">You and your opponent each have three pieces, starting on opposite sides of the board.</span>
+                </li>
+                <li>On your turn, tap one of your pieces, then a connected open dot to move it there. One step at a time, no jumping over pieces.</li>
+                <li>Get all three of your pieces to the far side (your opponent&apos;s starting dots) to win the race.</li>
+                <li>Your opponent is coming the other way, so you will block each other. Getting in the way is part of it.</li>
+                <li>If nobody completes the crossing, whoever advanced further wins. Dead even is a draw.</li>
+              </ul>
+              <button
+                onClick={dismissIntro}
+                style={{ backgroundColor: "var(--color-primary)", color: "#05060a" }}
+                className="mt-6 h-12 w-full rounded-[var(--radius-button)] text-sm font-semibold"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

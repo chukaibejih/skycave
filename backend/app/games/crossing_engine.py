@@ -275,6 +275,38 @@ def _winner_for(state, side):
     return side if set(_nodes_of(state, side)) == set(state["tgt"][side]) else None
 
 
+def _progress(state, side):
+    """How far `side` has advanced: (pieces home, -total graph-distance to home).
+    Higher is better. Distances use the empty-board graph (ignore blocking), which
+    is all we need to rank who advanced further. Used to settle a game that ended
+    without anyone completing (repetition / move-cap / stalemate)."""
+    bid = state["board"]
+    tgt = state["tgt"][side]
+    tset = set(tgt)
+    home = 0
+    dist = 0
+    for n, p in state["occ"].items():
+        if p != side:
+            continue
+        if n in tset:
+            home += 1
+        else:
+            dist += min(_DIST[bid][n][t] for t in tgt)
+    return (home, -dist)
+
+
+def _settle(state):
+    """Decide a non-completed game by progress: the side that advanced further
+    wins; a genuine tie stays a draw. Returns the winning side id, or None."""
+    a, b = state["order"]
+    pa, pb = _progress(state, a), _progress(state, b)
+    if pa > pb:
+        return a
+    if pb > pa:
+        return b
+    return None
+
+
 def apply_move(state, mv):
     """Return a NEW state with `mv` applied. Raises ValueError if illegal, so
     callers that trust the client must catch (the Skycave wrapper returns None)."""
@@ -298,12 +330,18 @@ def apply_move(state, mv):
         return new
     key = normalize(new)
     new["hist"][key] = new["hist"].get(key, 0) + 1
-    if new["hist"][key] >= REPEAT_LIMIT or new["moves"] >= MOVE_CAP:
-        new["draw"] = True
-    elif not legal_moves(new):
-        # The side to move is stalemated (all three pieces boxed in). A rare
-        # terminal that would otherwise hang the game with no move to make.
-        new["draw"] = True
+    # A game that ends without a completion - threefold repetition, the move cap,
+    # or the side-to-move stalemated (all three pieces boxed in) - is settled by
+    # progress rather than called a draw outright: whoever advanced further wins,
+    # only a dead-even position is a true draw. Without this these standoffs (very
+    # common vs a perfect blocker) drew far too often.
+    if (new["hist"][key] >= REPEAT_LIMIT or new["moves"] >= MOVE_CAP
+            or not legal_moves(new)):
+        w = _settle(new)
+        if w is not None:
+            new["winner"] = w
+        else:
+            new["draw"] = True
     return new
 
 
