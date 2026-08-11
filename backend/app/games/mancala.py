@@ -254,7 +254,7 @@ class Mancala(BaseGame):
             return f"lost to the Caver {score}-{theirs}"
         return f"tied the Caver {score}-{theirs}"
 
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         p = self._pindex(state, player_id)
         legal = [pit for pit in _own_pits(p) if state["pits"][pit] > 0]
         if not legal:

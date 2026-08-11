@@ -155,7 +155,7 @@ class TileTakeover(BaseGame):
         return self.turn_metric(score, st) if st else f"{score} tiles"
 
     # ---- solo AI (greedy: grab the most tiles this turn) ----
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         opp = self._opponent(state, player_id)
         forbidden = {state["pcolor"][player_id], state["pcolor"][opp]}
         before = sum(1 for o in state["owner"] if o == player_id)

@@ -212,7 +212,7 @@ class Connect4(BaseGame):
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
         return "beat the Caver" if score else "lost to the Caver"
 
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         owner = state["owner"]
         legal = [c for c in range(COLS) if owner[c] is None]
         if not legal:

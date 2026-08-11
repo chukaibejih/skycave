@@ -44,6 +44,9 @@ class BaseGame:
     # ---- single-player ----
     # Whether this game supports a solo mode (all six built games do).
     solo_enabled: bool = True
+    # Whether the solo Caver offers Easy / Normal / Hard. When True, `ai_move`
+    # honours the `difficulty` argument; the client shows a difficulty picker.
+    supports_difficulty: bool = False
     # How solo plays out:
     #   "rounds" - same fixed-round flow as versus, just one player (GeoGuess)
     #   "timed"  - continuous beat-the-clock; a fresh prompt after each correct
@@ -143,8 +146,11 @@ class BaseGame:
         """Final per-player tally (e.g. tiles owned)."""
         return {}
 
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
-        """Solo only: choose a move for the AI opponent, or None if it can't."""
+    def ai_move(
+        self, state: dict[str, Any], player_id: str, difficulty: str = "normal"
+    ) -> dict[str, Any] | None:
+        """Solo only: choose a move for the AI opponent, or None if it can't.
+        `difficulty` is honoured only when `supports_difficulty` is True."""
         return None
 
     def turn_metric(self, score: int, state: dict[str, Any]) -> str:

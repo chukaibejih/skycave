@@ -26,7 +26,7 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   // Game whose mode is being chosen, and the pending {game, mode} awaiting auth.
   const [chooser, setChooser] = useState<GameInfo | null>(null);
-  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" | "daily" } | null>(null);
+  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" | "daily"; difficulty?: "easy" | "normal" | "hard" } | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Instant dock + signal from the cached catalog (rendered before paint), so
@@ -55,11 +55,16 @@ export default function Home() {
       .catch(() => {});
   }, [hydrate]);
 
-  const go = async (game: GameInfo, m: "versus" | "solo" | "daily") => {
+  const go = async (
+    game: GameInfo,
+    m: "versus" | "solo" | "daily",
+    difficulty: "easy" | "normal" | "hard" = "normal",
+  ) => {
     if (m === "solo" || m === "daily") {
       // Solo + daily skip the lobby - the /play route creates the room + drops
-      // in. Daily passes ?mode=daily so /play creates a daily room.
-      router.push(`/play/${gameSlug(game.type)}${m === "daily" ? "?mode=daily" : ""}`);
+      // in. Daily passes ?mode=daily; solo passes the chosen Caver difficulty.
+      const qs = m === "daily" ? "?mode=daily" : `?diff=${difficulty}`;
+      router.push(`/play/${gameSlug(game.type)}${qs}`);
       return;
     }
     setCreating(true);
@@ -75,14 +80,18 @@ export default function Home() {
   // reference so the memoized orbit/cards don't re-render on modal open/close.
   const launch = useCallback((game: GameInfo) => setChooser(game), []);
 
-  const choose = async (game: GameInfo, m: "versus" | "solo" | "daily") => {
+  const choose = async (
+    game: GameInfo,
+    m: "versus" | "solo" | "daily",
+    difficulty: "easy" | "normal" | "hard" = "normal",
+  ) => {
     setChooser(null);
     if (!identity) {
-      setPending({ game, mode: m }); // auth first, then launch
+      setPending({ game, mode: m, difficulty }); // auth first, then launch
       setAuthOpen(true);
       return;
     }
-    await go(game, m);
+    await go(game, m, difficulty);
   };
 
   return (
@@ -203,7 +212,7 @@ export default function Home() {
           setAuthOpen(false);
           const p = pending;
           setPending(null);
-          if (p) go(p.game, p.mode); // resume the chosen launch now that we're authed
+          if (p) go(p.game, p.mode, p.difficulty); // resume the chosen launch now that we're authed
         }}
       />
     </main>
@@ -352,8 +361,23 @@ function ModeChooser({
 }: {
   game: GameInfo | null;
   onClose: () => void;
-  onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily") => void;
+  onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily", difficulty?: "easy" | "normal" | "hard") => void;
 }) {
+  const [diff, setDiff] = useState<"easy" | "normal" | "hard">("normal");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const s = localStorage.getItem("skycave_caver_diff");
+    if (s === "easy" || s === "normal" || s === "hard") setDiff(s);
+  }, [game]);
+  const pickSolo = () => {
+    if (!game) return;
+    try {
+      localStorage.setItem("skycave_caver_diff", diff);
+    } catch {
+      /* private mode; fine */
+    }
+    onChoose(game, "solo", diff);
+  };
   return (
     <AnimatePresence>
       {game && (
@@ -383,12 +407,34 @@ function ModeChooser({
                 1v1
               </button>
               <button
-                onClick={() => onChoose(game, "solo")}
+                onClick={pickSolo}
                 className="flex h-28 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)] active:border-[var(--color-primary)]"
               >
                 Solo
               </button>
             </div>
+            {game.supports_difficulty && (
+              <div className="mt-4">
+                <p className="mb-2 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+                  Caver · solo difficulty
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["easy", "normal", "hard"] as const).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => setDiff(l)}
+                      className={`h-10 rounded-full border text-sm font-semibold capitalize transition-colors ${
+                        diff === l
+                          ? "border-transparent bg-[var(--color-primary)] text-white"
+                          : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

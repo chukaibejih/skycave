@@ -329,7 +329,7 @@ class Uno(BaseGame):
 
     # ---- solo opponent ----
 
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         """Play if it can, otherwise draw.
 
         Preference order: shed the expensive cards first (Wild Draw Four, Wild,

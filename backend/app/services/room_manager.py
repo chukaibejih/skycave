@@ -65,6 +65,7 @@ async def create_room(
     host: dict[str, Any],
     mode: str = "versus",
     ttl_seconds: int | None = None,
+    difficulty: str = "normal",
 ) -> dict[str, Any]:
     room = {
         "id": room_id,
@@ -72,6 +73,9 @@ async def create_room(
         # "versus" = 1v1 (waits for an opponent); "solo" = single-player, starts
         # as soon as the lone player is ready.
         "mode": mode if mode in ("versus", "solo", "daily") else "versus",
+        # Solo Caver strength (Easy / Normal / Hard); ignored outside solo and by
+        # games that don't support difficulty.
+        "difficulty": difficulty if difficulty in ("easy", "normal", "hard") else "normal",
         "status": "waiting",
         "host_id": host["id"],
         "host_handle": host["handle"],

@@ -18,6 +18,7 @@ _GAMES: list[GameInfo] = [
         tagline=g.tagline,
         total_rounds=g.total_rounds,
         mode=g.mode,
+        supports_difficulty=g.supports_difficulty,
     )
     for g in reversed(all_games())
     if g.listed

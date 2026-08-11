@@ -429,7 +429,7 @@ async def _turn_ai_move(room_id: str) -> None:
         state = gs.get("turn_state")
         if gs["phase"] != "active" or ai is None or state is None or state["turn"] != ai:
             return
-        move = game.ai_move(state, ai)
+        move = game.ai_move(state, ai, difficulty=room.get("difficulty", "normal"))
         new = game.apply_turn(state, ai, move) if move else None
         if new is None:
             return  # AI has no legal move (shouldn't happen)

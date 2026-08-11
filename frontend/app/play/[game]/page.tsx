@@ -42,9 +42,11 @@ export default function PlayPage() {
     startedRef.current = true;
     (async () => {
       try {
-        const mode =
-          new URLSearchParams(window.location.search).get("mode") === "daily" ? "daily" : "solo";
-        const r = await createRoom(gameType, mode);
+        const params = new URLSearchParams(window.location.search);
+        const mode = params.get("mode") === "daily" ? "daily" : "solo";
+        const d = params.get("diff");
+        const difficulty = d === "easy" || d === "hard" ? d : "normal";
+        const r = await createRoom(gameType, mode, difficulty);
         setRoomId(r.id);
         setGameName(r.game_name ?? null);
         connect(r.id);

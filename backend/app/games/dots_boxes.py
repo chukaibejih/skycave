@@ -178,7 +178,7 @@ class DotsAndBoxes(BaseGame):
         return self.turn_metric(score, st) if st else f"{score} boxes"
 
     # ---- Caver AI: take free boxes, else play safe, else sacrifice least ----
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         h0, v0 = state["h"], state["v"]
         legal = [e for e in range(NUM_H + NUM_V) if self._undrawn(h0, v0, e)]
         if not legal:

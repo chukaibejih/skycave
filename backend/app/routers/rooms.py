@@ -96,7 +96,9 @@ async def create_room(
     else:
         raise HTTPException(status_code=500, detail="Could not allocate room id")
 
-    await rooms.create_room(room_id, body.game_type, identity.model_dump(), mode=mode)
+    await rooms.create_room(
+        room_id, body.game_type, identity.model_dump(), mode=mode, difficulty=body.difficulty
+    )
 
     # Versus rooms silently start a 15 minute expiry window in the background;
     # if no opponent joins, the room auto-closes. Solo rooms never wait.

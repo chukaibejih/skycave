@@ -40,6 +40,7 @@ class GameInfo(BaseModel):
     mode: str  # "race" | "simultaneous"
     min_players: int = 2
     max_players: int = 2
+    supports_difficulty: bool = False  # solo Caver offers Easy / Normal / Hard
 
 
 # --- Rooms ---
@@ -47,6 +48,7 @@ class GameInfo(BaseModel):
 class CreateRoomRequest(BaseModel):
     game_type: str
     mode: str = "versus"  # "versus" (1v1) | "solo"
+    difficulty: str = "normal"  # solo Caver strength: "easy" | "normal" | "hard"
 
 
 class PlayerSlot(BaseModel):

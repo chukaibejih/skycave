@@ -16,12 +16,16 @@ from app.games.base import TURN_BASED, BaseGame
 # Bot search depth. The state is small but the branching factor (~12) is higher
 # than Mancala's, so keep the lookahead modest to stay snappy under the room
 # lock; Phase-5 tuning can deepen with a time budget if wanted.
-AI_DEPTH = 3
-
-# Solo only: a little exploration so the Caver is beatable and doesn't lock every
-# game into a perfect eternal block. The negamax base keeps it a real challenge on
-# the other ~82% of moves; 1v1 is human-vs-human and never touches this.
-AI_EPSILON = 0.18
+# Solo Caver strength by difficulty. Each level is (search depth, blunder rate):
+# a deeper search plays sharper, a higher epsilon plays a random legal move that
+# often. Normal is the long-standing bot (depth 3, eps 0.18) so nobody who liked
+# it sees a regression; Easy stays beatable for newcomers, Hard never blunders.
+# Only solo touches this - 1v1 is human vs human.
+DIFFICULTY = {
+    "easy": {"depth": 1, "epsilon": 0.35},
+    "normal": {"depth": 3, "epsilon": 0.18},
+    "hard": {"depth": 4, "epsilon": 0.0},
+}
 
 
 class Crossing(BaseGame):
@@ -32,6 +36,7 @@ class Crossing(BaseGame):
     mode = TURN_BASED
     solo_enabled = True
     listed = True  # live on the hub
+    supports_difficulty = True  # solo Caver has Easy / Normal / Hard
 
     # ---- lifecycle ----
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
@@ -90,17 +95,20 @@ class Crossing(BaseGame):
             "scores": self.turn_scores(state),
         }
 
-    def ai_move(self, state: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    def ai_move(
+        self, state: dict[str, Any], player_id: str, difficulty: str = "normal"
+    ) -> dict[str, Any] | None:
         st = eng.deserialize(state)
         if st["turn"] != player_id or eng.is_over(st):
             return None
         moves = eng.legal_moves(st)
         if not moves:
             return None
-        if random.random() < AI_EPSILON:
+        cfg = DIFFICULTY.get(difficulty, DIFFICULTY["normal"])
+        if cfg["epsilon"] and random.random() < cfg["epsilon"]:
             mv = random.choice(moves)
         else:
-            mv = eng.best_move(st, depth=AI_DEPTH) or random.choice(moves)
+            mv = eng.best_move(st, depth=cfg["depth"]) or random.choice(moves)
         return {"from": mv[0], "to": mv[1]}
 
     # ---- results / share copy ----

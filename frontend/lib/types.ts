@@ -36,7 +36,10 @@ export interface GameInfo {
   mode: "race" | "simultaneous" | "turn_based";
   min_players: number;
   max_players: number;
+  supports_difficulty?: boolean; // solo Caver offers Easy / Normal / Hard
 }
+
+export type Difficulty = "easy" | "normal" | "hard";
 
 export interface GameState {
   game_type: string;
