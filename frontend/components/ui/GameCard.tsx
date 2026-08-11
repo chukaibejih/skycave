@@ -63,8 +63,8 @@ export const GameCard = memo(function GameCard({
           <div className="flex items-center gap-1.5">
             {showNew && (
               <span
-                className="rounded-full px-1.5 py-0.5 font-[var(--font-mono)] text-[9px] font-bold uppercase leading-none tracking-wide"
-                style={{ background: accent, color: "#05060a" }}
+                className="rounded-full px-2 py-[3px] font-[var(--font-mono)] text-[10px] font-bold uppercase leading-none tracking-wider text-white"
+                style={{ background: "#ff3b30", boxShadow: "0 0 12px rgba(255,59,48,0.55)" }}
               >
                 new
               </span>
