@@ -108,6 +108,7 @@ class DotsAndBoxes(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    supports_difficulty = True  # solo Caver: Easy blunders; Normal/Hard = full heuristic
 
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
         a, b = player_ids[0], player_ids[1]
@@ -183,6 +184,9 @@ class DotsAndBoxes(BaseGame):
         legal = [e for e in range(NUM_H + NUM_V) if self._undrawn(h0, v0, e)]
         if not legal:
             return None
+        # Easy Caver: play a random edge instead of a safe one (gives away boxes).
+        if difficulty == "easy" and random.random() < 0.35:
+            return {"edge": random.choice(legal)}
 
         # a) Complete a box if possible (prefer the move that claims the most).
         best_e, best_gain = None, 0

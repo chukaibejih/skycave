@@ -58,6 +58,7 @@ class TileTakeover(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    supports_difficulty = True  # solo Caver: Easy blunders; Normal/Hard = full heuristic
 
     # ---- board setup ----
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
@@ -158,6 +159,11 @@ class TileTakeover(BaseGame):
     def ai_move(self, state: dict[str, Any], player_id: str, difficulty: str = "normal") -> dict[str, Any] | None:
         opp = self._opponent(state, player_id)
         forbidden = {state["pcolor"][player_id], state["pcolor"][opp]}
+        # Easy Caver: grab a random allowed colour instead of the best-gain one.
+        if difficulty == "easy" and random.random() < 0.35:
+            allowed = [c for c in range(state["ncolors"]) if c not in forbidden]
+            if allowed:
+                return {"color": random.choice(allowed)}
         before = sum(1 for o in state["owner"] if o == player_id)
         best_color, best_gain = None, -1
         for color in range(state["ncolors"]):

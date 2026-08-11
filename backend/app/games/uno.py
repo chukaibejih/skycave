@@ -101,6 +101,9 @@ class Uno(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    # No difficulty levels: Uno is luck-dominated, so a weaker bot doesn't lose
+    # meaningfully more (self-play Easy vs Normal is ~50/50). A picker here would
+    # be cosmetic, so it's left off.
 
     # ---- setup ----
 
