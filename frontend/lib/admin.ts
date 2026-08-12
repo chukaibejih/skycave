@@ -28,7 +28,7 @@ async function adminGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function adminSend(path: string, method: string, body?: unknown): Promise<void> {
+async function adminSend<T = void>(path: string, method: string, body?: unknown): Promise<T> {
   const token = getAdminToken();
   const res = await fetch(`${API}${path}`, {
     method,
@@ -43,6 +43,8 @@ async function adminSend(path: string, method: string, body?: unknown): Promise<
     throw new AdminAuthError("Session expired");
   }
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const setFeedbackResolved = (id: number, resolved: boolean) =>
@@ -146,18 +148,42 @@ export const getInsights = () => adminGet<Insights>("/admin/insights");
 export const getOverview = () => adminGet<Overview>("/admin/overview");
 export const getTimeseries = (days = 30) =>
   adminGet<Timeseries>(`/admin/timeseries?days=${days}`);
-export const getUsers = (limit = 25, offset = 0) =>
-  adminGet<{ total: number; users: UserRow[] }>(
-    `/admin/users?limit=${limit}&offset=${offset}`
+export type UserSort = "created" | "played" | "won" | "win_rate" | "score";
+export const getUsers = (
+  limit = 25,
+  offset = 0,
+  opts: { q?: string; sort?: UserSort; order?: "asc" | "desc" } = {},
+) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (opts.q) p.set("q", opts.q);
+  if (opts.sort) p.set("sort", opts.sort);
+  if (opts.order) p.set("order", opts.order);
+  return adminGet<{ total: number; users: UserRow[] }>(`/admin/users?${p}`);
+};
+export const getGames = (
+  limit = 25,
+  offset = 0,
+  opts: { game_type?: string; mode?: string; q?: string } = {},
+) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (opts.game_type) p.set("game_type", opts.game_type);
+  if (opts.mode) p.set("mode", opts.mode);
+  if (opts.q) p.set("q", opts.q);
+  return adminGet<{ total: number; games: GameRow[] }>(`/admin/games?${p}`);
+};
+export const getFeedback = (limit = 15, offset = 0, resolved?: boolean) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (resolved !== undefined) p.set("resolved", String(resolved));
+  return adminGet<{ total: number; feedback: FeedbackRow[] }>(`/admin/feedback?${p}`);
+};
+
+// ── Session management ──
+export const recomputeUser = (did: string) =>
+  adminSend<{ did: string; games_played: number; games_won: number; total_score: number }>(
+    `/admin/users/${encodeURIComponent(did)}/recompute`,
+    "POST",
   );
-export const getGames = (limit = 25, offset = 0) =>
-  adminGet<{ total: number; games: GameRow[] }>(
-    `/admin/games?limit=${limit}&offset=${offset}`
-  );
-export const getFeedback = (limit = 15, offset = 0) =>
-  adminGet<{ total: number; feedback: FeedbackRow[] }>(
-    `/admin/feedback?limit=${limit}&offset=${offset}`
-  );
+export const deleteGame = (id: number) => adminSend(`/admin/games/${id}`, "DELETE");
 
 export interface TournamentAdminRow {
   id: string;

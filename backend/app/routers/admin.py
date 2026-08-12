@@ -7,11 +7,12 @@ is unset, admin access is disabled entirely.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import bindparam, desc, func, or_, select, text
+from sqlalchemy import bindparam, case, delete, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -47,6 +48,61 @@ from app.schemas.rest import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = logging.getLogger(__name__)
+
+
+def _score_for(did: str):
+    """SQL expression: this user's own score in a game_sessions row."""
+    return case(
+        (GameSession.player1_id == did, GameSession.player1_score),
+        (GameSession.player2_id == did, GameSession.player2_score),
+        else_=0,
+    )
+
+
+async def _recompute_user_stats(db: AsyncSession, did: str) -> User | None:
+    """Re-derive a user's aggregates + personal bests from game_sessions - the
+    single source of truth. Used after deleting sessions or to repair drift.
+    Aggregates come from ALL sessions (both sides); personal bests only from the
+    user's SOLO sessions (that is all _persist_solo ever writes)."""
+    user = await db.get(User, did)
+    if user is None:
+        return None
+    played_where = or_(GameSession.player1_id == did, GameSession.player2_id == did)
+    user.games_played = await db.scalar(
+        select(func.count()).select_from(GameSession).where(played_where)
+    ) or 0
+    user.games_won = await db.scalar(
+        select(func.count()).select_from(GameSession).where(GameSession.winner_id == did)
+    ) or 0
+    user.total_score = int(
+        await db.scalar(
+            select(func.coalesce(func.sum(_score_for(did)), 0)).where(played_where)
+        ) or 0
+    )
+    # Rebuild personal bests from the user's solo sessions.
+    from app.models import PersonalBest
+
+    await db.execute(delete(PersonalBest).where(PersonalBest.player_id == did))
+    rows = (
+        await db.execute(
+            select(
+                GameSession.game_type,
+                func.max(_score_for(did)),
+                func.count(),
+            )
+            .where(GameSession.mode.in_(SINGLE_PLAYER_MODES), played_where)
+            .group_by(GameSession.game_type)
+        )
+    ).all()
+    for game_type, best, plays in rows:
+        db.add(
+            PersonalBest(
+                player_id=did, game_type=game_type,
+                best_score=int(best or 0), plays=int(plays),
+            )
+        )
+    return user
 
 
 @router.post("/login", response_model=AdminTokenResponse)
@@ -376,14 +432,27 @@ async def users(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: str | None = Query(None, description="search handle / display name"),
+    sort: str = Query("created", pattern="^(created|played|won|win_rate|score)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
 ) -> AdminUsersResponse:
-    total = await db.scalar(select(func.count()).select_from(User)) or 0
+    conds = []
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        conds.append(or_(User.handle.ilike(like), User.display_name.ilike(like)))
+    total = await db.scalar(select(func.count()).select_from(User).where(*conds)) or 0
+    win_rate = func.coalesce(User.games_won * 1.0 / func.nullif(User.games_played, 0), 0)
+    sort_col = {
+        "created": User.created_at,
+        "played": User.games_played,
+        "won": User.games_won,
+        "win_rate": win_rate,
+        "score": User.total_score,
+    }[sort]
+    ordered = sort_col.desc() if order == "desc" else sort_col.asc()
     rows = (
         await db.execute(
-            select(User)
-            .order_by(desc(User.created_at))
-            .limit(limit)
-            .offset(offset)
+            select(User).where(*conds).order_by(ordered).limit(limit).offset(offset)
         )
     ).scalars().all()
     return AdminUsersResponse(
@@ -411,11 +480,25 @@ async def games(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    game_type: str | None = Query(None),
+    mode: str | None = Query(None),
+    q: str | None = Query(None, description="search either player's handle"),
 ) -> AdminGamesResponse:
-    total = await db.scalar(select(func.count()).select_from(GameSession)) or 0
+    conds = []
+    if game_type:
+        conds.append(GameSession.game_type == game_type)
+    if mode:
+        conds.append(GameSession.mode == mode)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        conds.append(
+            or_(GameSession.player1_handle.ilike(like), GameSession.player2_handle.ilike(like))
+        )
+    total = await db.scalar(select(func.count()).select_from(GameSession).where(*conds)) or 0
     rows = (
         await db.execute(
             select(GameSession)
+            .where(*conds)
             .order_by(desc(GameSession.created_at))
             .limit(limit)
             .offset(offset)
@@ -446,11 +529,14 @@ async def feedback(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    resolved: bool | None = Query(None, description="filter by resolved state"),
 ) -> AdminFeedbackResponse:
-    total = await db.scalar(select(func.count()).select_from(Feedback)) or 0
+    conds = [] if resolved is None else [Feedback.resolved == resolved]
+    total = await db.scalar(select(func.count()).select_from(Feedback).where(*conds)) or 0
     rows = (
         await db.execute(
             select(Feedback)
+            .where(*conds)
             .order_by(desc(Feedback.created_at))
             .limit(limit)
             .offset(offset)
@@ -487,6 +573,59 @@ async def resolve_feedback(
     fb.resolved = body.resolved
     await db.commit()
     return {"id": fid, "resolved": body.resolved}
+
+
+# --------------------------------------------------------------------------- #
+# Session management (delete / repair)
+# --------------------------------------------------------------------------- #
+
+@router.post("/users/{did}/recompute")
+async def recompute_user(
+    did: str, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict[str, int | str]:
+    """Re-derive a user's stats + personal bests from game_sessions - repairs
+    drift (e.g. a bug that inflated a counter) with no data loss."""
+    user = await _recompute_user_stats(db, did)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.commit()
+    return {
+        "did": did,
+        "games_played": user.games_played,
+        "games_won": user.games_won,
+        "total_score": user.total_score,
+    }
+
+
+@router.delete("/games/{gid}")
+async def delete_game(
+    gid: int, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Delete a game session and re-derive every affected real user's stats from
+    the remaining sessions. Guests/AI have no User row and are skipped. The row
+    is logged first as an audit snapshot."""
+    g = await db.get(GameSession, gid)
+    if g is None:
+        raise HTTPException(status_code=404, detail="Game session not found")
+    logger.info(
+        "admin delete game_session id=%s type=%s mode=%s p1=%s p2=%s winner=%s scores=%s/%s",
+        g.id, g.game_type, g.mode, g.player1_id, g.player2_id,
+        g.winner_id, g.player1_score, g.player2_score,
+    )
+    affected = [p for p in (g.player1_id, g.player2_id) if p]
+    await db.delete(g)
+    await db.flush()
+    recomputed: dict[str, dict[str, int]] = {}
+    for did in affected:
+        u = await _recompute_user_stats(db, did)
+        if u is not None:
+            recomputed[did] = {
+                "games_played": u.games_played,
+                "games_won": u.games_won,
+                "total_score": u.total_score,
+            }
+    await db.commit()
+    return {"deleted": gid, "recomputed": recomputed}
 
 
 # --------------------------------------------------------------------------- #

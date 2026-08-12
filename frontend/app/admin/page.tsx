@@ -15,6 +15,9 @@ import {
   getTimeseries,
   getUsers,
   getTournamentsAdmin,
+  recomputeUser,
+  deleteGame,
+  type UserSort,
   type FeedbackRow,
   type GameRow,
   type Insights,
@@ -64,6 +67,16 @@ export default function AdminPage() {
   const [gamesOff, setGamesOff] = useState(0);
   const [fbOff, setFbOff] = useState(0);
 
+  // Filters / search / sort
+  const [usersQ, setUsersQ] = useState("");
+  const [usersSort, setUsersSort] = useState<UserSort>("created");
+  const [usersOrder, setUsersOrder] = useState<"asc" | "desc">("desc");
+  const [gamesType, setGamesType] = useState("");
+  const [gamesMode, setGamesMode] = useState("");
+  const [gamesQ, setGamesQ] = useState("");
+  const [fbHideResolved, setFbHideResolved] = useState(false);
+  const [note, setNote] = useState<string | null>(null); // transient action result
+
   // Login form
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -89,19 +102,29 @@ export default function AdminPage() {
   // Lazy-load + paginate each section. Refetch when its page offset changes.
   useEffect(() => {
     if (!authed || section !== "users") return;
-    getUsers(PAGE, usersOff).then(setUsers).catch(handleErr);
+    getUsers(PAGE, usersOff, { q: usersQ || undefined, sort: usersSort, order: usersOrder })
+      .then(setUsers)
+      .catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, authed, usersOff]);
+  }, [section, authed, usersOff, usersQ, usersSort, usersOrder]);
   useEffect(() => {
     if (!authed || section !== "games") return;
-    getGames(PAGE, gamesOff).then(setGames).catch(handleErr);
+    getGames(PAGE, gamesOff, {
+      game_type: gamesType || undefined,
+      mode: gamesMode || undefined,
+      q: gamesQ || undefined,
+    })
+      .then(setGames)
+      .catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, authed, gamesOff]);
+  }, [section, authed, gamesOff, gamesType, gamesMode, gamesQ]);
   useEffect(() => {
     if (!authed || section !== "feedback") return;
-    getFeedback(FB_PAGE, fbOff).then(setFeedback).catch(handleErr);
+    getFeedback(FB_PAGE, fbOff, fbHideResolved ? false : undefined)
+      .then(setFeedback)
+      .catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, authed, fbOff]);
+  }, [section, authed, fbOff, fbHideResolved]);
   useEffect(() => {
     if (!authed || section !== "tournaments") return;
     getTournamentsAdmin().then(setTournaments).catch(handleErr);
@@ -124,6 +147,49 @@ export default function AdminPage() {
       );
     } catch (e) {
       handleErr(e);
+    }
+  };
+
+  const onRecompute = async (did: string) => {
+    if (!window.confirm("Recompute this user's stats from their game history?")) return;
+    try {
+      const r = await recomputeUser(did);
+      setUsers((prev) =>
+        prev
+          ? {
+              ...prev,
+              users: prev.users.map((u) =>
+                u.did === did
+                  ? {
+                      ...u,
+                      games_played: r.games_played,
+                      games_won: r.games_won,
+                      total_score: r.total_score,
+                      win_rate: r.games_played ? r.games_won / r.games_played : 0,
+                    }
+                  : u,
+              ),
+            }
+          : prev,
+      );
+      setNote(`Recomputed: ${r.games_played} played · ${r.games_won} won · ${r.total_score.toLocaleString()} pts`);
+    } catch (e) {
+      handleErr(e);
+      setNote(`Recompute failed: ${(e as Error).message}`);
+    }
+  };
+
+  const onDeleteGame = async (id: number) => {
+    if (!window.confirm(`Delete game #${id}? Affected players' stats are recomputed. This cannot be undone.`)) return;
+    try {
+      await deleteGame(id);
+      setGames((prev) =>
+        prev ? { ...prev, total: prev.total - 1, games: prev.games.filter((g) => g.id !== id) } : prev,
+      );
+      setNote(`Deleted game #${id} · affected players recomputed.`);
+    } catch (e) {
+      handleErr(e);
+      setNote(`Delete failed: ${(e as Error).message}`);
     }
   };
 
@@ -225,22 +291,85 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {note && (
+        <div className="mb-4 flex items-center gap-3 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-elevated)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+          <span className="flex-1">{note}</span>
+          <button onClick={() => setNote(null)} className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide hover:text-[var(--color-text-primary)]">
+            dismiss
+          </button>
+        </div>
+      )}
       {section === "overview" && overview && <OverviewView o={overview} />}
       {section === "users" && (
         <>
-          <UsersView users={users?.users ?? null} startIndex={usersOff} />
+          <div className="mb-3">
+            <input
+              value={usersQ}
+              onChange={(e) => { setUsersQ(e.target.value); setUsersOff(0); }}
+              placeholder="Search @handle or name…"
+              className="w-full max-w-xs rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <UsersView
+            users={users?.users ?? null}
+            startIndex={usersOff}
+            sort={usersSort}
+            order={usersOrder}
+            onSort={(col) => {
+              setUsersOff(0);
+              if (usersSort === col) setUsersOrder((o) => (o === "desc" ? "asc" : "desc"));
+              else { setUsersSort(col); setUsersOrder("desc"); }
+            }}
+            onRecompute={onRecompute}
+          />
           <Pager loaded={!!users} offset={usersOff} pageSize={PAGE} total={users?.total ?? 0} onChange={setUsersOff} />
         </>
       )}
       {section === "games" && (
         <>
-          <GamesView games={games?.games ?? null} />
+          <div className="mb-3 flex flex-wrap gap-2">
+            <select
+              value={gamesType}
+              onChange={(e) => { setGamesType(e.target.value); setGamesOff(0); }}
+              className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            >
+              <option value="">All games</option>
+              {(overview?.by_game ?? []).map((g) => (
+                <option key={g.game_type} value={g.game_type}>{gname(g.game_type)}</option>
+              ))}
+            </select>
+            <select
+              value={gamesMode}
+              onChange={(e) => { setGamesMode(e.target.value); setGamesOff(0); }}
+              className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            >
+              <option value="">All modes</option>
+              {["versus", "solo", "daily", "tournament"].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <input
+              value={gamesQ}
+              onChange={(e) => { setGamesQ(e.target.value); setGamesOff(0); }}
+              placeholder="Search player…"
+              className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <GamesView games={games?.games ?? null} onDelete={onDeleteGame} />
           <Pager loaded={!!games} offset={gamesOff} pageSize={PAGE} total={games?.total ?? 0} onChange={setGamesOff} />
         </>
       )}
       {section === "tournaments" && <TournamentsView data={tournaments} />}
       {section === "feedback" && (
         <>
+          <label className="mb-3 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={fbHideResolved}
+              onChange={(e) => { setFbHideResolved(e.target.checked); setFbOff(0); }}
+            />
+            Hide resolved
+          </label>
           <FeedbackView feedback={feedback?.feedback ?? null} onResolve={toggleFeedback} />
           <Pager loaded={!!feedback} offset={fbOff} pageSize={FB_PAGE} total={feedback?.total ?? 0} onChange={setFbOff} />
         </>
@@ -593,11 +722,31 @@ function ChartSkeleton() {
   return <div className="h-[200px] animate-pulse rounded-[12px] bg-white/5" />;
 }
 
-function UsersView({ users, startIndex = 0 }: { users: UserRow[] | null; startIndex?: number }) {
+function UsersView({
+  users,
+  startIndex = 0,
+  sort,
+  order,
+  onSort,
+  onRecompute,
+}: {
+  users: UserRow[] | null;
+  startIndex?: number;
+  sort: UserSort;
+  order: "asc" | "desc";
+  onSort: (col: UserSort) => void;
+  onRecompute: (did: string) => void;
+}) {
   if (!users) return <Loading />;
-  if (users.length === 0) return <Empty label="No Bluesky users yet (guests aren't stored)." />;
+  if (users.length === 0) return <Empty label="No users match." />;
+  const col = (label: string, key: UserSort) => (
+    <button onClick={() => onSort(key)} className="flex items-center gap-1 uppercase tracking-wide hover:text-[var(--color-text-primary)]">
+      {label}
+      <span className="text-[9px]">{sort === key ? (order === "desc" ? "▼" : "▲") : "↕"}</span>
+    </button>
+  );
   return (
-    <Table head={["#", "Handle", "Joined", "Played", "Won", "Win %", "Score"]}>
+    <Table head={["#", "Handle", col("Joined", "created"), col("Played", "played"), col("Won", "won"), col("Win %", "win_rate"), col("Score", "score"), ""]}>
       {users.map((u, i) => (
         <tr key={u.did} className="border-t border-[var(--color-border)]">
           <Td className="text-[var(--color-text-secondary)]">{startIndex + i + 1}</Td>
@@ -617,17 +766,26 @@ function UsersView({ users, startIndex = 0 }: { users: UserRow[] | null; startIn
           <Td>{u.games_won}</Td>
           <Td>{Math.round(u.win_rate * 100)}%</Td>
           <Td className="font-[var(--font-mono)]">{u.total_score.toLocaleString()}</Td>
+          <Td>
+            <button
+              onClick={() => onRecompute(u.did)}
+              title="Recompute this user's stats from their game history"
+              className="whitespace-nowrap rounded-[8px] border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]"
+            >
+              ↻ stats
+            </button>
+          </Td>
         </tr>
       ))}
     </Table>
   );
 }
 
-function GamesView({ games }: { games: GameRow[] | null }) {
+function GamesView({ games, onDelete }: { games: GameRow[] | null; onDelete: (id: number) => void }) {
   if (!games) return <Loading />;
-  if (games.length === 0) return <Empty label="No games recorded yet." />;
+  if (games.length === 0) return <Empty label="No games match." />;
   return (
-    <Table head={["When", "Game", "Result", "Winner"]}>
+    <Table head={["When", "Game", "Result", "Winner", ""]}>
       {games.map((g) => {
         const solo = g.mode === "solo";
         const winner = solo
@@ -663,6 +821,15 @@ function GamesView({ games }: { games: GameRow[] | null }) {
             </Td>
             <Td className={winner === "draw" || solo ? "text-[var(--color-text-secondary)]" : "text-[var(--color-success)]"}>
               {winner}
+            </Td>
+            <Td>
+              <button
+                onClick={() => onDelete(g.id)}
+                title={`Delete game #${g.id} and recompute affected players`}
+                className="whitespace-nowrap rounded-[8px] border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:border-[var(--color-warm)] hover:text-[var(--color-warm)]"
+              >
+                Delete
+              </button>
             </Td>
           </tr>
         );
@@ -795,14 +962,14 @@ function Pager({
 function Empty({ label }: { label: string }) {
   return <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">{label}</p>;
 }
-function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
+function Table({ head, children }: { head: React.ReactNode[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-[14px] border border-[var(--color-border)]">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="bg-[var(--color-surface)]">
-            {head.map((h) => (
-              <th key={h} className="px-4 py-3 font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+            {head.map((h, i) => (
+              <th key={i} className="px-4 py-3 font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
                 {h}
               </th>
             ))}
