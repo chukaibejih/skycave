@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { shareToBluesky, BLUESKY_TAGS } from "@/lib/bluesky";
+import { shareToBluesky } from "@/lib/bluesky";
 import { playUrl } from "@/lib/solo";
 import { useAuth, useRoom } from "@/lib/store";
 
@@ -366,15 +366,12 @@ export function Clay() {
    * and open the composer so it can be attached by hand.
    */
   const shareCard = async () => {
-    // Match every other post: a solo run carries "beat my score" + the play
-    // link, so anyone can tap in to beat it. `base` has no hashtags, since the
-    // composer fallback (composeIntentUrl) appends them itself; the native share
-    // sheet does not, so it gets `withTags`. That keeps the tags on both paths
-    // without ever doubling them.
+    // A solo run carries "beat my score" + the play link, so anyone can tap in
+    // to beat it. No Skycave hashtags are added on any path - the player adds
+    // their own tags in the composer / share sheet.
     const base = isSolo
       ? `${shareLine}\n\nbeat my score:\n${playUrl("clay")}`
       : `${shareLine}\n\nskycave.space`;
-    const withTags = `${base}\n\n${BLUESKY_TAGS}`;
     const canvas = cardRef.current;
     if (!canvas) return shareToBluesky(base);
     setSharing(true);
@@ -383,7 +380,7 @@ export function Clay() {
       if (blob) {
         const file = new File([blob], "clay-pot.png", { type: "image/png" });
         if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], text: withTags });
+          await navigator.share({ files: [file], text: base });
           return; // shared with the picture attached
         }
         const url = URL.createObjectURL(blob);
