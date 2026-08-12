@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import bindparam, case, delete, desc, func, or_, select, text
+from sqlalchemy import bindparam, case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -60,11 +60,14 @@ def _score_for(did: str):
     )
 
 
-async def _recompute_user_stats(db: AsyncSession, did: str) -> User | None:
-    """Re-derive a user's aggregates + personal bests from game_sessions - the
-    single source of truth. Used after deleting sessions or to repair drift.
-    Aggregates come from ALL sessions (both sides); personal bests only from the
-    user's SOLO sessions (that is all _persist_solo ever writes)."""
+async def _recompute_user_stats(
+    db: AsyncSession, did: str, pb_game_types: set[str] | None = None
+) -> User | None:
+    """Re-derive a user's aggregates from game_sessions (the single source of
+    truth) - aggregates come from ALL sessions (both sides). Personal bests are
+    only re-derived for the game types in `pb_game_types` (e.g. the type of a
+    deleted session): a PB with no backing solo session - an older record - is
+    left untouched, so a stat repair never destroys a personal best."""
     user = await db.get(User, did)
     if user is None:
         return None
@@ -80,28 +83,33 @@ async def _recompute_user_stats(db: AsyncSession, did: str) -> User | None:
             select(func.coalesce(func.sum(_score_for(did)), 0)).where(played_where)
         ) or 0
     )
-    # Rebuild personal bests from the user's solo sessions.
-    from app.models import PersonalBest
+    if pb_game_types:
+        from app.models import PersonalBest
 
-    await db.execute(delete(PersonalBest).where(PersonalBest.player_id == did))
-    rows = (
-        await db.execute(
-            select(
-                GameSession.game_type,
-                func.max(_score_for(did)),
-                func.count(),
-            )
-            .where(GameSession.mode.in_(SINGLE_PLAYER_MODES), played_where)
-            .group_by(GameSession.game_type)
-        )
-    ).all()
-    for game_type, best, plays in rows:
-        db.add(
-            PersonalBest(
-                player_id=did, game_type=game_type,
-                best_score=int(best or 0), plays=int(plays),
-            )
-        )
+        for gt in pb_game_types:
+            best, plays = (
+                await db.execute(
+                    select(func.max(_score_for(did)), func.count()).where(
+                        GameSession.game_type == gt,
+                        GameSession.mode.in_(SINGLE_PLAYER_MODES),
+                        played_where,
+                    )
+                )
+            ).one()
+            pb = await db.get(PersonalBest, (did, gt))
+            if plays:
+                if pb is None:
+                    db.add(
+                        PersonalBest(
+                            player_id=did, game_type=gt,
+                            best_score=int(best or 0), plays=int(plays),
+                        )
+                    )
+                else:
+                    pb.best_score = int(best or 0)
+                    pb.plays = int(plays)
+            elif pb is not None:
+                await db.delete(pb)
     return user
 
 
@@ -612,12 +620,13 @@ async def delete_game(
         g.id, g.game_type, g.mode, g.player1_id, g.player2_id,
         g.winner_id, g.player1_score, g.player2_score,
     )
+    game_type = g.game_type
     affected = [p for p in (g.player1_id, g.player2_id) if p]
     await db.delete(g)
     await db.flush()
     recomputed: dict[str, dict[str, int]] = {}
     for did in affected:
-        u = await _recompute_user_stats(db, did)
+        u = await _recompute_user_stats(db, did, pb_game_types={game_type})
         if u is not None:
             recomputed[did] = {
                 "games_played": u.games_played,
