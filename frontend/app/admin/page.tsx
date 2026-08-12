@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -15,9 +15,15 @@ import {
   getTimeseries,
   getUsers,
   getTournamentsAdmin,
+  getTournamentMatches,
+  decideMatch,
+  resolveForfeits,
+  closeRegistration,
   recomputeUser,
   deleteGame,
   type UserSort,
+  type TournamentMatches,
+  type TournamentAdminRow,
   type FeedbackRow,
   type GameRow,
   type Insights,
@@ -125,11 +131,15 @@ export default function AdminPage() {
       .catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, authed, fbOff, fbHideResolved]);
-  useEffect(() => {
-    if (!authed || section !== "tournaments") return;
+  const loadTournaments = useCallback(() => {
     getTournamentsAdmin().then(setTournaments).catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, authed]);
+  }, []);
+  useEffect(() => {
+    if (!authed || section !== "tournaments") return;
+    loadTournaments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, authed, loadTournaments]);
 
   function handleErr(e: unknown) {
     if (e instanceof AdminAuthError) {
@@ -359,7 +369,9 @@ export default function AdminPage() {
           <Pager loaded={!!games} offset={gamesOff} pageSize={PAGE} total={games?.total ?? 0} onChange={setGamesOff} />
         </>
       )}
-      {section === "tournaments" && <TournamentsView data={tournaments} />}
+      {section === "tournaments" && (
+        <TournamentsView data={tournaments} onNote={setNote} onRefresh={loadTournaments} />
+      )}
       {section === "feedback" && (
         <>
           <label className="mb-3 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
@@ -846,7 +858,16 @@ const TSTATUS: Record<string, { label: string; color: string }> = {
   finished: { label: "finished", color: "#56f0aa" },
 };
 
-function TournamentsView({ data }: { data: TournamentsAdmin | null }) {
+function TournamentsView({
+  data,
+  onNote,
+  onRefresh,
+}: {
+  data: TournamentsAdmin | null;
+  onNote: (n: string) => void;
+  onRefresh: () => void;
+}) {
+  const [manageId, setManageId] = useState<string | null>(null);
   if (!data) return <Loading />;
   const { summary: s, tournaments } = data;
   const cards = [
@@ -872,40 +893,57 @@ function TournamentsView({ data }: { data: TournamentsAdmin | null }) {
       {tournaments.length === 0 ? (
         <Empty label="No tournaments have run yet." />
       ) : (
-        <Table head={["Created", "Name", "Status", "Entrants", "Series", "Champion"]}>
+        <Table head={["Created", "Name", "Status", "Entrants", "Series", "Champion", ""]}>
           {tournaments.map((t) => {
             const st = TSTATUS[t.status] ?? { label: t.status, color: "var(--color-text-secondary)" };
             return (
-              <tr key={t.id} className="border-t border-[var(--color-border)]">
-                <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
-                  {new Date(t.created_at).toLocaleDateString()}
-                </Td>
-                <Td>
-                  <div className="font-medium">{t.name}</div>
-                  <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{t.id}</div>
-                </Td>
-                <Td>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                    style={{ background: `${st.color}22`, color: st.color }}
-                  >
-                    {t.status === "in_progress" && (
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
-                    )}
-                    {st.label}
-                  </span>
-                </Td>
-                <Td className="font-[var(--font-mono)] whitespace-nowrap">
-                  {t.entrants}
-                  <span className="text-[var(--color-text-secondary)]">/{t.max_players}</span>
-                </Td>
-                <Td className="font-[var(--font-mono)] whitespace-nowrap text-[var(--color-text-secondary)]">
-                  {t.matches_total ? `${t.matches_done}/${t.matches_total}` : "·"}
-                </Td>
-                <Td className={t.champion ? "text-[var(--color-success)]" : "text-[var(--color-text-secondary)]"}>
-                  {t.champion ? `@${t.champion}` : "·"}
-                </Td>
-              </tr>
+              <Fragment key={t.id}>
+                <tr className="border-t border-[var(--color-border)]">
+                  <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
+                    {new Date(t.created_at).toLocaleDateString()}
+                  </Td>
+                  <Td>
+                    <div className="font-medium">{t.name}</div>
+                    <div className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">{t.id}</div>
+                  </Td>
+                  <Td>
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style={{ background: `${st.color}22`, color: st.color }}
+                    >
+                      {t.status === "in_progress" && (
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
+                      )}
+                      {st.label}
+                    </span>
+                  </Td>
+                  <Td className="font-[var(--font-mono)] whitespace-nowrap">
+                    {t.entrants}
+                    <span className="text-[var(--color-text-secondary)]">/{t.max_players}</span>
+                  </Td>
+                  <Td className="font-[var(--font-mono)] whitespace-nowrap text-[var(--color-text-secondary)]">
+                    {t.matches_total ? `${t.matches_done}/${t.matches_total}` : "·"}
+                  </Td>
+                  <Td className={t.champion ? "text-[var(--color-success)]" : "text-[var(--color-text-secondary)]"}>
+                    {t.champion ? `@${t.champion}` : "·"}
+                  </Td>
+                  <Td>
+                    <button
+                      onClick={() => setManageId((id) => (id === t.id ? null : t.id))}
+                      className="whitespace-nowrap rounded-[8px] border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]"
+                    >
+                      {manageId === t.id ? "Close" : "Manage"}
+                    </button>
+                  </Td>
+                </tr>
+                {manageId === t.id && (
+                  <tr className="border-t border-[var(--color-border)] bg-black/30">
+                    <td colSpan={7} className="p-4">
+                      <ManagePanel t={t} onNote={onNote} onRefresh={onRefresh} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             );
           })}
         </Table>
@@ -962,6 +1000,132 @@ function Pager({
 function Empty({ label }: { label: string }) {
   return <p className="py-10 text-center text-sm text-[var(--color-text-secondary)]">{label}</p>;
 }
+function ManagePanel({
+  t,
+  onNote,
+  onRefresh,
+}: {
+  t: TournamentAdminRow;
+  onNote: (n: string) => void;
+  onRefresh: () => void;
+}) {
+  const [m, setM] = useState<TournamentMatches | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    getTournamentMatches(t.id).then(setM).catch(() => setM(null));
+  }, [t.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const act = async (label: string, fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      const r = (await fn()) as { changed?: boolean; status?: string } | undefined;
+      onNote(
+        label +
+          (r?.changed !== undefined ? ` · changed=${r.changed}` : "") +
+          (r?.status ? ` · now ${r.status}` : ""),
+      );
+      load();
+      onRefresh();
+    } catch (e) {
+      onNote(`${label} failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = (round: number, slot: number, did: string, who: string) => {
+    if (!window.confirm(`Award r${round} s${slot} to ${who}? This advances the bracket.`)) return;
+    act(`Decided r${round}s${slot} → ${who}`, () => decideMatch(t.id, round, slot, did));
+  };
+
+  const btn =
+    "rounded-[8px] border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)] disabled:opacity-50";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {t.status === "registering" && (
+          <button
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm("Close registration and draw the bracket now?"))
+                act("Closed registration + drew bracket", () => closeRegistration(t.id));
+            }}
+            className={btn}
+          >
+            Close registration + draw
+          </button>
+        )}
+        <button disabled={busy} onClick={() => act("Resolved forfeits", () => resolveForfeits(t.id))} className={btn}>
+          Resolve forfeits now
+        </button>
+      </div>
+
+      {!m ? (
+        <div className="text-sm text-[var(--color-text-secondary)]">Loading matches…</div>
+      ) : m.matches.length === 0 ? (
+        <div className="text-sm text-[var(--color-text-secondary)]">No matches drawn yet.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-[10px] border border-[var(--color-border)]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-[var(--color-surface)] font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <th className="px-3 py-2">R/S</th>
+                <th className="px-3 py-2">Players</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Decide</th>
+              </tr>
+            </thead>
+            <tbody>
+              {m.matches.map((mm) => {
+                const decided = !!mm.winner_did || mm.status === "done" || mm.status === "bye";
+                const canDecide = !decided && !!mm.player1_did && !!mm.player2_did;
+                return (
+                  <tr key={`${mm.round}-${mm.slot}`} className="border-t border-[var(--color-border)]">
+                    <td className="whitespace-nowrap px-3 py-2 font-[var(--font-mono)] text-[var(--color-text-secondary)]">
+                      r{mm.round} s{mm.slot}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={mm.winner_did && mm.winner_did === mm.player1_did ? "text-[var(--color-success)]" : ""}>
+                        {mm.player1_handle ? `@${mm.player1_handle}` : "—"}
+                      </span>
+                      <span className="text-[var(--color-text-secondary)]"> vs </span>
+                      <span className={mm.winner_did && mm.winner_did === mm.player2_did ? "text-[var(--color-success)]" : ""}>
+                        {mm.player2_handle ? `@${mm.player2_handle}` : "—"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[var(--color-text-secondary)]">
+                      {mm.status}
+                      {mm.winner_handle ? ` · @${mm.winner_handle}` : ""}
+                    </td>
+                    <td className="px-3 py-2">
+                      {canDecide ? (
+                        <div className="flex gap-1">
+                          <button disabled={busy} onClick={() => decide(mm.round, mm.slot, mm.player1_did!, `@${mm.player1_handle}`)} className={btn}>
+                            {mm.player1_handle ? `@${mm.player1_handle}` : "P1"}
+                          </button>
+                          <button disabled={busy} onClick={() => decide(mm.round, mm.slot, mm.player2_did!, `@${mm.player2_handle}`)} className={btn}>
+                            {mm.player2_handle ? `@${mm.player2_handle}` : "P2"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[var(--color-text-secondary)]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Table({ head, children }: { head: React.ReactNode[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-[14px] border border-[var(--color-border)]">

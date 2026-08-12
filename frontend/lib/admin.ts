@@ -211,3 +211,39 @@ export interface TournamentsAdmin {
 }
 export const getTournamentsAdmin = () =>
   adminGet<TournamentsAdmin>("/admin/tournaments");
+
+// ── Tournament controls ──
+export interface TournamentMatchRow {
+  round: number;
+  slot: number;
+  status: string;
+  player1_did: string | null;
+  player1_handle: string | null;
+  player2_did: string | null;
+  player2_handle: string | null;
+  winner_did: string | null;
+  winner_handle: string | null;
+  opens_at: string | null;
+  deadline: string | null;
+}
+export interface TournamentMatches {
+  id: string;
+  name: string;
+  status: string;
+  rounds: number;
+  matches: TournamentMatchRow[];
+}
+export const getTournamentMatches = (tid: string) =>
+  adminGet<TournamentMatches>(`/admin/tournaments/${tid}/matches`);
+export const decideMatch = (tid: string, round: number, slot: number, winner_did: string) =>
+  adminSend(`/admin/tournaments/${tid}/matches/${round}/${slot}/decide`, "POST", { winner_did });
+export const resolveForfeits = (tid: string) =>
+  adminSend<{ tournament: string; changed: boolean }>(
+    `/admin/tournaments/${tid}/resolve-forfeits`,
+    "POST",
+  );
+export const closeRegistration = (tid: string) =>
+  adminSend<{ tournament: string; status: string }>(
+    `/admin/tournaments/${tid}/close-registration`,
+    "POST",
+  );

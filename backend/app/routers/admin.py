@@ -740,3 +740,130 @@ async def admin_tournaments(
         ),
         tournaments=rows,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Tournament controls (operational)
+# --------------------------------------------------------------------------- #
+
+class DecideMatchRequest(BaseModel):
+    winner_did: str
+
+
+@router.get("/tournaments/{tid}/matches")
+async def admin_tournament_matches(
+    tid: str, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Every match in one tournament, with player handles, for the control panel."""
+    from app.models.tournament import Tournament, TournamentEntrant, TournamentMatch
+
+    t = await db.get(Tournament, tid)
+    if t is None:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    ents = (
+        await db.execute(
+            select(TournamentEntrant).where(TournamentEntrant.tournament_id == tid)
+        )
+    ).scalars().all()
+    handle = {e.did: e.handle for e in ents}
+    ms = (
+        await db.execute(
+            select(TournamentMatch)
+            .where(TournamentMatch.tournament_id == tid)
+            .order_by(TournamentMatch.round, TournamentMatch.slot)
+        )
+    ).scalars().all()
+    return {
+        "id": t.id,
+        "name": t.name,
+        "status": t.status,
+        "rounds": t.rounds,
+        "matches": [
+            {
+                "round": m.round,
+                "slot": m.slot,
+                "status": m.status,
+                "player1_did": m.player1_did,
+                "player1_handle": handle.get(m.player1_did or ""),
+                "player2_did": m.player2_did,
+                "player2_handle": handle.get(m.player2_did or ""),
+                "winner_did": m.winner_did,
+                "winner_handle": handle.get(m.winner_did or ""),
+                "opens_at": m.opens_at,
+                "deadline": m.deadline,
+            }
+            for m in ms
+        ],
+    }
+
+
+@router.post("/tournaments/{tid}/matches/{round}/{slot}/decide")
+async def admin_decide_match(
+    tid: str,
+    round: int,
+    slot: int,
+    body: DecideMatchRequest,
+    _: AdminAuth,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Force a winner for an undecided match (no-show / disqualification / stuck
+    fixture) and advance the bracket. Uses the same engine advance + persistence
+    path a normal result takes, so downstream rounds stay consistent."""
+    from app.services import tournament as tsvc
+    from app.services import tournament_engine as teng
+    from app.models.tournament import Tournament
+
+    t = await db.get(Tournament, tid)
+    if t is None:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    rows = await tsvc.matches(db, tid)
+    fixtures = tsvc.to_fixtures(rows)
+    target = next((f for f in fixtures if f.round == round and f.slot == slot), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if target.decided():
+        raise HTTPException(status_code=400, detail="Match already decided")
+    if body.winner_did not in (target.p1, target.p2):
+        raise HTTPException(status_code=400, detail="Winner must be one of the two players")
+    target.winner = body.winner_did
+    teng.advance(fixtures)
+    await tsvc.sync_fixtures(db, t, rows, fixtures)
+    logger.info("admin decided tournament %s r%ds%d -> %s", tid, round, slot, body.winner_did)
+    return {"tournament": tid, "round": round, "slot": slot, "winner_did": body.winner_did}
+
+
+@router.post("/tournaments/{tid}/resolve-forfeits")
+async def admin_resolve_forfeits(
+    tid: str, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Run forfeit resolution now: any match past its deadline is decided by the
+    normal rules (series lead, who checked in, points, higher seed) and the
+    bracket advances. Same logic the scheduler runs, triggered on demand."""
+    from app.services import tournament as tsvc
+    from app.models.tournament import Tournament
+
+    t = await db.get(Tournament, tid)
+    if t is None:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    changed = await tsvc.apply_forfeits(db, t)
+    logger.info("admin resolve-forfeits tournament %s changed=%s", tid, changed)
+    return {"tournament": tid, "changed": bool(changed)}
+
+
+@router.post("/tournaments/{tid}/close-registration")
+async def admin_close_registration(
+    tid: str, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Close registration now and draw the bracket - the same lock the scheduler
+    runs at the deadline. Only valid while still registering."""
+    from app.services import tournament as tsvc
+    from app.models.tournament import REGISTERING, Tournament
+
+    t = await db.get(Tournament, tid)
+    if t is None:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    if t.status != REGISTERING:
+        raise HTTPException(status_code=400, detail=f"Not registering (status={t.status})")
+    await tsvc.lock_and_draw(db, t)
+    logger.info("admin closed registration + drew tournament %s", tid)
+    return {"tournament": tid, "status": t.status}
