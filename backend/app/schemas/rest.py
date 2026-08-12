@@ -49,6 +49,7 @@ class GameInfo(BaseModel):
 class CreateRoomRequest(BaseModel):
     game_type: str
     mode: str = "versus"  # "versus" (1v1) | "solo"
+    settings: dict | None = None
     difficulty: str = "normal"  # solo Caver strength: "easy" | "normal" | "hard"
 
 

@@ -6,6 +6,7 @@ import { GeoGuessUpdate, GEO_UPDATE_FRAMES } from "./GeoGuessUpdate";
 import { PlayIn, PLAYIN_FRAMES } from "./PlayIn";
 import { Spectate, SPECTATE_FRAMES } from "./Spectate";
 import { SpectateThumb } from "./Thumbnail";
+import { CupCard } from "./CupCard";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -89,5 +90,10 @@ export const RemotionRoot: React.FC = () => (
     {/* Spectating cover/thumbnail (still). Landscape 16:9 + vertical 9:16. */}
     <Composition id="SpectateThumb" component={SpectateThumb} durationInFrames={1} fps={FPS} width={1920} height={1080} />
     <Composition id="SpectateThumbVert" component={SpectateThumb} durationInFrames={1} fps={FPS} width={WIDTH} height={HEIGHT} />
+
+    {/* Weekend-tournament announcement card (still), ocean/beach theme with the
+        registration countdown. Landscape 16:9 + square for Bluesky. */}
+    <Composition id="CupCard" component={CupCard} durationInFrames={1} fps={FPS} width={1600} height={900} />
+    <Composition id="CupCardSquare" component={CupCard} durationInFrames={1} fps={FPS} width={1200} height={1200} />
   </>
 );

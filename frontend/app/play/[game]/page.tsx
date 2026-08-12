@@ -46,7 +46,11 @@ export default function PlayPage() {
         const mode = params.get("mode") === "daily" ? "daily" : "solo";
         const d = params.get("diff");
         const difficulty = d === "easy" || d === "hard" ? d : "normal";
-        const r = await createRoom(gameType, mode, difficulty);
+        
+        const cat = params.get("cat");
+        const settings = cat ? { category: cat } : undefined;
+        
+        const r = await createRoom(gameType, mode, difficulty, settings);
         setRoomId(r.id);
         setGameName(r.game_name ?? null);
         connect(r.id);

@@ -66,6 +66,7 @@ async def create_room(
     mode: str = "versus",
     ttl_seconds: int | None = None,
     difficulty: str = "normal",
+    settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     room = {
         "id": room_id,
@@ -76,7 +77,9 @@ async def create_room(
         # Solo Caver strength (Easy / Normal / Hard); ignored outside solo and by
         # games that don't support difficulty.
         "difficulty": difficulty if difficulty in ("easy", "normal", "hard") else "normal",
+        "settings": settings or {},
         "status": "waiting",
+
         "host_id": host["id"],
         "host_handle": host["handle"],
         "players": [_player_slot(host)],

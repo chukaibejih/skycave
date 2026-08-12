@@ -168,6 +168,8 @@ async def start_round(room_id: str, round_number: int) -> None:
             used = gs.get("_used_prompts") or []
             public, secret = game.new_round_unique(round_number, used)
             gs["_used_prompts"] = used + [public.get("prompt")]
+        elif hasattr(game, "new_round_with_settings"):
+            public, secret = game.new_round_with_settings(round_number, room.get("settings", {}))
         else:
             public, secret = game.new_round(round_number)
         now = time.time()
@@ -469,7 +471,10 @@ async def _solo_begin(room_id: str) -> None:
                 duration = float(public.get("round_time", game.solo_duration))
             else:
                 duration = game.solo_duration
-                public, secret = game.new_round(1)
+                if hasattr(game, "new_round_with_settings"):
+                    public, secret = game.new_round_with_settings(1, room.get("settings", {}))
+                else:
+                    public, secret = game.new_round(1)
             public = {**public, "round_time": duration}
             gs["round"] = 1
             gs["round_data"] = public
@@ -487,7 +492,10 @@ async def _solo_begin(room_id: str) -> None:
             ends_at, scores, rdata = gs["round_ends_at"], gs["scores"], public
             timer_delay = duration
         elif kind == "ladder":
-            public, secret = game.new_round(1)
+            if hasattr(game, "new_round_with_settings"):
+                public, secret = game.new_round_with_settings(1, room.get("settings", {}))
+            else:
+                public, secret = game.new_round(1)
             step = game.solo_step_time(public)
             public = {**public, "round_time": step}
             gs["round"] = 1
@@ -522,7 +530,10 @@ async def _serve_timed_prompt(room: dict[str, Any], game) -> None:
     room_id = room["id"]
     gs = room["game"]
     idx = gs["round"] + 1
-    public, secret = game.new_round(idx)
+    if hasattr(game, "new_round_with_settings"):
+        public, secret = game.new_round_with_settings(idx, room.get("settings", {}))
+    else:
+        public, secret = game.new_round(idx)
     public = {**public, "round_time": game.solo_duration}
     gs["round"] = idx
     gs["round_data"] = public
@@ -602,7 +613,10 @@ async def _solo_handle(room: dict[str, Any], game, player_id: str, action: dict)
             gs["scores"][player_id] = gs["scores"].get(player_id, 0) + 1
             level = gs["solo_state"]["level"] + 1
             gs["solo_state"]["level"] = level
-            public2, secret2 = game.new_round(level)
+            if hasattr(game, "new_round_with_settings"):
+                public2, secret2 = game.new_round_with_settings(level, room.get("settings", {}))
+            else:
+                public2, secret2 = game.new_round(level)
             step = game.solo_step_time(public2)
             public2 = {**public2, "round_time": step}
             gs["round"] = level
@@ -692,7 +706,18 @@ async def _finish_round_locked(
         "timed_out": timed_out,
     }
 
-    gs["history"].append({"round": round_number, "points": points})
+    # Keep the round's prompt + answer on the history entry so a results page can
+    # show a per-round review (e.g. Flag Rush / Outline Quiz: the flag and the
+    # right country). Only image-identify games carry a code + a named answer;
+    # the round is over, so nothing here is secret. Points already tell who was
+    # right, so no extra per-player data is needed.
+    entry: dict = {"round": round_number, "points": points}
+    _code = public.get("code")
+    _name = answer.get("name") if isinstance(answer, dict) else None
+    if _code and _name:
+        entry["code"] = _code
+        entry["answer"] = _name
+    gs["history"].append(entry)
     gs["phase"] = "round_over"
     gs["last_result"] = result
     await rooms.save_room(room)

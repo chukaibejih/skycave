@@ -12,9 +12,16 @@ from typing import Any
 from app.games.base import RACE, BaseGame
 
 
-def _problem() -> tuple[str, int]:
+def _problem(category: str = "random") -> tuple[str, int]:
     """Return (display, answer) for one arithmetic problem."""
-    op = random.choice(["+", "+", "-", "-", "x"])  # slightly favor +/- over x
+    if category == "addition":
+        op = "+"
+    elif category == "subtraction":
+        op = "-"
+    elif category == "multiplication":
+        op = "x"
+    else:
+        op = random.choice(["+", "+", "-", "-", "x"])  # slightly favor +/- over x
     if op == "+":
         a, b = random.randint(2, 49), random.randint(2, 49)
         return f"{a} + {b}", a + b
@@ -53,8 +60,9 @@ class MadMath(BaseGame):
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
         return f"{score} correct · 60 seconds"
 
-    def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        problem, answer = _problem()
+    def new_round_with_settings(self, round_number: int, settings: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        category = settings.get("category", "random")
+        problem, answer = _problem(category)
         public = {
             "problem": problem,
             "options": _options(answer),
@@ -62,6 +70,9 @@ class MadMath(BaseGame):
         }
         secret = {"answer": answer}
         return public, secret
+
+    def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        return self.new_round_with_settings(round_number, {})
 
     def check(
         self, public: dict[str, Any], secret: dict[str, Any], action: dict[str, Any]

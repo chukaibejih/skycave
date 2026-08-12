@@ -26,7 +26,7 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   // Game whose mode is being chosen, and the pending {game, mode} awaiting auth.
   const [chooser, setChooser] = useState<GameInfo | null>(null);
-  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" | "daily"; difficulty?: "easy" | "normal" | "hard" } | null>(null);
+  const [pending, setPending] = useState<{ game: GameInfo; mode: "versus" | "solo" | "daily"; difficulty?: "easy" | "normal" | "hard"; settings?: Record<string, any> } | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Instant dock + signal from the cached catalog (rendered before paint), so
@@ -59,17 +59,19 @@ export default function Home() {
     game: GameInfo,
     m: "versus" | "solo" | "daily",
     difficulty: "easy" | "normal" | "hard" = "normal",
+    settings?: Record<string, any>
   ) => {
     if (m === "solo" || m === "daily") {
       // Solo + daily skip the lobby - the /play route creates the room + drops
       // in. Daily passes ?mode=daily; solo passes the chosen Caver difficulty.
-      const qs = m === "daily" ? "?mode=daily" : `?diff=${difficulty}`;
+      let qs = m === "daily" ? "?mode=daily" : `?diff=${difficulty}`;
+      if (settings?.category) qs += `&cat=${settings.category}`;
       router.push(`/play/${gameSlug(game.type)}${qs}`);
       return;
     }
     setCreating(true);
     try {
-      const room = await createRoom(game.type);
+      const room = await createRoom(game.type, "versus", "normal", settings);
       router.push(`/room/${room.id}`);
     } finally {
       setCreating(false);
@@ -84,14 +86,15 @@ export default function Home() {
     game: GameInfo,
     m: "versus" | "solo" | "daily",
     difficulty: "easy" | "normal" | "hard" = "normal",
+    settings?: Record<string, any>
   ) => {
     setChooser(null);
     if (!identity) {
-      setPending({ game, mode: m, difficulty }); // auth first, then launch
+      setPending({ game, mode: m, difficulty, settings }); // auth first, then launch
       setAuthOpen(true);
       return;
     }
-    await go(game, m, difficulty);
+    await go(game, m, difficulty, settings);
   };
 
   return (
@@ -212,7 +215,7 @@ export default function Home() {
           setAuthOpen(false);
           const p = pending;
           setPending(null);
-          if (p) go(p.game, p.mode, p.difficulty); // resume the chosen launch now that we're authed
+          if (p) go(p.game, p.mode, p.difficulty, p.settings); // resume the chosen launch now that we're authed
         }}
       />
     </main>
@@ -361,37 +364,74 @@ function ModeChooser({
 }: {
   game: GameInfo | null;
   onClose: () => void;
-  onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily", difficulty?: "easy" | "normal" | "hard") => void;
+  onChoose: (game: GameInfo, mode: "versus" | "solo" | "daily", difficulty?: "easy" | "normal" | "hard", settings?: Record<string, any>) => void;
 }) {
-  const [step, setStep] = useState<"mode" | "difficulty">("mode");
+  const [step, setStep] = useState<"mode" | "difficulty" | "category">("mode");
+  const [chosenMode, setChosenMode] = useState<"versus" | "solo" | null>(null);
+
   useEffect(() => {
-    // Solo-only games with a Caver open straight into the difficulty step.
     setStep(
       game && game.versus_enabled === false && game.supports_difficulty ? "difficulty" : "mode",
     );
+    setChosenMode(null);
   }, [game]);
+
+  const onVersus = () => {
+    if (!game) return;
+    if (game.type === "mad_math") {
+      setChosenMode("versus");
+      setStep("category");
+      return;
+    }
+    onChoose(game, "versus");
+  };
+
   const onSolo = () => {
     if (!game) return;
+    setChosenMode("solo");
     if (game.supports_difficulty) {
-      setStep("difficulty"); // ask the Caver level as a second step
+      setStep("difficulty");
+      return;
+    }
+    if (game.type === "mad_math") {
+      setStep("category");
       return;
     }
     onChoose(game, "solo", "normal");
   };
-  const launchSolo = (level: "easy" | "normal" | "hard") => {
+
+  const launchSoloDiff = (level: "easy" | "normal" | "hard") => {
     if (!game) return;
     try {
       localStorage.setItem("skycave_caver_diff", level);
     } catch {
-      /* private mode; fine */
+      /* ignore */
+    }
+    if (game.type === "mad_math") {
+      setStep("category");
+      return;
     }
     onChoose(game, "solo", level);
   };
+
+  const launchCategory = (cat: string) => {
+    if (!game || !chosenMode) return;
+    onChoose(game, chosenMode, "normal", { category: cat });
+  };
+
   const DIFF_DESC: Record<"easy" | "normal" | "hard", string> = {
     easy: "Gentle · good for learning",
     normal: "A real match",
     hard: "Sharp · never blunders",
   };
+
+  const CATS = [
+    { id: "addition", label: "Addition", desc: "Just sums" },
+    { id: "subtraction", label: "Subtraction", desc: "Just differences" },
+    { id: "multiplication", label: "Multiplication", desc: "Just times tables" },
+    { id: "random", label: "Random Mix", desc: "Anything goes" },
+  ];
+
   return (
     <AnimatePresence>
       {game && (
@@ -417,7 +457,7 @@ function ModeChooser({
               <div className={`grid gap-3 ${game.versus_enabled === false ? "grid-cols-1" : "grid-cols-2"}`}>
                 {game.versus_enabled !== false && (
                   <button
-                    onClick={() => onChoose(game, "versus")}
+                    onClick={onVersus}
                     className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-[var(--color-primary)] font-[var(--font-display)] text-xl font-bold text-white shadow-[0_0_28px_var(--color-primary-glow)] active:brightness-110"
                   >
                     1v1
@@ -430,7 +470,7 @@ function ModeChooser({
                   Solo
                 </button>
               </div>
-            ) : (
+            ) : step === "difficulty" ? (
               <div>
                 <p className="mb-3 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
                   Caver difficulty
@@ -439,7 +479,7 @@ function ModeChooser({
                   {(["easy", "normal", "hard"] as const).map((l) => (
                     <button
                       key={l}
-                      onClick={() => launchSolo(l)}
+                      onClick={() => launchSoloDiff(l)}
                       className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors active:border-[var(--color-primary)]"
                     >
                       <span
@@ -459,6 +499,37 @@ function ModeChooser({
                   className="mt-3 w-full text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]"
                 >
                   {game.versus_enabled === false ? "close" : "back"}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-3 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
+                  Math Category
+                </p>
+                <div className="flex flex-col gap-2">
+                  {CATS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => launchCategory(c.id)}
+                      className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left transition-colors active:border-[var(--color-primary)]"
+                    >
+                      <span
+                        className="font-[var(--font-display)] text-base font-bold capitalize"
+                        style={{ color: "var(--color-text-primary)" }}
+                      >
+                        {c.label}
+                      </span>
+                      <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+                        {c.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setStep("mode")}
+                  className="mt-3 w-full text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]"
+                >
+                  back
                 </button>
               </div>
             )}

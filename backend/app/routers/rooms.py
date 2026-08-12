@@ -100,7 +100,7 @@ async def create_room(
         raise HTTPException(status_code=500, detail="Could not allocate room id")
 
     await rooms.create_room(
-        room_id, body.game_type, identity.model_dump(), mode=mode, difficulty=body.difficulty
+        room_id, body.game_type, identity.model_dump(), mode=mode, difficulty=body.difficulty, settings=body.settings
     )
 
     # Versus rooms silently start a 15 minute expiry window in the background;

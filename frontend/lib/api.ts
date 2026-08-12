@@ -183,11 +183,12 @@ export const getRanking = () =>
 export const createRoom = (
   gameType: string,
   mode: "versus" | "solo" | "daily" = "versus",
-  difficulty: "easy" | "normal" | "hard" = "normal"
+  difficulty: "easy" | "normal" | "hard" = "normal",
+  settings?: Record<string, any>
 ) =>
   request<Room>("/rooms", {
     method: "POST",
-    body: JSON.stringify({ game_type: gameType, mode, difficulty }),
+    body: JSON.stringify({ game_type: gameType, mode, difficulty, settings }),
   });
 
 export const getRoom = (roomId: string) => request<Room>(`/rooms/${roomId}`);
