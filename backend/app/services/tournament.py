@@ -533,16 +533,10 @@ def _round_open_map(t: Tournament) -> dict[int, datetime]:
 
 
 def _opens_when(when: datetime, now: datetime) -> str:
-    """A short, timezone-fair 'when' clause: 'in about 5 hours (2pm PT / 5pm ET)'
-    for a same-day gap, or 'sunday 2pm PT / 5pm ET' for an overnight one."""
-    pac = when.astimezone(eng.PACIFIC)
-    est = when.astimezone(_EASTERN)
-    clock = f"{pac.strftime('%-I%p').lower()} PT / {est.strftime('%-I%p').lower()} ET"
-    hours = (when - now).total_seconds() / 3600
-    if hours <= 4:
-        n = max(1, round(hours))
-        return f"IN ABOUT {n} HOUR{'S' if n != 1 else ''} ({clock})"
-    return f"{pac.strftime('%A').upper()} {clock}"
+    """An hours-from-now clause: 'IN 4 HOURS'. Players asked for hours rather than
+    a day name, so even an overnight gap reads 'IN 14 HOURS', not 'SATURDAY 2PM'."""
+    hours = max(1, round((when - now).total_seconds() / 3600))
+    return f"IN {hours} HOUR{'S' if hours != 1 else ''}"
 
 
 async def _current_room(m: TournamentMatch) -> dict | None:

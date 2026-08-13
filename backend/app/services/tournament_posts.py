@@ -218,9 +218,13 @@ def compose_play_in(
     """The play-in, as a THREAD so everyone fighting for the last seats is
     tagged. These are the players who registered latest; win here and you take
     a main-draw seat."""
-    lead = "THE PLAY-IN IS SET. WIN YOUR MATCH AND YOU ARE IN THE MAIN DRAW."
-    tail = f"THE LAST TO REGISTER PLAY FOR THE LAST SEATS.\n{bracket_url(tournament_id)}"
     items = [f"{_at(a)} VS {_at(b)}" for a, b in matches if a and b]
+    n = len(items)
+    lead = (
+        f"THE PLAY-IN IS SET. {n} {'MATCH' if n == 1 else 'MATCHES'}, "
+        f"{n} {'SPOT' if n == 1 else 'SPOTS'} IN THE MAIN DRAW."
+    )
+    tail = f"WIN YOUR MATCH AND YOU'RE IN. GOOD LUCK.\n{bracket_url(tournament_id)}"
 
     thread: list[str] = []
     i, first_body = 0, []
@@ -262,8 +266,9 @@ def compose_play_live(
     the tone is a calm nudge, not a starting gun.
     """
     lead = (
-        "Round one is open. No rush, play your first fixture any time before "
-        "the round closes. Best of three, the winner goes through."
+        "ROUND ONE IS OPEN. PLAY YOUR FIXTURE ANY TIME BEFORE THE DEADLINE. "
+        "NO RUSH, BUT DON'T SLEEP ON IT.\n\n"
+        "BEST OF THREE. WIN AND YOU'RE THROUGH."
     )
     tail = bracket_url(tournament_id)
     items = [_at(h) for h in players]
@@ -273,21 +278,21 @@ def compose_play_live(
     # First post: lead + as many mentions as fit above the link.
     i, first = 0, []
     while i < len(items):
-        line = ", ".join(first + [items[i]])
+        line = " ".join(first + [items[i]])
         if len("\n\n".join([lead, line, tail])) <= THREAD_FIRST_LIMIT:
             first.append(items[i])
             i += 1
         else:
             break
     thread.append(
-        "\n\n".join([lead, ", ".join(first), tail]) if first else f"{lead}\n\n{tail}"
+        "\n\n".join([lead, " ".join(first), tail]) if first else f"{lead}\n\n{tail}"
     )
 
     # Continuation posts: the rest of the players, so nobody is left untagged.
     while i < len(items):
         names: list[str] = []
         while i < len(items):
-            line = "Also up: " + ", ".join(names + [items[i]])
+            line = "ALSO UP: " + " ".join(names + [items[i]])
             if len(line) <= THREAD_CONT_LIMIT:
                 names.append(items[i])
                 i += 1
@@ -296,7 +301,7 @@ def compose_play_live(
         if not names:
             names = [items[i]]
             i += 1
-        thread.append("Also up: " + ", ".join(names))
+        thread.append("ALSO UP: " + " ".join(names))
 
     return thread
 
@@ -325,32 +330,30 @@ def compose_round(
     a match they were never in would be worse than saying nothing.
     """
     played = [r for r in results if r[1] is not None]
-    label, _plural = round_label(round, rounds)
+    label, plural = round_label(round, rounds)
+
+    def _next_tail() -> str:
+        """When the next round opens (in hours) + a one-line nudge, then the link.
+        The final gets its own champion post, so a finished final has no next."""
+        link = bracket_url(tournament_id)
+        if round >= rounds:
+            return link
+        flavor = "ONE MATCH LEFT." if round + 1 == rounds else "CHECK YOUR FIXTURE."
+        if next_opens_phrase:
+            return f"{next_opens_phrase}. {flavor}\n{link}"
+        nxt, nxt_plural = round_label(round + 1, rounds)
+        verb = "OPEN" if nxt_plural else "OPENS"
+        return f"{nxt.upper()} {verb} SOON. {flavor}\n{link}"
 
     # Down to one or two fixtures there is a story, so tell it with the score.
     if played and len(played) <= 2:
-        lead = f"{label.upper()} DONE."
-        tail = ""
-        if round < rounds:
-            if next_opens_phrase:
-                tail = f"{next_opens_phrase}.\n"
-            else:
-                nxt, _ = round_label(round + 1, rounds)
-                tail = f"{nxt.upper()} UP NEXT.\n"
-        tail += bracket_url(tournament_id)
-        body = [f"{_at(w)} TOOK IT {a}-{b} AGAINST {_at(l)}" for w, l, a, b in played]
-        return [_fit(lead, body, tail)]
+        lead = f"{label.upper()} {'ARE' if plural else 'IS'} DONE."
+        body = [f"{_at(w)} TOOK IT {a}-{b} AGAINST {_at(l)}." for w, l, a, b in played]
+        return [_fit(lead, body, _next_tail())]
 
     # A wide round names every survivor, threaded so all are tagged.
-    lead = f"{label.upper()} WRAPPED."
-    tail = ""
-    if round < rounds:
-        if next_opens_phrase:
-            tail = f"{next_opens_phrase}.\n"
-        else:
-            nxt, _ = round_label(round + 1, rounds)
-            tail = f"{nxt.upper()} NEXT.\n"
-    tail += bracket_url(tournament_id)
+    lead = f"{label.upper()} {'ARE' if plural else 'IS'} WRAPPED."
+    tail = _next_tail()
     survivors = [_at(w) for w, _, _, _ in results if w]
 
     thread: list[str] = []
@@ -358,20 +361,20 @@ def compose_round(
     # First post: lead + "STILL STANDING: <names that fit>" + tail.
     i, first = 0, []
     while i < len(survivors):
-        line = "STILL STANDING: " + ", ".join(first + [survivors[i]])
+        line = "STILL STANDING: " + " ".join(first + [survivors[i]])
         if len("\n\n".join([lead, line, tail])) <= THREAD_FIRST_LIMIT:
             first.append(survivors[i])
             i += 1
         else:
             break
-    first_line = "STILL STANDING: " + ", ".join(first) if first else "STILL STANDING:"
+    first_line = "STILL STANDING: " + " ".join(first) if first else "STILL STANDING:"
     thread.append("\n\n".join([lead, first_line, tail]))
 
     # Continuation posts: the rest of the survivors, so nobody is left untagged.
     while i < len(survivors):
         names: list[str] = []
         while i < len(survivors):
-            line = "STILL STANDING: " + ", ".join(names + [survivors[i]])
+            line = "STILL STANDING: " + " ".join(names + [survivors[i]])
             if len(line) <= THREAD_CONT_LIMIT:
                 names.append(survivors[i])
                 i += 1
@@ -380,7 +383,7 @@ def compose_round(
         if not names:  # a single name longer than a whole post (pathological)
             names = [survivors[i]]
             i += 1
-        thread.append("STILL STANDING: " + ", ".join(names))
+        thread.append("STILL STANDING: " + " ".join(names))
 
     return thread
 
