@@ -83,6 +83,10 @@ def bracket_url(tournament_id: str) -> str:
     return f"{SITE}/tournament/{tournament_id}"
 
 
+def rules_url() -> str:
+    return f"{SITE}/tournament/rules"
+
+
 def _fit(lead: str, body: list[str], tail: str) -> str:
     """Assemble under Bluesky's ceiling, sacrificing the middle.
 
@@ -146,11 +150,22 @@ def compose_draw(
     Matches where both seats are contested are omitted here - those players are
     tagged in the play-in post instead.
     """
-    lead = (
-        f"THE BRACKET IS LIVE. {entrants} PLAYERS. "
-        f"{rounds} {'ROUND' if rounds == 1 else 'ROUNDS'}. LET'S GO."
+    # First post: pure intro/hype, no fixtures. Fixtures (the "full bracket") and
+    # the links come in the follow-up posts below it. `entrants`/`rounds` are no
+    # longer surfaced in the copy but stay in the signature for the caller.
+    intro = (
+        f"THE BRACKET IS DRAWN FOR THIS WEEKEND'S {name.upper()}.\n\n"
+        "CHECK YOUR FIXTURES, STUDY YOUR OPPONENT, AND GET SOME PRACTICE IN BEFORE FRIDAY.\n\n"
+        "PLAY HARD, KEEP IT RESPECTFUL, AND HAVE FUN. THAT'S WHAT THE CAVE IS ABOUT.\n\n"
+        "FULL BRACKET + RULES BELOW."
     )
-    tail = f"BEST OF THREE EVERY ROUND.\n{bracket_url(tournament_id)}"
+    tail = (
+        "BEST OF THREE EVERY ROUND.\n\n"
+        "GOOD LUCK, EVERYONE.\n\n"
+        f"FULL BRACKET: {bracket_url(tournament_id)}\n"
+        f"RULES: {rules_url()}"
+    )
+
     items: list[str] = []
     for p1, p2 in round1:
         if p1 and p2:
@@ -159,28 +174,18 @@ def compose_draw(
             items.append(f"{_at(p1 or p2)} VS A PLAY-IN WINNER")
         # both contested: skip; those players are tagged in the play-in post
 
-    thread: list[str] = []
+    thread: list[str] = [intro]
 
-    # First post: lead + as many fixtures as fit above the link.
-    i, first_body = 0, []
+    # Fixture posts: the header on the first, "MORE FIXTURES:" on any overflow, so
+    # every player is tagged no matter the field size.
+    fixture_posts: list[str] = []
+    i, first = 0, True
     while i < len(items):
-        trial = "\n\n".join([lead, "\n".join(first_body + [items[i]]), tail])
-        if len(trial) <= THREAD_FIRST_LIMIT:
-            first_body.append(items[i])
-            i += 1
-        else:
-            break
-    thread.append(
-        "\n\n".join([lead, "\n".join(first_body), tail])
-        if first_body
-        else f"{lead}\n\n{tail}"
-    )
-
-    # Continuation posts: the rest of the fixtures, so nobody is left untagged.
-    while i < len(items):
+        header = "THIS WEEKEND'S FIXTURES:" if first else "MORE FIXTURES:"
+        first = False
         body: list[str] = []
         while i < len(items):
-            trial = "\n".join(["MORE FIXTURES:"] + body + [items[i]])
+            trial = f"{header}\n\n" + "\n".join(body + [items[i]])
             if len(trial) <= THREAD_CONT_LIMIT:
                 body.append(items[i])
                 i += 1
@@ -189,8 +194,19 @@ def compose_draw(
         if not body:  # a single line longer than a whole post (pathological)
             body = [items[i]]
             i += 1
-        thread.append("\n".join(["MORE FIXTURES:"] + body))
+        fixture_posts.append(f"{header}\n\n" + "\n".join(body))
 
+    if not fixture_posts:  # nothing listable (all contested / play-in only)
+        fixture_posts.append("THIS WEEKEND'S FIXTURES:")
+
+    # The tail (best-of-three + good luck + links) rides the last fixtures post if
+    # it fits, otherwise it gets its own post so the links are never dropped.
+    if len(f"{fixture_posts[-1]}\n\n{tail}") <= THREAD_CONT_LIMIT:
+        fixture_posts[-1] = f"{fixture_posts[-1]}\n\n{tail}"
+    else:
+        fixture_posts.append(tail)
+
+    thread.extend(fixture_posts)
     return thread
 
 
