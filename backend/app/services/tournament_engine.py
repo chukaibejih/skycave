@@ -395,48 +395,69 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
 # evening round with a one-hour buffer (13:00 -> 14:00). The final is always the
 # Sunday evening slot; smaller fields use fewer days, spreading Friday to Sunday,
 # and only a full 33-64 field (six rounds) reaches back to the Thursday slot.
-EVENING = (14, 19)
-MORNING = (8, 13)
+# The earliest a round may open in the day, Pacific. A raw open before this (the
+# dead of night) is pushed here so nobody is asked to start a match at 4am.
+MORNING_OPEN_HOUR = 8
+# Target width per round. The play window is sized to `rounds * this`, so a small
+# field gets fewer, wider windows instead of tight fixed slots; 13h averages a
+# roomy daytime block and a roomy overnight block across a weekend.
+WINDOW_HOURS_PER_ROUND = 13
 
-# Day offset from the anchoring Thursday: Thu 0, Fri 1, Sat 2, Sun 3. Ordered by
-# priority - the final's slot first, then each earlier slot in the order it is
-# added as the field grows. Taking the first ``rounds`` of these and sorting them
-# chronologically yields the schedule for any field size, so an 8-player (three
-# round) event runs Fri/Sat/Sun one-a-night while a full bracket fills Thu-Sun.
-_SLOT_PRIORITY: tuple[tuple[int, tuple[int, int]], ...] = (
-    (3, EVENING),  # Sun evening  - the final
-    (2, EVENING),  # Sat evening
-    (1, EVENING),  # Fri evening
-    (3, MORNING),  # Sun morning
-    (2, MORNING),  # Sat morning
-    (0, EVENING),  # Thu evening  - only a full six-round field reaches this far
-)
+
+def _snap_open(dt_pac: datetime) -> datetime:
+    """Nudge a raw open out of the dead of night into the morning, else round it
+    down to a clean hour - so every round opens at a civilised, tidy time."""
+    if dt_pac.hour < MORNING_OPEN_HOUR:
+        return dt_pac.replace(hour=MORNING_OPEN_HOUR, minute=0, second=0, microsecond=0)
+    return dt_pac.replace(minute=0, second=0, microsecond=0)
 
 
 def round_windows(play_opens_at: datetime, rounds: int) -> list[tuple[datetime, datetime]]:
-    """(open, close) in UTC for each round, earliest first.
+    """(open, close) in UTC for each round, earliest first - wide, contiguous
+    windows spread across the weekend and scaled to the field.
 
-    ``play_opens_at`` supplies only the calendar week: any day in it is snapped
-    back to that week's Thursday, which the slots hang off, so this stays correct
-    even after the draw resets ``play_opens_at`` to the field's actual first
-    round. Slots are built in Pacific wall clock and converted to UTC, so every
-    window holds its local hour across a daylight-saving change.
+    The play window runs from a start sized to the field (fewer rounds -> a later
+    start, but never before Thursday 2pm Pacific) to the Sunday 7pm wall, and is
+    split into `rounds` equal slices end to end, so there is no dead time between
+    rounds and each one gets a generous window. Each open is nudged out of the
+    dead of night; the final always closes on the Sunday wall. Built in Pacific
+    wall clock and converted to UTC, so a window holds its local hour across DST.
+
+    ``play_opens_at`` supplies only the calendar week, snapped back to its
+    Thursday, so this stays correct even after the draw resets ``play_opens_at``
+    to the field's actual first round.
     """
     if rounds < 1:
         return []
-    if rounds > len(_SLOT_PRIORITY):
-        raise ValueError(f"{rounds} rounds exceeds the {len(_SLOT_PRIORITY)}-slot schedule")
 
     d = play_opens_at.astimezone(PACIFIC).date()
     thursday = d - timedelta(days=(d.weekday() - CLOSE_WEEKDAY) % 7)
+    sunday = thursday + timedelta(days=3)
+    wall = datetime.combine(sunday, time(PLAY_CLOSE_HOUR), tzinfo=PACIFIC)
+    earliest = datetime.combine(thursday, time(PLAY_OPEN_HOUR), tzinfo=PACIFIC)
+    start = max(earliest, wall - timedelta(hours=WINDOW_HOURS_PER_ROUND * rounds))
+    span = wall - start
 
-    chosen = sorted(_SLOT_PRIORITY[:rounds], key=lambda s: (s[0], s[1][0]))
+    # First the opens: an even spread, each nudged to a civilised hour and kept
+    # strictly increasing. Then contiguous windows - each round runs until an hour
+    # before the next one opens (a settle buffer), and the final closes on the wall.
+    opens: list[datetime] = []
+    prev: datetime | None = None
+    for i in range(rounds):
+        o = _snap_open((start + span * i / rounds).astimezone(PACIFIC))
+        if prev is not None and o <= prev:
+            o = prev + timedelta(hours=1)
+        opens.append(o)
+        prev = o
+
     windows: list[tuple[datetime, datetime]] = []
-    for day_offset, (open_hour, close_hour) in chosen:
-        day = thursday + timedelta(days=day_offset)
-        open_local = datetime.combine(day, time(open_hour), tzinfo=PACIFIC)
-        close_local = datetime.combine(day, time(close_hour), tzinfo=PACIFIC)
-        windows.append(
-            (open_local.astimezone(timezone.utc), close_local.astimezone(timezone.utc))
-        )
+    for i in range(rounds):
+        o = opens[i]
+        if i == rounds - 1:
+            c = wall
+        else:
+            c = opens[i + 1] - timedelta(hours=1)
+            if c <= o:
+                c = opens[i + 1]
+        windows.append((o.astimezone(timezone.utc), c.astimezone(timezone.utc)))
     return windows

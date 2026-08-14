@@ -196,13 +196,22 @@ async def matches(db: AsyncSession, tournament_id: str) -> list[TournamentMatch]
 # --------------------------------------------------------------------------- #
 
 async def _enqueue_play_live(db: AsyncSession, t: Tournament) -> None:
-    """Queue the kickoff post, tagging everyone with a round-one fixture (byes
-    skip round one, so they are not pinged to play yet)."""
+    """Queue the kickoff post, tagging everyone in the FIRST round that opens.
+
+    That is the play-in (round 0) when the field has one, else round one. The old
+    version hardcoded round 1, so a play-in field pinged the resting main-draw
+    players instead of the play-in players who were actually live. Later rounds
+    get their own pre-open heads-up + nudges, not this one-time post.
+    """
     rows = await matches(db, t.id)
+    if not rows:
+        return
+    first_round = min(m.round for m in rows)
+    last_round = max(m.round for m in rows)
     handle_of = {e.did: e.handle for e in await entrants(db, t.id)}
     players: list[str] = []
     for m in rows:
-        if m.round != 1 or not (m.player1_did and m.player2_did):
+        if m.round != first_round or not (m.player1_did and m.player2_did):
             continue
         for did in (m.player1_did, m.player2_did):
             h = handle_of.get(did)
@@ -216,6 +225,7 @@ async def _enqueue_play_live(db: AsyncSession, t: Tournament) -> None:
         dedupe_key=f"{t.id}:live",
         text=json.dumps(posts.compose_play_live(
             name=t.name, tournament_id=t.id, players=players,
+            round=first_round, rounds=last_round,
         )),
     )
 
@@ -650,10 +660,14 @@ async def _queue_progress(
     rounds = max((f.round for f in fixtures), default=0)
     if not rounds:
         return
+    # Start at the lowest round present (0 when there is a play-in) so the play-in
+    # gets its own "who advanced, next round opens WHEN" summary instead of the
+    # play-in resolving in silence. The final round is still the champion's post.
+    first_round = min((f.round for f in fixtures), default=1)
     open_map = _round_open_map(t)
     now = _now()
 
-    for rnd in range(1, rounds + 1):
+    for rnd in range(first_round, rounds + 1):
         in_round = [f for f in fixtures if f.round == rnd]
         if not in_round or not all(f.decided() for f in in_round):
             continue

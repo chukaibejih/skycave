@@ -60,6 +60,9 @@ def round_label(round: int, rounds: int) -> tuple[str, bool]:
     "The final is done" and "the semi-finals are done" both need saying, and
     getting that wrong is the giveaway that a bot wrote the post.
     """
+    if round == 0:
+        # Round 0 only exists when there is a play-in; it is always the play-in.
+        return "the play-in", False
     left = rounds - round
     if left == 0:
         return "the final", False
@@ -255,18 +258,23 @@ def compose_play_in(
 
 
 def compose_play_live(
-    *, name: str, tournament_id: str, players: list[str]
+    *, name: str, tournament_id: str, players: list[str], round: int, rounds: int
 ) -> list[str]:
-    """Play just opened: the kickoff post, tagging everyone with a round-one
-    fixture so they know it is open. Threaded like the draw so no field size
-    leaves anyone untagged.
+    """Play just opened: the kickoff post, tagging everyone in the FIRST round
+    that opens - the play-in when there is one, else round one. Threaded like the
+    draw so no field size leaves anyone untagged.
+
+    `round`/`rounds` name that first round in the copy (via round_label), so a
+    play-in field reads "THE PLAY-IN IS OPEN", not the old hardcoded "ROUND ONE".
 
     Unlike the celebratory posts, this one does not shout. It is the tournament
     telling players they can start, and that they have until the round closes, so
     the tone is a calm nudge, not a starting gun.
     """
+    label, plural = round_label(round, rounds)
+    verb = "ARE OPEN" if plural else "IS OPEN"
     lead = (
-        "ROUND ONE IS OPEN. PLAY YOUR FIXTURE ANY TIME BEFORE THE DEADLINE. "
+        f"{label.upper()} {verb}. PLAY YOUR FIXTURE ANY TIME BEFORE THE DEADLINE. "
         "NO RUSH, BUT DON'T SLEEP ON IT.\n\n"
         "BEST OF THREE. WIN AND YOU'RE THROUGH."
     )

@@ -1,18 +1,21 @@
-"""The v5 per-round schedule: named daily slots, not even slices.
+"""The v6 per-round schedule: wide, field-scaled windows, not fixed slots.
 
 Usage:  python tests/tournament_schedule.py   (inside the api container)
 
-The point of round_windows is that a round never opens in the middle of anyone's
-night. These checks pin the shape it promised the players on the rulebook:
+round_windows splits the play window into `rounds` equal slices, from a start
+sized to the field to the Sunday 7pm Pacific wall, each open nudged out of the
+dead of night and contiguous with a one-hour settle buffer between rounds. A
+small field therefore gets a few wide windows instead of tight 5-hour slots.
+These checks pin the promises made on the rulebook:
 
-  - the final is always the Sunday evening slot;
-  - nothing opens before 8am Pacific, and every night's decisive round closes at
-    10pm Eastern (19:00 Pacific);
-  - a two-round day carries a one-hour buffer between its rounds;
-  - small fields spread Friday to Sunday, and only a full six-round field reaches
-    back to the Thursday slot;
-  - and, like the weekend anchors, the local hours hold across a DST change
-    rather than drifting an hour with the UTC offset.
+  - one window per round, ordered, never overlapping;
+  - nothing opens before 8am Pacific;
+  - the final always closes on the Sunday 7pm wall (10pm Eastern);
+  - consecutive rounds carry exactly a one-hour buffer;
+  - every window is generous (>= 5h), wider than the old fixed slots;
+  - play starts no earlier than Thursday 2pm, and only a full six-round field
+    starts that early;
+  - and the local hours hold across a DST change, not a fixed UTC offset.
 """
 import sys
 from datetime import datetime, timezone
@@ -32,100 +35,96 @@ SAMPLES = [
     ("winter (PST)", datetime(2026, 12, 15, 12, 0, tzinfo=timezone.utc)),
 ]
 
-# rounds -> the set of Pacific weekdays (Mon=0) the windows should fall on.
-EXPECTED_DAYS = {
-    1: {6},              # Sun
-    2: {5, 6},           # Sat, Sun
-    3: {4, 5, 6},        # Fri, Sat, Sun  (the 5-8 player cup, one a night)
-    4: {4, 5, 6},        # Fri, Sat, Sun
-    5: {4, 5, 6},        # Fri, Sat, Sun
-    6: {3, 4, 5, 6},     # Thu, Fri, Sat, Sun  (the full 33-64 field)
-}
-
 
 def _anchor(now: datetime) -> datetime:
-    """The tournament's stored play_opens_at: Thursday 14:00 Pacific."""
+    """The tournament's stored play_opens_at anchor: Thursday 14:00 Pacific."""
     _closes, opens, _wall = eng.weekend_anchors(now)
     return opens
 
 
-def test_final_is_always_sunday_evening() -> None:
+def test_count_wall_and_floor() -> None:
     for label, now in SAMPLES:
         opens = _anchor(now)
+        _c, _o, wall = eng.weekend_anchors(now)
         for rounds in range(1, 7):
             windows = eng.round_windows(opens, rounds)
             assert len(windows) == rounds, f"{label} r{rounds}: got {len(windows)} windows"
-            open_final, close_final = windows[-1]
-            o, c = open_final.astimezone(PACIFIC), close_final.astimezone(PACIFIC)
-            assert o.weekday() == 6 and o.hour == 14, f"{label} r{rounds}: final opens {o:%a %H:%M}"
-            assert c.weekday() == 6 and c.hour == 19, f"{label} r{rounds}: final closes {c:%a %H:%M}"
-            # The final's close is the hard wall the weekend anchors publish.
-            _closes, _opens, wall = eng.weekend_anchors(now)
-            assert close_final == wall, f"{label} r{rounds}: final close {close_final} != wall {wall}"
-    print("the final is the Sunday 2-7pm PT slot for every field size, both seasons")
-
-
-def test_floor_wall_and_ordering() -> None:
-    for label, now in SAMPLES:
-        opens = _anchor(now)
-        for rounds in range(1, 7):
-            windows = eng.round_windows(opens, rounds)
-            prev_close = None
             for open_utc, close_utc in windows:
                 o = open_utc.astimezone(PACIFIC)
-                c = close_utc.astimezone(PACIFIC)
                 assert o.hour >= 8, f"{label} r{rounds}: opens {o:%a %H:%M}, before the 8am PT floor"
-                assert (o.hour, c.hour) in {eng.EVENING, eng.MORNING}, (
-                    f"{label} r{rounds}: window {o:%H:%M}-{c:%H:%M} is neither slot shape"
-                )
-                # Evening rounds are the nightly wall: 19:00 PT == 22:00 ET.
-                if (o.hour, c.hour) == eng.EVENING:
-                    assert c.astimezone(EASTERN).hour == 22, (
-                        f"{label} r{rounds}: evening closes {c.astimezone(EASTERN):%H:%M} ET, not 10pm"
-                    )
-                if prev_close is not None:
-                    assert open_utc >= prev_close, f"{label} r{rounds}: windows overlap or go backwards"
-                prev_close = close_utc
-    print("nothing opens before 8am PT, evenings close at 10pm ET, windows never overlap")
+                assert open_utc < close_utc, f"{label} r{rounds}: a window is empty or backwards"
+            close_final = windows[-1][1]
+            assert close_final == wall, f"{label} r{rounds}: final close {close_final} != wall {wall}"
+            cfp = close_final.astimezone(PACIFIC)
+            assert cfp.weekday() == 6 and cfp.hour == 19, f"{label} r{rounds}: final closes {cfp:%a %H:%M}, not Sun 19:00"
+            assert close_final.astimezone(EASTERN).hour == 22, f"{label} r{rounds}: wall is not 10pm ET"
+    print("one window per round; opens >= 8am PT; the final closes on the Sunday 7pm wall (10pm ET)")
 
 
-def test_same_day_buffer_is_one_hour() -> None:
+def test_order_no_overlap_and_buffer() -> None:
     for label, now in SAMPLES:
         opens = _anchor(now)
         for rounds in range(1, 7):
             windows = eng.round_windows(opens, rounds)
-            by_day: dict = {}
-            for open_utc, close_utc in windows:
-                o = open_utc.astimezone(PACIFIC)
-                by_day.setdefault(o.date(), []).append((open_utc, close_utc))
-            for day, wins in by_day.items():
-                if len(wins) < 2:
-                    continue
-                wins.sort()
-                for (_, a_close), (b_open, _) in zip(wins, wins[1:]):
-                    gap = (b_open - a_close).total_seconds() / 3600
-                    assert gap == 1.0, f"{label} r{rounds} {day}: {gap}h between rounds, not 1h"
-    print("two-round days carry exactly a one-hour buffer between their rounds")
+            for (_, a_close), (b_open, _) in zip(windows, windows[1:]):
+                assert b_open >= a_close, f"{label} r{rounds}: windows overlap or go backwards"
+                gap = (b_open - a_close).total_seconds() / 3600
+                assert gap == 1.0, f"{label} r{rounds}: {gap}h between rounds, not the 1h buffer"
+    print("windows are ordered, never overlap, and carry exactly a one-hour settle buffer")
 
 
-def test_field_size_spreads_correctly() -> None:
+def test_windows_are_generous() -> None:
     for label, now in SAMPLES:
         opens = _anchor(now)
-        for rounds, expected in EXPECTED_DAYS.items():
+        for rounds in range(1, 7):
             windows = eng.round_windows(opens, rounds)
-            days = {o.astimezone(PACIFIC).weekday() for o, _ in windows}
-            assert days == expected, f"{label} r{rounds}: runs on {sorted(days)}, expected {sorted(expected)}"
-            # Thursday (weekday 3) is reserved for the full six-round field.
-            assert (3 in days) == (rounds == 6), f"{label} r{rounds}: Thursday used at the wrong size"
-    print("small fields spread Fri-Sun; only a full six-round field starts Thursday")
+            for open_utc, close_utc in windows:
+                hours = (close_utc - open_utc).total_seconds() / 3600
+                assert hours >= 5, f"{label} r{rounds}: a {hours:.0f}h window is tighter than the old 5h slot"
+    print("every window is at least 5h - a small field gets room, not the old tight slots")
+
+
+def test_start_scales_with_field() -> None:
+    for label, now in SAMPLES:
+        thursday_2pm = _anchor(now).astimezone(PACIFIC)  # Thu 14:00 Pacific
+        for rounds in range(1, 7):
+            windows = eng.round_windows(_anchor(now), rounds)
+            first = windows[0][0].astimezone(PACIFIC)
+            assert first >= thursday_2pm, f"{label} r{rounds}: starts {first:%a %H:%M}, before Thursday 2pm"
+            # Only a full six-round field (33-64 players) reaches back to Thursday.
+            assert (first.weekday() == 3) == (rounds == 6), (
+                f"{label} r{rounds}: starts {first:%a}, Thursday used at the wrong field size"
+            )
+    print("play starts no earlier than Thursday 2pm; only a six-round field starts Thursday")
+
+
+def test_hours_hold_across_dst() -> None:
+    shapes: dict[int, dict[str, list]] = {}
+    for label, now in SAMPLES:
+        opens = _anchor(now)
+        for rounds in range(1, 7):
+            windows = eng.round_windows(opens, rounds)
+            shape = [
+                (
+                    o.astimezone(PACIFIC).weekday(), o.astimezone(PACIFIC).hour,
+                    c.astimezone(PACIFIC).weekday(), c.astimezone(PACIFIC).hour,
+                )
+                for o, c in windows
+            ]
+            shapes.setdefault(rounds, {})[label] = shape
+    for rounds, by_label in shapes.items():
+        vals = list(by_label.values())
+        assert all(v == vals[0] for v in vals), f"r{rounds}: the schedule's local hours drift across DST"
+    print("every window's Pacific weekday+hour holds identically across a DST change")
 
 
 def main() -> None:
-    test_final_is_always_sunday_evening()
-    test_floor_wall_and_ordering()
-    test_same_day_buffer_is_one_hour()
-    test_field_size_spreads_correctly()
-    print("\nPASS: the schedule lands where the rulebook says it does")
+    test_count_wall_and_floor()
+    test_order_no_overlap_and_buffer()
+    test_windows_are_generous()
+    test_start_scales_with_field()
+    test_hours_hold_across_dst()
+    print("\nPASS: the v6 wide-window schedule lands where the rulebook says it does")
 
 
 if __name__ == "__main__":
