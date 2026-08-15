@@ -470,8 +470,10 @@ def compose_champion(
         result += f" WITH A {final_score[0]}-{final_score[1]} FINAL"
     lead = f"\U0001f451 THE CAVE HAS A CHAMPION.\n\n{result}."  # 👑
     body = [f"{entrants} ENTERED. ONE LEFT WITH THE CROWN."]
+    # No fixed cadence, so the close celebrates the win rather than promising a
+    # next weekend that may not come.
     tail = (
-        "ENJOY THE WIN. WE RESET THE BRACKET NEXT WEEKEND.\n"
+        "ENJOY THE WIN. YOU EARNED IT.\n"
         f"{bracket_url(tournament_id)}"
     )
     return _fit(lead, body, tail)
