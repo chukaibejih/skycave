@@ -195,23 +195,25 @@ async def matches(db: AsyncSession, tournament_id: str) -> list[TournamentMatch]
 # Lifecycle, all derived on read
 # --------------------------------------------------------------------------- #
 
-async def _enqueue_play_live(db: AsyncSession, t: Tournament) -> None:
-    """Queue the kickoff post, tagging everyone in the FIRST round that opens.
+async def _enqueue_round_live(db: AsyncSession, t: Tournament, round: int) -> None:
+    """Queue the "this round is open, go play" post for `round`, tagging everyone
+    with a fixture in it.
 
-    That is the play-in (round 0) when the field has one, else round one. The old
-    version hardcoded round 1, so a play-in field pinged the resting main-draw
-    players instead of the play-in players who were actually live. Later rounds
-    get their own pre-open heads-up + nudges, not this one-time post.
+    Fires as EACH round opens (not just the first), keyed per round so it posts
+    once, so the quarter-finals / semis / final each get their own tagged "you're
+    up" the moment their window arrives - separate from the pre-open heads-up (an
+    hour before, untagged) and the deadline nudges (per player, near the wall).
+    The round label in the copy comes from round_label, so a play-in field reads
+    "THE PLAY-IN IS OPEN" and the main rounds read "THE QUARTER-FINALS ARE OPEN".
     """
     rows = await matches(db, t.id)
     if not rows:
         return
-    first_round = min(m.round for m in rows)
     last_round = max(m.round for m in rows)
     handle_of = {e.did: e.handle for e in await entrants(db, t.id)}
     players: list[str] = []
     for m in rows:
-        if m.round != first_round or not (m.player1_did and m.player2_did):
+        if m.round != round or not (m.player1_did and m.player2_did):
             continue
         for did in (m.player1_did, m.player2_did):
             h = handle_of.get(did)
@@ -222,10 +224,10 @@ async def _enqueue_play_live(db: AsyncSession, t: Tournament) -> None:
     await posts.enqueue(
         db,
         kind=posts.KIND_LIVE,
-        dedupe_key=f"{t.id}:live",
+        dedupe_key=f"{t.id}:live:{round}",
         text=json.dumps(posts.compose_play_live(
             name=t.name, tournament_id=t.id, players=players,
-            round=first_round, rounds=last_round,
+            round=round, rounds=last_round,
         )),
     )
 
@@ -247,11 +249,10 @@ async def ensure_fresh(db: AsyncSession, t: Tournament) -> Tournament:
         await lock_and_draw(db, t)
 
     if t.status == LOCKED and now >= _aware(t.play_opens_at):
+        # Play opens. The tagged "you're up" post for each round (including this
+        # first one) is enqueued by _open_due_rounds as its window arrives, so no
+        # separate kickoff here.
         t.status = IN_PROGRESS
-        # Play just opened: post the kickoff, tagging everyone with a round-one
-        # fixture so they are pinged to go play. Dedupe-keyed, so the enqueue is
-        # a no-op if this transition is somehow read twice.
-        await _enqueue_play_live(db, t)
         await db.commit()
 
     if t.status in (LOCKED, IN_PROGRESS):
@@ -272,12 +273,16 @@ async def _open_due_rounds(db: AsyncSession, t: Tournament, now: datetime) -> No
     `scheduled` forever without this.
     """
     rows = await matches(db, t.id)
-    changed = False
+    opened: set[int] = set()
     for m in rows:
         if m.status == M_SCHEDULED and m.opens_at is not None and now >= _aware(m.opens_at):
             m.status = M_READY
-            changed = True
-    if changed:
+            opened.add(m.round)
+    if opened:
+        # A round just went live: tag its players so they know they're up. Keyed
+        # per round, so it posts once even though this pass runs every tick.
+        for rnd in sorted(opened):
+            await _enqueue_round_live(db, t, rnd)
         await db.commit()
 
 
