@@ -278,6 +278,13 @@ async def tournament_tick(
     return {"status": "ok", "preopen": preopen, "nudges": nudges}
 
 
+# Fortnightly cadence: the cron runs every Monday, but a cup is only created when
+# the last one was created at least this many days ago. A weekly gap is 7 days and
+# a fortnightly gap is 14, so any threshold between them makes rotate skip the
+# "off" Monday and fire the next. Lower this toward 7 to go back to weekly.
+ROTATE_MIN_GAP_DAYS = 11
+
+
 @router.post("/tournaments/rotate")
 async def rotate_tournament(
     x_internal_secret: str | None = Header(default=None),
@@ -310,6 +317,28 @@ async def rotate_tournament(
             "tournament_status": existing.status,
             "announced": False,
         }
+
+    # Fortnightly gate: skip the "off" Monday. Runs every Monday but only creates
+    # when the most recent cup (any status) is old enough, so the cadence is every
+    # two weeks without the cron needing to know which Monday it is.
+    recent = (
+        await db.execute(
+            select(Tournament).order_by(Tournament.created_at.desc()).limit(1)
+        )
+    ).scalar_one_or_none()
+    if recent is not None and recent.created_at is not None:
+        created = recent.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age = now - created
+        if age < timedelta(days=ROTATE_MIN_GAP_DAYS):
+            return {
+                "status": "too_soon",
+                "reason": f"last cup created {age.days}d ago; fortnightly gate is {ROTATE_MIN_GAP_DAYS}d",
+                "last_tournament_id": recent.id,
+                "next_eligible_at": (created + timedelta(days=ROTATE_MIN_GAP_DAYS)).isoformat(),
+                "announced": False,
+            }
 
     announcement_text = (
         "Registration is now open for this weekend's Skycave Tournament! 🏆\n\n"
