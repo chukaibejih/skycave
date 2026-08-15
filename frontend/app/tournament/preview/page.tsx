@@ -47,13 +47,13 @@ const champ: TournamentPlayer = {
   avatar_url: null,
 };
 
-const P = (h: string): TournamentPlayer => ({ did: `did:plc:${h}`, handle: h, display_name: h, avatar_url: null });
-const liveM = (slot: number, a: string, b: string, inPlay = true): TournamentMatch => ({
+const P = (handle: string, name: string): TournamentPlayer => ({ did: `did:plc:${handle}`, handle, display_name: name, avatar_url: null });
+const liveM = (slot: number, a: TournamentPlayer, b: TournamentPlayer, inPlay = true): TournamentMatch => ({
   round: 2,
   slot,
   status: "live",
-  player1: P(a),
-  player2: P(b),
+  player1: a,
+  player2: b,
   games: [],
   game_names: [],
   results: [],
@@ -62,13 +62,13 @@ const liveM = (slot: number, a: string, b: string, inPlay = true): TournamentMat
   checked_in: [],
   in_play: inPlay,
 });
-const doneFinal: TournamentMatch = { ...liveM(0, "x", "y"), round: 3, status: "done" };
+const doneFinal: TournamentMatch = { ...liveM(0, P("x", "x"), P("y", "y")), round: 3, status: "done" };
 
 const LIVE_MATCHES = [
-  liveM(0, "editorintaste.bsky.social", "yourmajesty.blacksky.app"),
-  liveM(1, "governorofchaos.blacksky.app", "birdchelle.blacksky.app"),
-  liveM(2, "sunkissk.blacksky.app", "funsizesnicker.blacksky.app", false),
-  liveM(3, "dtdeng.blacksky.app", "shepptar.blacksky.app", false),
+  liveM(0, P("editorintaste.bsky.social", "Editor In Taste 🖊"), P("yourmajesty.blacksky.app", "Your Majesty 👑")),
+  liveM(1, P("governorofchaos.blacksky.app", "The Governor of Chaos"), P("birdchelle.blacksky.app", "Birdchelle Da Southern Belle")),
+  liveM(2, P("sunkissk.blacksky.app", "sunkiss’d k"), P("funsizesnicker.blacksky.app", "fun size snicker"), false),
+  liveM(3, P("dtdeng.blacksky.app", "DT Deng"), P("shepptar.blacksky.app", "Shepp"), false),
 ];
 
 const STATES: { label: string; t: Tournament }[] = [

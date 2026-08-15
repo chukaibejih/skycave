@@ -223,9 +223,9 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
                       className="flex items-center justify-between gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-white/50"
                     >
                       <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold" style={{ color: TOURNEY.ink }}>
-                        <span className="truncate">@{m.player1!.handle}</span>
+                        <span className="truncate">{m.player1!.display_name || m.player1!.handle}</span>
                         <span className="shrink-0 opacity-50">vs</span>
-                        <span className="truncate">@{m.player2!.handle}</span>
+                        <span className="truncate">{m.player2!.display_name || m.player2!.handle}</span>
                       </span>
                       <span
                         className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm"
