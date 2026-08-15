@@ -27,6 +27,7 @@ function mock(over: Partial<Tournament>): Tournament {
     play_closes_at: new Date(now + 100 * H).toISOString(),
     bracket_size: 64,
     rounds: 6,
+    round_opens: [],
     round_deadlines: [],
     champion: null,
     game_pool: [],
@@ -46,25 +47,43 @@ const champ: TournamentPlayer = {
   avatar_url: null,
 };
 
-const liveMatch: TournamentMatch = {
-  round: 1,
-  slot: 0,
+const P = (h: string): TournamentPlayer => ({ did: `did:plc:${h}`, handle: h, display_name: h, avatar_url: null });
+const liveM = (slot: number, a: string, b: string, inPlay = true): TournamentMatch => ({
+  round: 2,
+  slot,
   status: "live",
-  player1: null,
-  player2: null,
+  player1: P(a),
+  player2: P(b),
   games: [],
   game_names: [],
   results: [],
   winner_did: null,
   deadline: null,
   checked_in: [],
-  in_play: true,
-};
+  in_play: inPlay,
+});
+const doneFinal: TournamentMatch = { ...liveM(0, "x", "y"), round: 3, status: "done" };
+
+const LIVE_MATCHES = [
+  liveM(0, "editorintaste.bsky.social", "yourmajesty.blacksky.app"),
+  liveM(1, "governorofchaos.blacksky.app", "birdchelle.blacksky.app"),
+  liveM(2, "sunkissk.blacksky.app", "funsizesnicker.blacksky.app", false),
+  liveM(3, "dtdeng.blacksky.app", "shepptar.blacksky.app", false),
+];
 
 const STATES: { label: string; t: Tournament }[] = [
   { label: "Registration open", t: mock({}) },
   { label: "Last call (under 12h)", t: mock({ registration_closes_at: new Date(Date.now() + 5 * H).toISOString(), spots_left: 4 }) },
-  { label: "The final is on", t: mock({ status: "in_progress", rounds: 1, matches: [liveMatch] }) },
+  { label: "Live matches on (4)", t: mock({ status: "in_progress", rounds: 3, matches: LIVE_MATCHES }) },
+  {
+    label: "Between rounds",
+    t: mock({
+      status: "in_progress",
+      rounds: 3,
+      matches: [doneFinal],
+      round_opens: [{ round: 2, open: new Date(Date.now() + 5 * H).toISOString() }],
+    }),
+  },
   { label: "Champion crowned", t: mock({ status: "finished", champion: champ }) },
 ];
 

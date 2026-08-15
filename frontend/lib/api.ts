@@ -329,6 +329,7 @@ export interface Tournament {
   play_closes_at: string;
   bracket_size: number;
   rounds: number;
+  round_opens: { round: number; open: string }[];
   round_deadlines: { round: number; deadline: string }[];
   champion: TournamentPlayer | null;
   game_pool: string[];

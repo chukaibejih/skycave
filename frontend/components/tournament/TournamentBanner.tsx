@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Countdown } from "@/components/tournament/Countdown";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
 import { useTournamentSignal } from "@/lib/useTournamentSignal";
-import type { Tournament } from "@/lib/api";
+import type { Tournament, TournamentMatch } from "@/lib/api";
 
 /**
  * The tournament's entry point on the hub, rebuilt per season as a scene rather
@@ -14,6 +14,12 @@ import type { Tournament } from "@/lib/api";
  *
  * Everything is driven from TOURNEY, so next week's scene is a palette swap.
  * Pass `preview` to render a specific (mock) tournament for design review.
+ *
+ * Below the scene, a live strip surfaces matches in progress with a Watch button
+ * (anyone can spectate), or - between rounds - when the next round opens. A
+ * participant's own entrance stays primary: their "Your match is waiting" CTA is
+ * in the scene above, and their own live match is never listed as a thing to
+ * watch (they play it), so the strip is purely additive.
  */
 
 const BASE_SHADOW = "0 16px 44px rgba(4, 48, 63, 0.32)";
@@ -24,6 +30,15 @@ const CORAL_PULSE = [
   "0 16px 44px rgba(4,48,63,0.28), 0 0 0px 0px rgba(229,83,61,0)",
 ];
 const URGENT_MS = 12 * 60 * 60 * 1000;
+
+/** Short round name for the strip, play-in aware. */
+function shortRound(round: number, maxRound: number): { label: string; plural: boolean } {
+  if (round === 0) return { label: "Play-in", plural: false };
+  if (round === maxRound) return { label: "Final", plural: false };
+  if (round === maxRound - 1) return { label: "Semis", plural: true };
+  if (round === maxRound - 2) return { label: "Quarters", plural: true };
+  return { label: `Round ${round}`, plural: false };
+}
 
 export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
   const signal = useTournamentSignal();
@@ -41,7 +56,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
   const closesMs = s.countdownTo ? new Date(s.countdownTo).getTime() - Date.now() : Infinity;
   const urgent = s.phase === "open" && t.spots_left > 0 && closesMs > 0 && closesMs < URGENT_MS;
 
-  const eyebrow = urgent ? "Closing soon" : s.phase === "finished" ? "Weekend event" : "Weekend event";
+  const eyebrow = urgent ? "Closing soon" : "Weekend event";
   const label = urgent ? "Last call" : s.label;
   const cta = livePip
     ? "Your match is waiting"
@@ -52,21 +67,42 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
         : s.cta;
   const live = urgent || s.phase === "live" || s.phase === "finals";
 
+  // --- Live strip: matches on right now, or when the next round opens --------
+  const inProgress = t.status === "in_progress" || t.status === "locked";
+  const myDid = t.you?.did;
+  const matches: TournamentMatch[] = t.matches ?? [];
+  const maxRound = matches.reduce((m, x) => Math.max(m, x.round), 0);
+  const liveMatches = matches
+    .filter((m) => m.status === "live" && m.player1 && m.player2)
+    // Never tell a player to "watch" their own live match - they play it.
+    .filter((m) => !myDid || (m.player1!.did !== myDid && m.player2!.did !== myDid))
+    // Actually-in-play matches first, then the ones still checking in.
+    .sort((a, b) => Number(!!b.in_play) - Number(!!a.in_play));
+  const now = Date.now();
+  const nextOpen = (t.round_opens ?? [])
+    .map((r) => ({ round: r.round, at: new Date(r.open).getTime(), iso: r.open }))
+    .filter((r) => r.at > now)
+    .sort((a, b) => a.at - b.at)[0];
+  const showLive = inProgress && liveMatches.length > 0;
+  const showNext = inProgress && !showLive && !!nextOpen && s.phase !== "finished";
+  const shownLive = liveMatches.slice(0, 3);
+  const extraLive = liveMatches.length - shownLive.length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 200, damping: 24 }}
     >
-      <Link href={href} className="block group">
-        <motion.div
-          className="relative overflow-hidden rounded-[22px] border border-white/50"
-          style={{ minHeight: 268, background: TOURNEY.sky }}
-          animate={{ boxShadow: urgent ? CORAL_PULSE : BASE_SHADOW }}
-          transition={
-            urgent ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }
-          }
-        >
+      <motion.div
+        className="relative overflow-hidden rounded-[22px] border border-white/50"
+        animate={{ boxShadow: urgent ? CORAL_PULSE : BASE_SHADOW }}
+        transition={
+          urgent ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }
+        }
+      >
+        {/* SCENE — the participant's entrance (whole scene is the primary link). */}
+        <Link href={href} className="group relative block" style={{ minHeight: 268, background: TOURNEY.sky }}>
           {/* Sun, low over the water, with a soft bob. */}
           <motion.div
             aria-hidden
@@ -157,8 +193,72 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
               </motion.span>
             </div>
           </div>
-        </motion.div>
-      </Link>
+        </Link>
+
+        {/* LIVE STRIP — additive; its own links, so it never nests inside the scene link. */}
+        {(showLive || showNext) && (
+          <div
+            className="relative border-t border-white/50 px-4 py-3"
+            style={{ background: "rgba(255,255,255,0.42)", backdropFilter: "blur(6px)" }}
+          >
+            {showLive ? (
+              <>
+                <div
+                  className="mb-1.5 flex items-center gap-1.5 px-1 font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={{ color: "#0a5566" }}
+                >
+                  <motion.span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: "#e5533d" }}
+                    animate={{ opacity: [1, 0.3, 1], scale: [1, 1.25, 1] }}
+                    transition={{ duration: 1.1, repeat: Infinity }}
+                  />
+                  Live now
+                </div>
+                <div className="flex flex-col gap-1">
+                  {shownLive.map((m) => (
+                    <Link
+                      key={`${m.round}-${m.slot}`}
+                      href={`/tournament/${t.id}/watch/${m.round}/${m.slot}`}
+                      className="flex items-center justify-between gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-white/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold" style={{ color: TOURNEY.ink }}>
+                        <span className="truncate">@{m.player1!.handle}</span>
+                        <span className="shrink-0 opacity-50">vs</span>
+                        <span className="truncate">@{m.player2!.handle}</span>
+                      </span>
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm"
+                        style={{ background: TOURNEY.sun, color: TOURNEY.ink }}
+                      >
+                        Watch →
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+                {extraLive > 0 && (
+                  <Link href="/tournament" className="mt-1.5 block px-1.5 text-[11px] font-semibold" style={{ color: "#0a6072" }}>
+                    +{extraLive} more live · watch all →
+                  </Link>
+                )}
+              </>
+            ) : (
+              nextOpen && (
+                <div className="flex items-center gap-1.5 px-1 py-0.5 text-[12px] font-semibold" style={{ color: "#0a5566" }}>
+                  <span aria-hidden>⏳</span>
+                  <span>
+                    {shortRound(nextOpen.round, maxRound).label}{" "}
+                    {shortRound(nextOpen.round, maxRound).plural ? "open" : "opens"} in{" "}
+                  </span>
+                  <span style={{ color: TOURNEY.ink }}>
+                    <Countdown to={nextOpen.iso} compact />
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </motion.div>
     </motion.div>
   );
 }
