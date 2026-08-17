@@ -33,6 +33,11 @@ logger = logging.getLogger("skycave.reigns")
 # daily roundup instead.
 TAKEOVER_MIN_DAYS = 7
 
+# A still-running reign is announced as a new all-time record only once it is
+# both the longest ever AND at least this many days - so the "longest reign in
+# Skycave history" post always has real weight behind it.
+RECORD_MIN_DAYS = 10
+
 # The exact deterministic sort the solo leaderboard uses, so "who is #1" here can
 # never disagree with what players see on the board.
 _TOP_SORT = (
@@ -182,6 +187,90 @@ async def _announce_takeover(
         dedupe_key=f"takeover:{game}:{int(at.timestamp())}",
         text=text,
     )
+
+
+async def _record_candidate(db: AsyncSession, at: datetime) -> tuple[LeaderboardReign, int] | None:
+    """The still-running reign that is currently the longest in Skycave history
+    (strictly longer than every other reign, and past the weight floor), or None.
+    """
+    rows = (await db.execute(select(LeaderboardReign))).scalars().all()
+    ongoing = [r for r in rows if r.ended_at is None]
+    if not ongoing:
+        return None
+
+    def _days(r: LeaderboardReign) -> int:
+        end = _aware(r.ended_at) if r.ended_at is not None else at
+        return (end - _aware(r.started_at)).days
+
+    top = max(ongoing, key=_days)
+    top_days = _days(top)
+    prev = max((_days(r) for r in rows if r.id != top.id), default=0)
+    if top_days > prev and top_days >= RECORD_MIN_DAYS:
+        return top, top_days
+    return None
+
+
+async def check_record_milestone(db: AsyncSession, *, commit: bool = True) -> bool:
+    """Post once when a still-running reign becomes the longest in Skycave history.
+
+    Run daily (piggybacks the roundup cron). Deduped per reign, so a reign that
+    holds the record announces it a single time and then simply keeps extending
+    it quietly. Enqueue only; the drain posts it. Returns whether it queued.
+    """
+    now = datetime.now(timezone.utc)
+    cand = await _record_candidate(db, now)
+    if cand is None:
+        return False
+    top, top_days = cand
+
+    from app.models import User
+    from app.services import announce, tournament_posts
+
+    handle = (
+        await db.execute(select(User.handle).where(User.did == top.holder_did))
+    ).scalar_one_or_none()
+    if not handle:
+        return False
+    text = announce.compose_record_set(
+        game_type=top.game_type, handle=handle, days=top_days, seed=top.id
+    )
+    posted = await tournament_posts.enqueue(
+        db, kind="reign_record", dedupe_key=f"reign_record:{top.id}", text=text
+    )
+    if commit and posted:
+        await db.commit()
+    return posted
+
+
+async def seed_record_marker(db: AsyncSession) -> bool:
+    """One-off: suppress the reign that already holds the record, so going live
+    does not retroactively announce a record set before tracking began. Writes an
+    already-handled outbox row under the dedupe key the daily check uses; a future
+    reign that surpasses this one is a different key and still posts. Returns
+    whether a marker was written.
+    """
+    from app.models.announcement import AnnouncementOutbox
+
+    cand = await _record_candidate(db, datetime.now(timezone.utc))
+    if cand is None:
+        return False
+    top, _ = cand
+    key = f"reign_record:{top.id}"
+    exists = (
+        await db.execute(select(AnnouncementOutbox.id).where(AnnouncementOutbox.dedupe_key == key))
+    ).scalar_one_or_none()
+    if exists is not None:
+        return False
+    db.add(
+        AnnouncementOutbox(
+            kind="reign_record",
+            dedupe_key=key,
+            text="(seeded marker: pre-existing record, not posted)",
+            posted_at=datetime.now(timezone.utc),
+        )
+    )
+    await db.commit()
+    return True
 
 
 async def seed(db: AsyncSession) -> int:

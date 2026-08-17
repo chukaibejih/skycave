@@ -307,6 +307,30 @@ def compose_takeover(
     return _pick_variant(variants, seed)
 
 
+def _record_set_variants(who: str, game: str, days: int, url: str) -> list[str]:
+    """Voices for a reign BECOMING the longest in Skycave history - the champ is
+    still on the throne, so this celebrates them, not a challenger."""
+    return [
+        f"{days} days at #1.\n\n{who} now holds the longest reign in Skycave history, "
+        f"on {game}. Nobody has ever sat on top this long.\n\nStill counting. Who can "
+        f"end it?\n\n{url}",
+        f"A Skycave record.\n\n{who} has held #1 on {game} for {days} days, longer than "
+        f"anyone ever has.\n\nThe throne is theirs, and the clock is still "
+        f"running.\n\n{url}",
+        f"History on {game}.\n\n{who}'s {days}-day reign at the top is now the longest "
+        f"Skycave has ever seen.\n\nSomebody's going to have to end it.\n\n{url}",
+        f"{days} days on top, and it's a record.\n\nNo one has ever held a Skycave #1 "
+        f"longer than {who} on {game}.\n\nThe reign continues.\n\n{url}",
+    ]
+
+
+def compose_record_set(*, game_type: str, handle: str, days: int, seed: int) -> str:
+    """The post for a still-running reign that just became the longest ever."""
+    game = _solo_name(_game_name(game_type))
+    url = f"skycave.space/play/{_slug(game_type)}"
+    return _pick_variant(_record_set_variants(_at(handle), game, days, url), seed)
+
+
 # --------------------------------------------------------------------------- #
 # Gathering a day from the database
 # --------------------------------------------------------------------------- #

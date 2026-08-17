@@ -84,6 +84,18 @@ async def daily_roundup(
     posting, so the cron can be exercised safely and the copy inspected."""
     _guard(x_internal_secret)
 
+    # A daily milestone check, independent of the roundup: has a still-running
+    # reign just become the longest in Skycave history? Enqueues its own post (the
+    # drain sends it). Best effort, and skipped on dry runs so it never posts
+    # while someone is only inspecting the roundup copy.
+    if not dry_run:
+        try:
+            from app.services import reigns
+
+            await reigns.check_record_milestone(db)
+        except Exception:  # noqa: BLE001
+            logger.exception("record milestone check failed")
+
     from app.models.roundup import RoundupShoutout
 
     now = datetime.now(timezone.utc)
