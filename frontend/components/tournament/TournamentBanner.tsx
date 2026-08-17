@@ -271,15 +271,35 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
   );
 }
 
+// The off-season line. A single curated bit of personality (not scheduling
+// prose): the arena is quiet, but the menace is implied. The "when" lives in the
+// metadata below, so this line never has to explain mechanics.
+const OFF_SEASON_LINE = "Enjoy the peace while it lasts.";
+
+/** "AUG 22" in the tournament's canonical Pacific zone (the schedule reasons in
+ * Pacific, and 15:00 UTC is the same calendar day there). */
+function shortDatePacific(iso: string): string {
+  return new Date(iso)
+    .toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "America/Los_Angeles",
+    })
+    .toUpperCase();
+}
+
 /**
- * The between-cups teaser. When the last tournament is done and the next has not
- * opened, the hub keeps a small, forward-looking card rather than going blank:
- * it honours the last champion and counts down to the next opening, so the
- * surface stays warm and the fortnightly rhythm reads at a glance.
+ * The between-cups card: Skycave's marquee competition, dormant rather than
+ * disabled. It honours the last champion (the visual anchor, softly gold-lit)
+ * and names when the next cup lands, with a thin championship accent along the
+ * top edge so it reads as the centrepiece even at rest. It wakes back into the
+ * full event scene the moment the next registration opens. No countdown, no
+ * inner container - whitespace and a hairline carry it.
  */
 function BetweenCups({ t }: { t: Tournament }) {
   const champ = t.champion;
-  const next = t.next_opens_at;
+  const date = t.next_opens_at ? shortDatePacific(t.next_opens_at) : null;
+  const meta = date ? `Next cup · ${date}` : "Next cup soon";
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -289,47 +309,86 @@ function BetweenCups({ t }: { t: Tournament }) {
       <Link
         href={`/tournament/${t.id}`}
         className="group relative block overflow-hidden rounded-[22px] border p-5"
-        style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+        style={{
+          borderColor: "color-mix(in srgb, var(--color-border) 75%, transparent)",
+          background: "var(--color-surface)",
+        }}
       >
-        {/* A soft gold glow, echoing the champion card and the Cup. */}
+        {/* Championship accent along the top edge: a thin gold line fading at
+            both ends, over a soft downward wash. Marks the card as the marquee
+            without a full glowing border. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-[0.18] blur-3xl"
-          style={{ background: "var(--color-gold)" }}
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-gold) 80%, transparent) 50%, transparent)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-10"
+          style={{
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent)",
+          }}
         />
 
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-              Weekend Tournament
-            </div>
-            {champ ? (
-              <div className="mt-3 flex items-center gap-2.5">
-                <span
-                  className="shrink-0 rounded-full p-[2px]"
-                  style={{ border: "1.5px solid color-mix(in srgb, var(--color-gold) 55%, transparent)" }}
-                >
-                  <Avatar id={champ.did} name={champ.display_name} avatarUrl={champ.avatar_url} size={34} />
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                    {champ.display_name}
-                  </div>
-                  <div
-                    className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em]"
-                    style={{ color: "var(--color-gold)" }}
-                  >
-                    last champion
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                The bracket is between cups.
-              </div>
-            )}
-          </div>
+        <div className="relative font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
+          Weekend Tournament
+        </div>
 
+        {/* The champion is the anchor: name in display type, a restrained gold
+            glow and ring behind the avatar - a title holder, not a list row. */}
+        {champ ? (
+          <div className="relative mt-3.5 flex items-center gap-3">
+            <div className="relative shrink-0">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -inset-2 rounded-full opacity-40 blur-xl"
+                style={{ background: "var(--color-gold)" }}
+              />
+              <span
+                className="relative block rounded-full p-[2px]"
+                style={{ border: "1.5px solid color-mix(in srgb, var(--color-gold) 65%, transparent)" }}
+              >
+                <Avatar id={champ.did} name={champ.display_name} avatarUrl={champ.avatar_url} size={40} />
+              </span>
+            </div>
+            <div className="min-w-0">
+              <div className="truncate font-[var(--font-display)] text-lg font-bold leading-tight text-[var(--color-text-primary)]">
+                {champ.display_name}
+              </div>
+              <div
+                className="mt-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em]"
+                style={{ color: "var(--color-gold)" }}
+              >
+                Last champion
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="relative mt-2 font-[var(--font-display)] text-lg font-bold text-[var(--color-text-primary)]">
+            The cave rests.
+          </div>
+        )}
+
+        {/* Hairline, not a boxed pill: no container-inside-a-container. */}
+        <div
+          aria-hidden
+          className="relative my-4 h-px"
+          style={{ background: "color-mix(in srgb, var(--color-border) 85%, transparent)" }}
+        />
+
+        <div className="relative flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+              {OFF_SEASON_LINE}
+            </div>
+            <div className="mt-1.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
+              {meta}
+            </div>
+          </div>
           <svg
             width="20"
             height="20"
@@ -340,28 +399,11 @@ function BetweenCups({ t }: { t: Tournament }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden
-            className="shrink-0 transition-transform group-hover:translate-x-0.5"
+            className="shrink-0 self-center transition-transform group-hover:translate-x-0.5"
           >
             <path d="M9 18l6-6-6-6" />
           </svg>
         </div>
-
-        {next && (
-          <div
-            className="relative mt-4 flex items-center justify-between gap-3 rounded-[12px] border px-3.5 py-2.5"
-            style={{ borderColor: "var(--color-border)", background: "var(--color-base)" }}
-          >
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              Next bracket opens in{" "}
-              <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">
-                <Countdown to={next} compact />
-              </span>
-            </span>
-            <span className="shrink-0 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
-              Sat · best of 3
-            </span>
-          </div>
-        )}
       </Link>
     </motion.div>
   );
