@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Countdown } from "@/components/tournament/Countdown";
+import { Avatar } from "@/components/ui/Avatar";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
 import { useTournamentSignal } from "@/lib/useTournamentSignal";
 import type { Tournament, TournamentMatch } from "@/lib/api";
@@ -47,12 +48,14 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
   if (!t) return null;
 
   const s = statusMeta(t);
-  // No active cup: once a tournament is finished it leaves the hub entirely
-  // (the champion lives on the tournament page + the Bluesky post), so the door
-  // is only ever up when there's something to enter or watch. It reappears on
-  // its own the moment the next tournament's registration opens.
-  if (!preview && s.phase === "finished") return null;
-  const href = s.phase === "finished" ? `/tournament/${t.id}` : "/tournament";
+  // Between cups: while the last tournament is finished and the next hasn't
+  // opened, the hub shows a compact teaser (the last champion + a countdown to
+  // the next opening) instead of the full event scene. It flips back to the live
+  // banner on its own the moment the next tournament's registration opens.
+  if (s.phase === "finished") return <BetweenCups t={t} />;
+  // Past here the cup is open/live/finals (finished returned above): the full
+  // event scene, always linking into the tournament door.
+  const href = "/tournament";
   const spots =
     s.phase === "open" && t.spots_left > 0
       ? `${t.spots_left} ${t.spots_left === 1 ? "spot" : "spots"} left`
@@ -89,7 +92,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
     .filter((r) => r.at > now)
     .sort((a, b) => a.at - b.at)[0];
   const showLive = inProgress && liveMatches.length > 0;
-  const showNext = inProgress && !showLive && !!nextOpen && s.phase !== "finished";
+  const showNext = inProgress && !showLive && !!nextOpen;
   const shownLive = liveMatches.slice(0, 3);
   const extraLive = liveMatches.length - shownLive.length;
 
@@ -264,6 +267,102 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
           </div>
         )}
       </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * The between-cups teaser. When the last tournament is done and the next has not
+ * opened, the hub keeps a small, forward-looking card rather than going blank:
+ * it honours the last champion and counts down to the next opening, so the
+ * surface stays warm and the fortnightly rhythm reads at a glance.
+ */
+function BetweenCups({ t }: { t: Tournament }) {
+  const champ = t.champion;
+  const next = t.next_opens_at;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 200, damping: 24 }}
+    >
+      <Link
+        href={`/tournament/${t.id}`}
+        className="group relative block overflow-hidden rounded-[22px] border p-5"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
+      >
+        {/* A soft gold glow, echoing the champion card and the Cup. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-[0.18] blur-3xl"
+          style={{ background: "var(--color-gold)" }}
+        />
+
+        <div className="relative flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
+              Weekend Tournament
+            </div>
+            {champ ? (
+              <div className="mt-3 flex items-center gap-2.5">
+                <span
+                  className="shrink-0 rounded-full p-[2px]"
+                  style={{ border: "1.5px solid color-mix(in srgb, var(--color-gold) 55%, transparent)" }}
+                >
+                  <Avatar id={champ.did} name={champ.display_name} avatarUrl={champ.avatar_url} size={34} />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                    {champ.display_name}
+                  </div>
+                  <div
+                    className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em]"
+                    style={{ color: "var(--color-gold)" }}
+                  >
+                    last champion
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                The bracket is between cups.
+              </div>
+            )}
+          </div>
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className="shrink-0 transition-transform group-hover:translate-x-0.5"
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </div>
+
+        {next && (
+          <div
+            className="relative mt-4 flex items-center justify-between gap-3 rounded-[12px] border px-3.5 py-2.5"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-base)" }}
+          >
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              Next bracket opens in{" "}
+              <span className="font-semibold tabular-nums text-[var(--color-text-primary)]">
+                <Countdown to={next} compact />
+              </span>
+            </span>
+            <span className="shrink-0 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
+              Sat · best of 3
+            </span>
+          </div>
+        )}
+      </Link>
     </motion.div>
   );
 }

@@ -84,7 +84,14 @@ const STATES: { label: string; t: Tournament }[] = [
       round_opens: [{ round: 2, open: new Date(Date.now() + 5 * H).toISOString() }],
     }),
   },
-  { label: "Champion crowned", t: mock({ status: "finished", champion: champ }) },
+  {
+    label: "Between cups (finished · teaser)",
+    t: mock({
+      status: "finished",
+      champion: champ,
+      next_opens_at: new Date(Date.now() + 117 * H).toISOString(), // ~4d 21h out
+    }),
+  },
 ];
 
 export default function TournamentThemePreview() {

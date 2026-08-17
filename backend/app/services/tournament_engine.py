@@ -377,6 +377,32 @@ def weekend_anchors(now: datetime) -> tuple[datetime, datetime, datetime]:
     return closes, opens, play_closes
 
 
+# The rotate cron fires Saturday 15:00 UTC and creates a cup only when the last
+# one is at least ROTATE_MIN_GAP_DAYS old, giving a fortnightly cadence. Kept here
+# with the other schedule constants as the single source; internal.py's rotate
+# and the hub's "next opens" countdown both read them.
+ROTATE_MIN_GAP_DAYS = 11
+ROTATE_WEEKDAY = 5      # Saturday (Monday=0)
+ROTATE_UTC_HOUR = 15    # 15:00 UTC = 8am Pacific (PDT), the cron slot
+
+
+def next_registration_open(last_created: datetime, now: datetime) -> datetime:
+    """When the next cup's registration opens, mirroring the rotate cron + gate:
+    the first Saturday 15:00 UTC that is both in the future and at least
+    ROTATE_MIN_GAP_DAYS after the last cup was created. Lets the hub count down to
+    the next opening while there is no active tournament.
+    """
+    eligible = last_created + timedelta(days=ROTATE_MIN_GAP_DAYS)
+    floor = max(now, eligible)
+    days_to_sat = (ROTATE_WEEKDAY - floor.weekday()) % 7
+    cand = (floor + timedelta(days=days_to_sat)).replace(
+        hour=ROTATE_UTC_HOUR, minute=0, second=0, microsecond=0
+    )
+    if cand < floor:
+        cand += timedelta(days=7)
+    return cand
+
+
 # --------------------------------------------------------------------------- #
 # Per-round day-slot schedule (v5)
 # --------------------------------------------------------------------------- #

@@ -301,8 +301,9 @@ async def tournament_tick(
 # Fortnightly cadence: the cron runs every Saturday, but a cup is only created
 # when the last one was created at least this many days ago. A weekly gap is 7
 # days and a fortnightly gap is 14, so any threshold between them makes rotate
-# skip the "off" Saturday and fire the next. Lower this toward 7 to go weekly.
-ROTATE_MIN_GAP_DAYS = 11
+# skip the "off" Saturday and fire the next. The value lives in the schedule
+# engine (single source, shared with the hub countdown); alias it here.
+ROTATE_MIN_GAP_DAYS = eng.ROTATE_MIN_GAP_DAYS
 
 
 @router.post("/tournaments/rotate")

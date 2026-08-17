@@ -78,6 +78,9 @@ class TournamentOut(BaseModel):
     round_opens: list[dict] = []
     round_deadlines: list[dict] = []
     champion: PlayerOut | None = None
+    # Only on a finished cup: when the next one's registration opens, so the hub
+    # can count down to it between tournaments. None while a cup is active.
+    next_opens_at: datetime | None = None
     # The full pool, so the registration page can show what might come up.
     game_pool: list[str] = []
     game_pool_names: list[str] = []
@@ -141,10 +144,20 @@ async def _serialise(
         )
         for m in rows
     ]
+    # Between cups (this one finished), tell the hub when the next opens so it can
+    # count down. Anchored off this cup's creation via the same cron + gate.
+    next_opens_at = None
+    if t.status == FINISHED and t.created_at is not None:
+        created = t.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        next_opens_at = eng.next_registration_open(created, datetime.now(timezone.utc))
+
     return TournamentOut(
         id=t.id,
         name=t.name,
         status=t.status,
+        next_opens_at=next_opens_at,
         max_players=t.max_players,
         entrants=len(people),
         spots_left=max(0, t.max_players - len(people)),

@@ -332,6 +332,9 @@ export interface Tournament {
   round_opens: { round: number; open: string }[];
   round_deadlines: { round: number; deadline: string }[];
   champion: TournamentPlayer | null;
+  // Only on a finished cup: when the next tournament's registration opens, for
+  // the hub's between-cups countdown. Absent/null while a cup is active.
+  next_opens_at?: string | null;
   game_pool: string[];
   game_pool_names: string[];
   you: TournamentPlayer | null;
