@@ -350,9 +350,9 @@ async def _build(db: AsyncSession) -> HallOfFame:
     # (the only record here that needs it - see LongestReign), then the holder is
     # resolved to a Person the same way as everyone else.
     longest_reign = None
-    top_reigns = await reigns.longest(db, 1)
-    if top_reigns:
-        tr = top_reigns[0]
+    # Take the longest reign whose holder still resolves to a Person (skip any
+    # rare unresolvable holder rather than dropping the record entirely).
+    for tr in await reigns.longest(db, 5):
         rp = (await _resolve(db, [tr["holder_did"]])).get(tr["holder_did"])
         if rp:
             longest_reign = LongestReign(
@@ -362,6 +362,7 @@ async def _build(db: AsyncSession) -> HallOfFame:
                 best_score=tr["best_score"],
                 current=tr["current"],
             )
+            break
 
     return HallOfFame(
         generated_at=datetime.now(timezone.utc),

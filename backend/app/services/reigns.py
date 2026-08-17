@@ -132,10 +132,14 @@ async def rebuild(db: AsyncSession, *, commit: bool = True) -> int:
     one continuous reign. Returns how many reigns were written.
     """
     await db.execute(delete(LeaderboardReign))
+    # Guests play into game_sessions but never land on the leaderboard
+    # (personal_bests skips them), so they can never hold #1 - exclude them, or
+    # the reconstruction credits reigns nobody could see on the board.
+    not_guest = GameSession.player1_id.notlike("guest:%")
     games = (
         await db.execute(
             select(GameSession.game_type)
-            .where(GameSession.mode.in_(SINGLE_PLAYER_MODES))
+            .where(GameSession.mode.in_(SINGLE_PLAYER_MODES), not_guest)
             .distinct()
         )
     ).scalars().all()
@@ -151,6 +155,7 @@ async def rebuild(db: AsyncSession, *, commit: bool = True) -> int:
                 .where(
                     GameSession.game_type == game,
                     GameSession.mode.in_(SINGLE_PLAYER_MODES),
+                    not_guest,
                 )
                 .order_by(GameSession.created_at.asc())
             )
