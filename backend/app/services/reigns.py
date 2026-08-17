@@ -16,6 +16,7 @@ stable thing to reign over. The versus boards are a rolling 7-day window, where
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import delete, desc, select
@@ -23,6 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import GameSession, LeaderboardReign, PersonalBest
 from app.models.game_session import SINGLE_PLAYER_MODES
+
+logger = logging.getLogger("skycave.reigns")
+
+# A takeover only earns a standalone @skycave.space post when it dethrones a
+# reign at least this long, or ends the longest reign on record. Everyday #1
+# churn (~1/day across all boards) would drown the account, so it stays in the
+# daily roundup instead.
+TAKEOVER_MIN_DAYS = 7
 
 # The exact deterministic sort the solo leaderboard uses, so "who is #1" here can
 # never disagree with what players see on the board.
@@ -86,10 +95,81 @@ async def reconcile(db: AsyncSession, game: str, *, commit: bool = True) -> None
                 game_type=game, holder_did=top.player_id, best_score=top.best_score, started_at=now
             )
         )
+        try:
+            await _announce_takeover(db, game, old_reign=open_r, new_did=top.player_id, at=now)
+        except Exception:  # noqa: BLE001 - a missed post must never fail a game
+            logger.exception("takeover announce failed for %s", game)
     elif open_r.best_score != top.best_score:
         open_r.best_score = top.best_score  # same champ, improved their own record
     if commit:
         await db.commit()
+
+
+async def _was_record_reign(db: AsyncSession, old_reign: LeaderboardReign, at: datetime) -> bool:
+    """Whether the reign just ending was the longest any player has ever held on
+    any board. Measured to ``at`` (its close), against every other reign to its
+    own close (or now, for still-open ones)."""
+    rows = (
+        await db.execute(
+            select(LeaderboardReign.id, LeaderboardReign.started_at, LeaderboardReign.ended_at)
+        )
+    ).all()
+
+    def _secs(started: datetime, ended: datetime | None) -> float:
+        end = _aware(ended) if ended is not None else at
+        return (end - _aware(started)).total_seconds()
+
+    old = (at - _aware(old_reign.started_at)).total_seconds()
+    others = [_secs(s, e) for (i, s, e) in rows if i != old_reign.id]
+    return old > 0 and old >= max(others, default=0.0)
+
+
+async def _announce_takeover(
+    db: AsyncSession, game: str, *, old_reign: LeaderboardReign, new_did: str, at: datetime
+) -> None:
+    """Queue a standalone "new #1" post when a takeover is genuinely news: it
+    dethroned a reign of at least ``TAKEOVER_MIN_DAYS`` days, or ended the longest
+    reign on record. Otherwise stay quiet (the roundup carries the small stuff).
+
+    Enqueue only - the drain does the posting - so this never makes a network
+    call on the game-finish path. Best effort: the caller swallows failures.
+    """
+    old_days = (at - _aware(old_reign.started_at)).days
+    is_record = await _was_record_reign(db, old_reign, at)
+    if old_days < TAKEOVER_MIN_DAYS and not is_record:
+        return
+
+    from app.models import User
+    from app.services import announce, tournament_posts
+
+    recs = {
+        did: (handle, display)
+        for did, handle, display in (
+            await db.execute(
+                select(User.did, User.handle, User.display_name).where(
+                    User.did.in_([new_did, old_reign.holder_did])
+                )
+            )
+        ).all()
+    }
+    new_handle = recs.get(new_did, (None, None))[0]
+    if not new_handle:
+        return  # can't tag the new champ -> better to stay silent than post a DID
+    old_handle, old_display = recs.get(old_reign.holder_did, (None, None))
+
+    text = announce.compose_takeover(
+        game_type=game,
+        new_handle=new_handle,
+        old_display=old_display or old_handle,
+        days=max(old_days, 0),
+        is_record=is_record,
+    )
+    await tournament_posts.enqueue(
+        db,
+        kind="leaderboard_takeover",
+        dedupe_key=f"takeover:{game}:{int(at.timestamp())}",
+        text=text,
+    )
 
 
 async def seed(db: AsyncSession) -> int:

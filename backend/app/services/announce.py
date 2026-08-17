@@ -227,6 +227,35 @@ def _fit(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Leaderboard takeover: a standalone "new #1" post
+# --------------------------------------------------------------------------- #
+# Reserved for a genuine changing of the guard - dethroning a long reign, or
+# ending the longest reign on record. Everyday #1 churn stays in the daily
+# roundup, so this post keeps its weight. The new champ is tagged; the dethroned
+# player is named but not tagged (the community asked not to be auto-tagged, and
+# a "you just lost #1" ping is the wrong note to send).
+def compose_takeover(
+    *, game_type: str, new_handle: str, old_display: str | None, days: int, is_record: bool
+) -> str:
+    game = _game_name(game_type).upper()
+    who = _at(new_handle)
+    beaten = (old_display or "the old #1").strip()
+    if is_record:
+        lead = (
+            f"\U0001f451 A RECORD REIGN JUST ENDED. {who} KNOCKED {beaten} OFF #1 ON "
+            f"{game} AFTER {days} DAYS ON TOP, THE LONGEST ANYONE HAS HELD A SKYCAVE "
+            "LEADERBOARD."
+        )
+    else:
+        lead = (
+            f"\U0001f451 NEW #1 ON {game}. {who} KNOCKED {beaten} OFF THE TOP SPOT "
+            f"AFTER A {days}-DAY REIGN."
+        )
+    tail = f"COME FOR THE TOP SPOT: skycave.space/play/{_slug(game_type)}"
+    return f"{lead}\n\n{tail}"
+
+
+# --------------------------------------------------------------------------- #
 # Gathering a day from the database
 # --------------------------------------------------------------------------- #
 # Kept below the pure composer so the composer stays import-light and testable.
