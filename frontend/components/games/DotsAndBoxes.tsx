@@ -1,6 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import type { BoardState, PlayerSlot } from "@/lib/types";
+import { Avatar } from "@/components/ui/Avatar";
 import { AssistToggle, useAssist, useIdleHint } from "./assist";
 
 interface Props {
@@ -143,11 +144,11 @@ export function DotsAndBoxes({ board, meId, players = [], onAction, spectator = 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       <header className="flex w-full items-center justify-between py-4">
-        <Chip color={YOU} label={spectator ? nameOf(me) : "you"} score={myScore} active={!over && board.turn === me} />
+        <Chip color={YOU} label={spectator ? nameOf(me) : "you"} player={players.find((p) => p.id === me)} score={myScore} active={!over && board.turn === me} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
           {outcome ?? (spectator ? `${nameOf(board.turn)} to move` : myTurn ? "your move" : `${oppName} is thinking`)}
         </div>
-        <Chip color={OPP} label={oppName} score={oppScore} active={!over && board.turn === opp} align="right" />
+        <Chip color={OPP} label={oppName} player={players.find((p) => p.id === opp)} score={oppScore} active={!over && board.turn === opp} align="right" />
       </header>
 
       <div className="flex w-full flex-1 flex-col items-center justify-center">
@@ -237,10 +238,12 @@ export function DotsAndBoxes({ board, meId, players = [], onAction, spectator = 
   );
 }
 
-function Chip({ color, label, score, active, align = "left" }: { color: string; label: string; score: number; active: boolean; align?: "left" | "right" }) {
+function Chip({ color, label, player, score, active, align = "left" }: { color: string; label: string; player?: PlayerSlot; score: number; active: boolean; align?: "left" | "right" }) {
   return (
     <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <span className="h-8 w-8 rounded-[8px]" style={{ background: color, outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2 }} />
+      <span className="rounded-[8px]" style={{ outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2, boxShadow: `0 0 0 1px ${color}` }}>
+        <Avatar id={player?.id ?? "ai"} name={player?.display_name ?? label} avatarUrl={player?.avatar_url} size={32} />
+      </span>
       <div className={align === "right" ? "items-end" : ""}>
         <div className="font-[var(--font-display)] text-xl font-bold leading-none tabular-nums">{score}</div>
         <div className="max-w-[90px] truncate font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</div>

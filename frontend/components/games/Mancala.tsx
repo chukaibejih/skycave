@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimate } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
 import { moveHints, bestMove, type MoveHint } from "@/lib/mancalaAssist";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface Props {
   board: BoardState | null;
@@ -247,7 +248,7 @@ export function Mancala({ board, meId, players = [], onAction, spectator = false
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-3 pb-[max(env(safe-area-inset-bottom),16px)]">
       <header className="flex items-center justify-between py-3">
-        <PlayerTag name={oppName} color={OPP} active={board.turn === opp && !over} />
+        <PlayerTag name={oppName} player={players.find((p) => p.id === opp)} color={OPP} active={board.turn === opp && !over} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em]"
              style={{ color: over ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {banner}
@@ -366,7 +367,7 @@ export function Mancala({ board, meId, players = [], onAction, spectator = false
       </div>
 
       <footer className="flex items-center justify-between py-3">
-        <PlayerTag name={spectator ? nameOf(me) : "You"} color={YOU} active={board.turn === me && !over} />
+        <PlayerTag name={spectator ? nameOf(me) : "You"} player={players.find((p) => p.id === me)} color={YOU} active={board.turn === me && !over} />
         <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
           {myScore} - {oppScore}
         </div>
@@ -624,13 +625,15 @@ function Store({
   );
 }
 
-function PlayerTag({ name, color, active }: { name: string; color: string; active: boolean }) {
+function PlayerTag({ name, player, color, active }: { name: string; player?: PlayerSlot; color: string; active: boolean }) {
   return (
     <div className="flex items-center gap-2">
       <span
-        className="h-7 w-7 rounded-full"
-        style={{ background: color, outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2 }}
-      />
+        className="rounded-full"
+        style={{ outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2, boxShadow: `0 0 0 1px ${color}` }}
+      >
+        <Avatar id={player?.id ?? "ai"} name={player?.display_name ?? name} avatarUrl={player?.avatar_url} size={28} />
+      </span>
       <span className="max-w-[84px] truncate font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
         {name}
       </span>

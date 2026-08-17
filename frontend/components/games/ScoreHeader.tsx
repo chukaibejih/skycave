@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import type { PlayerSlot } from "@/lib/types";
 import { RoundTimer } from "./RoundTimer";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface Props {
   players: PlayerSlot[];
@@ -40,7 +41,9 @@ export function ScoreHeader({
     accent: string;
     align: "left" | "right";
   }) => (
-    <div className={align === "right" ? "min-w-0 text-right" : "min-w-0 text-left"}>
+    <div className={`flex items-center gap-2 ${align === "right" ? "min-w-0 flex-row-reverse text-right" : "min-w-0 text-left"}`}>
+      {player && <Avatar id={player.id} name={player.display_name} avatarUrl={player.avatar_url} size={32} />}
+      <div>
       <div className="truncate text-xs text-[var(--color-text-secondary)]">
         {player ? (player.id === meId ? "you" : player.display_name) : "-"}
       </div>
@@ -54,6 +57,7 @@ export function ScoreHeader({
       >
         {player ? scores[player.id] ?? 0 : 0}
       </motion.div>
+      </div>
     </div>
   );
 

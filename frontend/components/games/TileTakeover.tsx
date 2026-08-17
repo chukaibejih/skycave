@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { BoardState, PlayerSlot } from "@/lib/types";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface Props {
   board: BoardState | null;
@@ -88,11 +89,11 @@ export function TileTakeover({ board, meId, players = [], onAction, spectator = 
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       {/* Tallies + whose turn */}
       <header className="flex w-full items-center justify-between py-4">
-        <Tally color={PALETTE[myColor]} count={board.scores[me] ?? 0} label={spectator ? nameOf(me) : "you"} active={board.turn === me} />
+        <Tally color={PALETTE[myColor]} count={board.scores[me] ?? 0} label={spectator ? nameOf(me) : "you"} player={players.find((p) => p.id === me)} active={board.turn === me} />
         <div className="text-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-text-secondary)]">
           {spectator ? `${nameOf(board.turn)} to move` : myTurn ? "your move" : `${oppName} is thinking`}
         </div>
-        <Tally color={PALETTE[oppColor]} count={board.scores[opp] ?? 0} label={oppName} active={board.turn === opp} align="right" />
+        <Tally color={PALETTE[oppColor]} count={board.scores[opp] ?? 0} label={oppName} player={players.find((p) => p.id === opp)} active={board.turn === opp} align="right" />
       </header>
 
       {/* Board */}
@@ -231,21 +232,22 @@ function Tally({
   color,
   count,
   label,
+  player,
   active,
   align = "left",
 }: {
   color: string;
   count: number;
   label: string;
+  player?: PlayerSlot;
   active: boolean;
   align?: "left" | "right";
 }) {
   return (
     <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <span
-        className="h-8 w-8 rounded-[8px]"
-        style={{ background: color, outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2 }}
-      />
+      <span className="rounded-[8px]" style={{ outline: active ? "2px solid var(--color-text-primary)" : "none", outlineOffset: 2, boxShadow: `0 0 0 1px ${color}` }}>
+        <Avatar id={player?.id ?? "ai"} name={player?.display_name ?? label} avatarUrl={player?.avatar_url} size={32} />
+      </span>
       <div className={align === "right" ? "items-end" : ""}>
         <div className="font-[var(--font-display)] text-xl font-bold leading-none tabular-nums">{count}</div>
         <div className="max-w-[80px] truncate font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
