@@ -84,11 +84,13 @@ async def daily_roundup(
     posting, so the cron can be exercised safely and the copy inspected."""
     _guard(x_internal_secret)
 
-    # A daily milestone check, independent of the roundup: has a still-running
-    # reign just become the longest in Skycave history? Enqueues its own post (the
-    # drain sends it). Best effort, and skipped on dry runs so it never posts
-    # while someone is only inspecting the roundup copy.
-    if not dry_run:
+    # A WEEKLY milestone check (Mondays), independent of the roundup: has a
+    # still-running reign become the longest in Skycave history? It's deduped per
+    # reign, so it never posts twice - but a new all-time record is a rare, prestige
+    # moment, so once a week is the right cadence to catch it (within ~7 days of the
+    # crossing) without a needless daily pass. Enqueues its own post (the drain
+    # sends it). Best effort, skipped on dry runs.
+    if not dry_run and datetime.now(timezone.utc).weekday() == 0:  # Monday
         try:
             from app.services import reigns
 
