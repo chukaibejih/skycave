@@ -96,7 +96,10 @@ async def reconcile(db: AsyncSession, game: str, *, commit: bool = True) -> None
             )
         )
         try:
-            await _announce_takeover(db, game, old_reign=open_r, new_did=top.player_id, at=now)
+            await _announce_takeover(
+                db, game, old_reign=open_r, new_did=top.player_id,
+                new_score=top.best_score, at=now,
+            )
         except Exception:  # noqa: BLE001 - a missed post must never fail a game
             logger.exception("takeover announce failed for %s", game)
     elif open_r.best_score != top.best_score:
@@ -125,7 +128,13 @@ async def _was_record_reign(db: AsyncSession, old_reign: LeaderboardReign, at: d
 
 
 async def _announce_takeover(
-    db: AsyncSession, game: str, *, old_reign: LeaderboardReign, new_did: str, at: datetime
+    db: AsyncSession,
+    game: str,
+    *,
+    old_reign: LeaderboardReign,
+    new_did: str,
+    new_score: int,
+    at: datetime,
 ) -> None:
     """Queue a standalone "new #1" post when a takeover is genuinely news: it
     dethroned a reign of at least ``TAKEOVER_MIN_DAYS`` days, or ended the longest
@@ -160,9 +169,12 @@ async def _announce_takeover(
     text = announce.compose_takeover(
         game_type=game,
         new_handle=new_handle,
-        old_display=old_display or old_handle,
+        old_handle=old_handle,
+        old_display=old_display,
         days=max(old_days, 0),
+        new_score=new_score,
         is_record=is_record,
+        seed=int(at.timestamp()),
     )
     await tournament_posts.enqueue(
         db,

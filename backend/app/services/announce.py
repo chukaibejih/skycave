@@ -231,28 +231,80 @@ def _fit(text: str) -> str:
 # --------------------------------------------------------------------------- #
 # Reserved for a genuine changing of the guard - dethroning a long reign, or
 # ending the longest reign on record. Everyday #1 churn stays in the daily
-# roundup, so this post keeps its weight. The new champ is tagged; the dethroned
-# player is named but not tagged (the community asked not to be auto-tagged, and
-# a "you just lost #1" ping is the wrong note to send).
+# roundup, so this post keeps its weight. These are meant to read like a sports
+# desk calling a moment, not a system printing a row: sentence case, both players
+# tagged, and a small pool of approved variants selected deterministically so a
+# rare event never sounds like the same bot every time.
+
+# Leave room for the sidecar's appended "#blacksky #blackskygamers" under the 300
+# ceiling; a variant that overflows (long handles) is dropped from the draw.
+_TAKEOVER_LIMIT = 272
+
+
+def _reign_variants(new: str, old: str, game: str, days: int, score: int, url: str) -> list[str]:
+    """Voices for ending a long (7+ day) reign. Favourite first."""
+    return [
+        f"Someone finally did it.\n\n{new} just ended {old}'s {days}-day reign at #1 "
+        f"on {game}.\n\nNew leader. New score to chase.\n\n{url}",
+        f"We have a new leader on {game}.\n\n{new} just ended {old}'s {days}-day run "
+        f"at the top and took the #1 spot.\n\nThe new score to beat is {score:,}.\n\n"
+        f"Who wants it next?\n\n{url}",
+        f"{days} days at the top and it's finally over.\n\n{new} has knocked {old} off "
+        f"#1 on {game} and taken the top spot.\n\nYour move, cave.\n\n{url}",
+        f"The {game} leaderboard has a new name at the top.\n\nAfter a {days}-day reign, "
+        f"{old} has been dethroned by {new}.\n\nNow we see how long the new champ can "
+        f"hold it.\n\n{url}",
+    ]
+
+
+def _record_variants(new: str, old: str, game: str, days: int, url: str) -> list[str]:
+    """Bigger voices for ending the longest reign on record. Favourite first."""
+    return [
+        f"It took {days} days, but somebody finally got them.\n\n{new} has ended {old}'s "
+        f"record reign at the top of {game}.\n\nThe longest reign in Skycave history "
+        f"ends here.\n\nA new one starts now.\n\n{url}",
+        f"{days} days.\n\nThat's how long {old} sat at the top of {game}, the longest "
+        f"anyone has ever held a Skycave leaderboard.\n\nToday, {new} ended the run.\n\n"
+        f"We have a new #1.\n\n{url}",
+        f"A Skycave record just fell.\n\nAfter {days} days at #1, {old}'s record-breaking "
+        f"{game} reign has been ended by {new}.\n\n{days} days is going to take some "
+        f"beating.\n\nAnd now {new} gets to start counting.\n\n{url}",
+        f"The longest reign in Skycave history is over.\n\n{old} held #1 on {game} for "
+        f"{days} days.\n\n{new} just took the top spot.\n\nRespect the run. Welcome the "
+        f"new #1.\n\n{url}",
+    ]
+
+
+def _pick_variant(variants: list[str], seed: int) -> str:
+    """Deterministically choose one variant that fits the length budget (so the
+    same event always renders the same post, and no two nearby events collide on
+    the same wording). Falls back to the shortest if none fit."""
+    fits = [v for v in variants if len(v) <= _TAKEOVER_LIMIT]
+    pool = fits or [min(variants, key=len)]
+    return pool[seed % len(pool)]
+
+
 def compose_takeover(
-    *, game_type: str, new_handle: str, old_display: str | None, days: int, is_record: bool
+    *,
+    game_type: str,
+    new_handle: str,
+    old_handle: str | None,
+    old_display: str | None,
+    days: int,
+    new_score: int,
+    is_record: bool,
+    seed: int,
 ) -> str:
-    game = _game_name(game_type).upper()
-    who = _at(new_handle)
-    beaten = (old_display or "the old #1").strip()
-    if is_record:
-        lead = (
-            f"\U0001f451 A RECORD REIGN JUST ENDED. {who} KNOCKED {beaten} OFF #1 ON "
-            f"{game} AFTER {days} DAYS ON TOP, THE LONGEST ANYONE HAS HELD A SKYCAVE "
-            "LEADERBOARD."
-        )
-    else:
-        lead = (
-            f"\U0001f451 NEW #1 ON {game}. {who} KNOCKED {beaten} OFF THE TOP SPOT "
-            f"AFTER A {days}-DAY REIGN."
-        )
-    tail = f"COME FOR THE TOP SPOT: skycave.space/play/{_slug(game_type)}"
-    return f"{lead}\n\n{tail}"
+    game = _solo_name(_game_name(game_type))
+    new = _at(new_handle)
+    old = f"@{old_handle}" if old_handle else (old_display or "the previous #1")
+    url = f"skycave.space/play/{_slug(game_type)}"
+    variants = (
+        _record_variants(new, old, game, days, url)
+        if is_record
+        else _reign_variants(new, old, game, days, new_score, url)
+    )
+    return _pick_variant(variants, seed)
 
 
 # --------------------------------------------------------------------------- #
