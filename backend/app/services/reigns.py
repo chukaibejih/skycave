@@ -3,9 +3,12 @@
 A reign is one continuous spell at #1 on a solo board. ``reconcile`` runs after
 every solo personal-best write: it opens a reign for a new #1, closes the
 previous one when someone is overtaken, and no-ops while the same player still
-leads. ``longest`` ranks reigns by duration for the Hall of Fame. ``seed``
-backfills a reign for each current champ (one-off), backdated to when their score
-was set so the ongoing reign is credited its full length.
+leads. ``longest`` ranks reigns by duration for the Hall of Fame. ``rebuild`` is the
+one-off backfill: it reconstructs the whole reign history (current and ended)
+from ``game_sessions``, accurately dating each reign to when its score was first
+reached. (``seed`` is the older current-champ-only backfill; it trusts
+``personal_bests.updated_at``, which bumps on every replay, so ``rebuild`` is
+preferred and supersedes it.)
 
 Reigns are tracked for SOLO boards only: those rank an all-time best, so #1 is a
 stable thing to reign over. The versus boards are a rolling 7-day window, where
@@ -15,10 +18,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import LeaderboardReign, PersonalBest
+from app.models import GameSession, LeaderboardReign, PersonalBest
+from app.models.game_session import SINGLE_PLAYER_MODES
 
 # The exact deterministic sort the solo leaderboard uses, so "who is #1" here can
 # never disagree with what players see on the board.
@@ -113,6 +117,80 @@ async def seed(db: AsyncSession) -> int:
         opened += 1
     await db.commit()
     return opened
+
+
+async def rebuild(db: AsyncSession, *, commit: bool = True) -> int:
+    """Reconstruct the full reign history for every solo board from
+    ``game_sessions``, replacing all existing reigns. This is the accurate
+    backfill: it replays each solo game chronologically and derives each reign
+    from when a player *first reached* the score that took (or held) #1 - immune
+    to the ``updated_at``-bumps-on-every-replay drift that ``seed`` suffers, and
+    it credits reigns that have since ended, not just current champs.
+
+    A player takes #1 only by scoring strictly higher than the standing leader's
+    best; matching it does not dethrone. A champ improving their own record keeps
+    one continuous reign. Returns how many reigns were written.
+    """
+    await db.execute(delete(LeaderboardReign))
+    games = (
+        await db.execute(
+            select(GameSession.game_type)
+            .where(GameSession.mode.in_(SINGLE_PLAYER_MODES))
+            .distinct()
+        )
+    ).scalars().all()
+    total = 0
+    for game in games:
+        rows = (
+            await db.execute(
+                select(
+                    GameSession.player1_id,
+                    GameSession.player1_score,
+                    GameSession.created_at,
+                )
+                .where(
+                    GameSession.game_type == game,
+                    GameSession.mode.in_(SINGLE_PLAYER_MODES),
+                )
+                .order_by(GameSession.created_at.asc())
+            )
+        ).all()
+
+        best: dict[str, int] = {}
+        leader: str | None = None
+        leader_best = 0
+        reigns: list[LeaderboardReign] = []
+        for pid, raw_score, ts in rows:
+            score = raw_score or 0
+            prev = best.get(pid)
+            if prev is not None and score <= prev:
+                continue  # not a personal best - can't move the standings
+            best[pid] = score
+            if leader is None:
+                leader, leader_best = pid, score
+                reigns.append(
+                    LeaderboardReign(
+                        game_type=game, holder_did=pid, best_score=score, started_at=_aware(ts)
+                    )
+                )
+            elif pid == leader:
+                leader_best = score  # champ improved own record; one reign
+                reigns[-1].best_score = score
+            elif score > leader_best:
+                reigns[-1].ended_at = _aware(ts)
+                leader, leader_best = pid, score
+                reigns.append(
+                    LeaderboardReign(
+                        game_type=game, holder_did=pid, best_score=score, started_at=_aware(ts)
+                    )
+                )
+            # else: a PB that does not reach #1 - no change of standings
+        for r in reigns:
+            db.add(r)
+        total += len(reigns)
+    if commit:
+        await db.commit()
+    return total
 
 
 async def longest(db: AsyncSession, limit: int = 20) -> list[dict]:
