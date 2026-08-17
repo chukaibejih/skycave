@@ -19,8 +19,12 @@ const POLL_MS = 30_000;
 // Bracket geometry. Each round-1 match owns one grid row; a match in round r
 // spans 2^(r-1) rows, which centres it exactly between the two matches feeding
 // it. That is what makes this read as a bracket rather than three lists.
-const ROW_H = 172; // px per round-1 match: tallest card (two players + game
-                   // pills) plus breathing room, so nothing crowds or spills
+const ROW_H = 212; // px per round-1 match. Must clear the TALLEST card: a live
+                   // fixture stacks two players + up to three game scorelines +
+                   // the WATCH button, and the live/checking-in badge protrudes
+                   // above the top edge - ~190px in all. The old 172 predated the
+                   // Watch button, so live cards spilled into the next row. This
+                   // leaves real breathing room so nothing overlaps.
 const COL_W = 216;
 const GUTTER = 26;
 const CUP_W = 156; // the trophy column the final feeds into

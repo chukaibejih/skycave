@@ -239,7 +239,15 @@ from app.models.game_session import GameSession  # noqa: E402
 
 
 def _is_named(handle: str | None, pid: str | None) -> bool:
-    return bool(handle) and handle != "guest" and bool(pid) and pid.startswith("did:")
+    # A handle that is itself a DID is an unresolved one; tagging it posts a raw
+    # "@did:plc:..." (a real bug we shipped once), so it counts as not-named.
+    return (
+        bool(handle)
+        and handle != "guest"
+        and not handle.startswith("did:")
+        and bool(pid)
+        and pid.startswith("did:")
+    )
 
 
 async def collect_day(db: AsyncSession, start: datetime, end: datetime) -> DayData:
@@ -254,33 +262,55 @@ async def collect_day(db: AsyncSession, start: datetime, end: datetime) -> DayDa
         await db.execute(select(G).where(G.created_at >= start, G.created_at < end))
     ).scalars().all()
 
+    # Authoritative did -> handle from the users table. A session's stored handle
+    # can be stale, or on older rows the raw DID; the users row carries the
+    # current handle, so an @mention resolves and we never post "@did:plc:...".
+    from app.models.user import User  # noqa: E402
+
+    day_dids = {
+        d
+        for r in rows
+        for d in (r.player1_id, r.player2_id)
+        if d and d.startswith("did:")
+    }
+    authoritative: dict[str, str] = {}
+    if day_dids:
+        authoritative = dict(
+            (await db.execute(select(User.did, User.handle).where(User.did.in_(day_dids)))).all()
+        )
+
+    def _h(pid: str | None, fallback: str | None) -> str | None:
+        return (authoritative.get(pid) if pid else None) or fallback
+
     data = DayData(total_games=len(rows))
-    handle_of: dict[str, str] = {}  # did -> handle, from this day's rows
+    handle_of: dict[str, str] = {}  # did -> handle, resolved
     best: dict[tuple[str, str], int] = {}  # (handle, game) -> best solo score
     win_dids: set[str] = set()
     played_dids: set[str] = set()
 
     for r in rows:
-        if _is_named(r.player1_handle, r.player1_id):
-            data.named_players.add(r.player1_handle)
-            handle_of[r.player1_id] = r.player1_handle
+        h1 = _h(r.player1_id, r.player1_handle)
+        h2 = _h(r.player2_id, r.player2_handle)
+        if _is_named(h1, r.player1_id):
+            data.named_players.add(h1)
+            handle_of[r.player1_id] = h1
             played_dids.add(r.player1_id)
-        if _is_named(r.player2_handle, r.player2_id):
-            data.named_players.add(r.player2_handle)
-            handle_of[r.player2_id] = r.player2_handle
+        if _is_named(h2, r.player2_id):
+            data.named_players.add(h2)
+            handle_of[r.player2_id] = h2
             played_dids.add(r.player2_id)
 
         # Best solo score per player+game.
-        if r.mode == "solo" and _is_named(r.player1_handle, r.player1_id) and r.player1_score > 0:
-            key = (r.player1_handle, r.game_type)
+        if r.mode == "solo" and _is_named(h1, r.player1_id) and r.player1_score > 0:
+            key = (h1, r.game_type)
             if r.player1_score > best.get(key, 0):
                 best[key] = r.player1_score
 
-        # 1v1 wins (map the winning did to its handle on this row).
+        # 1v1 wins (map the winning did to its resolved handle).
         if r.mode == "versus" and r.winner_id and r.winner_id.startswith("did:"):
-            win_dids.add(r.winner_id)
-            wh = r.player1_handle if r.winner_id == r.player1_id else r.player2_handle
-            if wh and wh != "guest":
+            wh = h1 if r.winner_id == r.player1_id else h2
+            if _is_named(wh, r.winner_id):
+                win_dids.add(r.winner_id)
                 data.versus_wins.append((wh, r.game_type))
 
     data.top_solo = sorted(

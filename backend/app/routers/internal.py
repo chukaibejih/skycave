@@ -24,7 +24,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.announcement import AnnouncementOutbox
-from app.models.tournament import FINISHED, IN_PROGRESS, LOCKED, Tournament
+from app.models.tournament import (
+    FINISHED,
+    IN_PROGRESS,
+    LOCKED,
+    M_DONE,
+    M_LIVE,
+    M_READY,
+    Tournament,
+)
 from app.services import announce, tournament as svc, tournament_engine as eng
 from app.services import tournament_posts as posts
 
@@ -245,6 +253,18 @@ async def tournament_tick(
     opens = svc._round_open_map(t)
     if not opens:
         return {"status": "not_drawn", "preopen": 0, "nudges": 0}
+
+    # A round can finish ahead of its published window (players don't dawdle) or
+    # be left with a stale future window after a live reschedule. Either way its
+    # slot in round_opens is no longer something to announce - preopening "THE
+    # SEMI-FINALS OPEN IN 1 HOUR" after the semis are already done is exactly the
+    # bug this guards. Drop any round that has already opened or been decided;
+    # only rounds still wholly scheduled are genuinely upcoming.
+    rows = await svc.matches(db, t.id)
+    started = {m.round for m in rows if m.status in (M_READY, M_LIVE, M_DONE)}
+    opens = {r: w for r, w in opens.items() if r not in started}
+    if not opens:
+        return {"status": "ok", "preopen": 0, "nudges": await svc.queue_due_nudges(db, t, now)}
 
     # 1. The first round on each Pacific calendar day gets a one-hour heads-up.
     day_first: dict = {}
