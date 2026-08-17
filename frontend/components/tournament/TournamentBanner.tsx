@@ -47,6 +47,11 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
   if (!t) return null;
 
   const s = statusMeta(t);
+  // No active cup: once a tournament is finished it leaves the hub entirely
+  // (the champion lives on the tournament page + the Bluesky post), so the door
+  // is only ever up when there's something to enter or watch. It reappears on
+  // its own the moment the next tournament's registration opens.
+  if (!preview && s.phase === "finished") return null;
   const href = s.phase === "finished" ? `/tournament/${t.id}` : "/tournament";
   const spots =
     s.phase === "open" && t.spots_left > 0

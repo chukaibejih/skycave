@@ -298,10 +298,10 @@ async def tournament_tick(
     return {"status": "ok", "preopen": preopen, "nudges": nudges}
 
 
-# Fortnightly cadence: the cron runs every Monday, but a cup is only created when
-# the last one was created at least this many days ago. A weekly gap is 7 days and
-# a fortnightly gap is 14, so any threshold between them makes rotate skip the
-# "off" Monday and fire the next. Lower this toward 7 to go back to weekly.
+# Fortnightly cadence: the cron runs every Saturday, but a cup is only created
+# when the last one was created at least this many days ago. A weekly gap is 7
+# days and a fortnightly gap is 14, so any threshold between them makes rotate
+# skip the "off" Saturday and fire the next. Lower this toward 7 to go weekly.
 ROTATE_MIN_GAP_DAYS = 11
 
 
@@ -313,8 +313,10 @@ async def rotate_tournament(
 ) -> dict:
     """Create the coming weekend's tournament if no active one exists, and post the signup announcement.
 
-    Driven by host cron (e.g. Monday 8:00 AM Pacific / 15:00 UTC). Safe to run repeatedly:
-    if an active non-finished tournament exists, it is a no-op.
+    Driven by host cron (e.g. Saturday 8:00 AM Pacific / 15:00 UTC). Registration
+    opens Saturday and play is the following weekend (windows anchor to the next
+    Thursday). Safe to run repeatedly: if an active non-finished tournament
+    exists, it is a no-op.
     """
     _guard(x_internal_secret)
 
@@ -338,9 +340,9 @@ async def rotate_tournament(
             "announced": False,
         }
 
-    # Fortnightly gate: skip the "off" Monday. Runs every Monday but only creates
-    # when the most recent cup (any status) is old enough, so the cadence is every
-    # two weeks without the cron needing to know which Monday it is.
+    # Fortnightly gate: skip the "off" Saturday. Runs every Saturday but only
+    # creates when the most recent cup (any status) is old enough, so the cadence
+    # is every two weeks without the cron needing to know which Saturday it is.
     recent = (
         await db.execute(
             select(Tournament).order_by(Tournament.created_at.desc()).limit(1)
@@ -360,8 +362,11 @@ async def rotate_tournament(
                 "announced": False,
             }
 
+    # Registration opens Saturday and play is the following weekend, so this is
+    # "the next" tournament, not "this weekend's" (which read wrong once the
+    # signup post moved to a Saturday).
     announcement_text = (
-        "Registration is now open for this weekend's Skycave Tournament! 🏆\n\n"
+        "Registration is now open for the next Skycave Tournament! 🏆\n\n"
         "Claim your seat before registration closes on Thursday.\n\n"
         "Claim your spot here: skycave.space/tournament"
     )
