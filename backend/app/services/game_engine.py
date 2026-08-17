@@ -973,6 +973,16 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
                 if score > pb.best_score:
                     pb.best_score = score
             await db.commit()
+            # A new best can change who is #1, so refresh the Hall of Fame reign
+            # for this board. Only on an actual best (nothing else moves the top),
+            # and never fatal to GAME_END.
+            if is_best:
+                try:
+                    from app.services import reigns
+
+                    await reigns.reconcile(db, room["game_type"])
+                except Exception:  # noqa: BLE001
+                    logger.exception("reign reconcile failed for %s", room["game_type"])
         summary["is_best"] = is_best
         summary["prev_best"] = prev_best
     except Exception:  # noqa: BLE001

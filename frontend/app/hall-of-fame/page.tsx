@@ -85,9 +85,20 @@ export default function HallOfFamePage() {
       )}
 
       {/* Highlights + firsts. */}
-      {(hof.biggest_1v1 || hof.first_game || (hof.first_champion && hof.champions.length > 1)) && (
+      {(hof.longest_reign || hof.biggest_1v1 || hof.first_game || (hof.first_champion && hof.champions.length > 1)) && (
         <Section title="For the books">
           <div className="space-y-3">
+            {hof.longest_reign && (
+              <HighlightCard
+                kicker="Longest reign at #1"
+                person={hof.longest_reign.player}
+                line={
+                  `${hof.longest_reign.days} ${hof.longest_reign.days === 1 ? "day" : "days"} atop ${gameName(hof.longest_reign.game_type)} solo` +
+                  ` · ${hof.longest_reign.best_score.toLocaleString()} best` +
+                  (hof.longest_reign.current ? " · still reigning" : "")
+                }
+              />
+            )}
             {hof.biggest_1v1 && (
               <HighlightCard
                 kicker="Biggest 1v1 score"

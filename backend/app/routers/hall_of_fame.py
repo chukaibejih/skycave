@@ -25,10 +25,11 @@ from app.core.redis_client import get_redis
 from app.models import GameSession, User
 from app.models.game_session import HEAD_TO_HEAD_MODES
 from app.models.tournament import FINISHED, Tournament, TournamentEntrant
+from app.services import reigns
 
 router = APIRouter(tags=["hall-of-fame"])
 
-CACHE_KEY = "hall_of_fame:v5"
+CACHE_KEY = "hall_of_fame:v6"
 CACHE_TTL = 300  # 5 min; the records barely move, so a stale-ish read is fine
 MIN_RATE_GAMES = 10  # a win rate under this many games is noise, not a record
 
@@ -87,6 +88,20 @@ class FirstGame(BaseModel):
     opponent: Person | None = None
 
 
+class LongestReign(BaseModel):
+    """The longest anyone has held #1 on a solo leaderboard, measured in days.
+
+    Unlike the other records this one cannot be derived from existing rows alone
+    (personal_bests keeps only the current best, not its history), so it reads
+    the tracked reign table. `current` is true while the holder is still reigning.
+    """
+    player: Person
+    game_type: str
+    days: int
+    best_score: int
+    current: bool
+
+
 class HallOfFame(BaseModel):
     generated_at: datetime
     champions: list[Champion]
@@ -96,6 +111,7 @@ class HallOfFame(BaseModel):
     longest_streak: StatRecord | None
     best_win_rate: WinRate | None
     biggest_1v1: BiggestScore | None
+    longest_reign: LongestReign | None
     first_game: FirstGame | None
     first_champion: Champion | None
 
@@ -330,6 +346,23 @@ async def _build(db: AsyncSession) -> HallOfFame:
 
     first_champion = champions[-1] if champions else None
 
+    # Longest #1 reign on any solo board. Sourced from the tracked reign table
+    # (the only record here that needs it - see LongestReign), then the holder is
+    # resolved to a Person the same way as everyone else.
+    longest_reign = None
+    top_reigns = await reigns.longest(db, 1)
+    if top_reigns:
+        tr = top_reigns[0]
+        rp = (await _resolve(db, [tr["holder_did"]])).get(tr["holder_did"])
+        if rp:
+            longest_reign = LongestReign(
+                player=rp,
+                game_type=tr["game_type"],
+                days=tr["days"],
+                best_score=tr["best_score"],
+                current=tr["current"],
+            )
+
     return HallOfFame(
         generated_at=datetime.now(timezone.utc),
         champions=champions,
@@ -339,6 +372,7 @@ async def _build(db: AsyncSession) -> HallOfFame:
         longest_streak=longest_streak,
         best_win_rate=best_win_rate,
         biggest_1v1=biggest_1v1,
+        longest_reign=longest_reign,
         first_game=first_game,
         first_champion=first_champion,
     )

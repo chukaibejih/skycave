@@ -495,6 +495,13 @@ export interface HofBiggest {
   game_type: string;
   score: number;
 }
+export interface HofLongestReign {
+  player: HofPerson;
+  game_type: string;
+  days: number;
+  best_score: number;
+  current: boolean;
+}
 export interface HofFirstGame {
   date: string;
   game_type: string;
@@ -510,6 +517,7 @@ export interface HallOfFame {
   longest_streak: HofStat | null;
   best_win_rate: HofWinRate | null;
   biggest_1v1: HofBiggest | null;
+  longest_reign: HofLongestReign | null;
   first_game: HofFirstGame | null;
   first_champion: HofChampion | null;
 }
