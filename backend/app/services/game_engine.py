@@ -956,15 +956,19 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
         from app.models import PersonalBest
 
         # Win/lose games ("wins") rank their solo board by career wins, so the
-        # personal best accumulates the win flag instead of taking the max.
+        # personal best accumulates the win flag instead of taking the max. A win
+        # counts only if it was NOT on Easy - beating the Caver on Easy should not
+        # climb the ranking. History isn't backfilled (older rows don't record the
+        # difficulty), so existing win totals stand and only new non-Easy wins add.
         wins_board = bool(game) and getattr(game, "solo_leaderboard", "best") == "wins"
+        win_credit = 1 if (wins_board and score > 0 and room.get("difficulty", "normal") != "easy") else 0
 
         async with AsyncSessionLocal() as db:
             pb = await db.get(PersonalBest, (pid, room["game_type"]))
             prev_best = pb.best_score if pb else None
             if wins_board:
-                # "is_best" == the total moved, which for a win counter means a win.
-                is_best = score > 0
+                # "is_best" == the total moved, i.e. a counted (non-Easy) win.
+                is_best = win_credit > 0
             else:
                 is_best = prev_best is None or score > prev_best
             if pb is None:
@@ -972,14 +976,14 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
                     PersonalBest(
                         player_id=pid,
                         game_type=room["game_type"],
-                        best_score=score,
+                        best_score=(win_credit if wins_board else score),
                         plays=1,
                     )
                 )
             else:
                 pb.plays += 1
                 if wins_board:
-                    pb.best_score += score  # accumulate wins
+                    pb.best_score += win_credit  # accumulate non-Easy wins
                 elif score > pb.best_score:
                     pb.best_score = score
             await db.commit()
