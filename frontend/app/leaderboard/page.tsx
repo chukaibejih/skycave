@@ -23,6 +23,7 @@ export default function LeaderboardPage() {
   const [mode, setMode] = useState<LeaderboardMode>("versus");
   const [period, setPeriod] = useState<LeaderboardPeriod>("week");
   const [cache, setCache] = useState<Record<string, LeaderboardEntry[]>>({});
+  const [unit, setUnit] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     listGames()
@@ -45,13 +46,20 @@ export default function LeaderboardPage() {
   const effPeriod: LeaderboardPeriod = solo ? "all" : period;
   const key = `${mode}:${game}:${effPeriod}`;
   const entries = game ? cache[key] ?? null : null;
+  // Solo boards for win/lose games (Connect 4, Crossing) rank by career wins,
+  // not a single-run "best" - the API says which via score_unit.
+  const soloWins = solo && (game ? unit[key] : undefined) === "wins";
+  const soloLabel = soloWins ? "wins" : "best";
 
   useEffect(() => {
     if (!game || cache[key]) return;
     let active = true;
     getLeaderboard({ game, mode, period: effPeriod, limit: 25 })
       .then((r) => {
-        if (active) setCache((c) => ({ ...c, [key]: r.entries }));
+        if (active) {
+          setCache((c) => ({ ...c, [key]: r.entries }));
+          setUnit((u) => ({ ...u, [key]: r.score_unit }));
+        }
       })
       .catch(() => {
         if (active) setCache((c) => ({ ...c, [key]: [] }));
@@ -166,18 +174,18 @@ export default function LeaderboardPage() {
           {/* PODIUM (Top 3) */}
           <div className="flex flex-row items-end justify-center gap-2 pt-4 sm:gap-6">
             {/* Rank 2 */}
-            {entries[1] && <PodiumCard entry={entries[1]} total={total} solo={solo} />}
+            {entries[1] && <PodiumCard entry={entries[1]} total={total} solo={solo} label={soloLabel} />}
             {/* Rank 1 */}
-            {entries[0] && <PodiumCard entry={entries[0]} total={total} solo={solo} isFirst />}
+            {entries[0] && <PodiumCard entry={entries[0]} total={total} solo={solo} label={soloLabel} isFirst />}
             {/* Rank 3 */}
-            {entries[2] && <PodiumCard entry={entries[2]} total={total} solo={solo} />}
+            {entries[2] && <PodiumCard entry={entries[2]} total={total} solo={solo} label={soloLabel} />}
           </div>
 
           {/* LIST (Ranks 4+) */}
           {entries.length > 3 && (
             <div className="flex flex-col gap-3">
               {entries.slice(3).map((e, i) => (
-                <ListCard key={e.did} e={e} index={i} total={total} solo={solo} />
+                <ListCard key={e.did} e={e} index={i} total={total} solo={solo} label={soloLabel} />
               ))}
             </div>
           )}
@@ -190,7 +198,9 @@ export default function LeaderboardPage() {
             ? "every play counts · points from the last 7 days"
             : "every play counts · daily, solo and 1v1 added up"
           : solo
-            ? "best single-run score"
+            ? soloWins
+              ? "career wins vs the Caver"
+              : "best single-run score"
             : period === "week"
               ? "1v1 wins from the last 7 days"
               : "1v1 wins, all time"}
@@ -234,7 +244,7 @@ function rankColor(rank: number): string {
   return "var(--color-text-secondary)";
 }
 
-function PodiumCard({ entry, total, solo, isFirst }: { entry: LeaderboardEntry; total: boolean; solo: boolean; isFirst?: boolean }) {
+function PodiumCard({ entry, total, solo, label, isFirst }: { entry: LeaderboardEntry; total: boolean; solo: boolean; label: string; isFirst?: boolean }) {
   const color = rankColor(entry.rank);
   const size = isFirst ? 56 : 44;
   const padding = isFirst ? "p-3 sm:p-6" : "p-2 sm:p-4";
@@ -274,14 +284,14 @@ function PodiumCard({ entry, total, solo, isFirst }: { entry: LeaderboardEntry; 
           {solo || total ? entry.total_score.toLocaleString() : entry.games_won}
         </div>
         <div className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)] sm:text-[10px]">
-          {total ? "points" : solo ? "best" : "wins"}
+          {total ? "points" : solo ? label : "wins"}
         </div>
       </div>
     </motion.div>
   );
 }
 
-function ListCard({ e, index, total, solo }: { e: LeaderboardEntry; index: number; total: boolean; solo: boolean }) {
+function ListCard({ e, index, total, solo, label }: { e: LeaderboardEntry; index: number; total: boolean; solo: boolean; label: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -330,7 +340,7 @@ function ListCard({ e, index, total, solo }: { e: LeaderboardEntry; index: numbe
             {solo || total ? e.total_score.toLocaleString() : e.games_won}
           </div>
           <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-            {total ? "points" : solo ? "best" : "wins"}
+            {total ? "points" : solo ? label : "wins"}
           </div>
         </div>
       </Link>

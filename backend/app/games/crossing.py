@@ -38,6 +38,7 @@ class Crossing(BaseGame):
     listed = True  # live on the hub
     versus_enabled = False  # solo-only for now (no 1v1)
     supports_difficulty = True  # solo Caver has Easy / Normal / Hard
+    solo_leaderboard = "wins"  # win/lose game: rank the solo board by wins, not a 1/0 "best"
 
     # ---- lifecycle ----
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:

@@ -328,6 +328,9 @@ class LeaderboardEntry(BaseModel):
 
 class LeaderboardResponse(BaseModel):
     entries: list[LeaderboardEntry]
+    # How a solo board's score reads: "best" (highest single run) or "wins"
+    # (career wins vs the Caver). None for the 1v1 / combined boards.
+    score_unit: str | None = None
 
 
 # --- Feedback ---

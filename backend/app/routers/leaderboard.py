@@ -177,8 +177,10 @@ async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:
                 avatar_url=(u.avatar_url if u else None),
                 games_played=pb.plays,
                 games_won=0,  # not meaningful for solo
-                total_score=pb.best_score,  # best single-run score
+                total_score=pb.best_score,  # best single-run score, or career wins
                 win_rate=0.0,
             )
         )
-    return LeaderboardResponse(entries=entries)
+    g = get_game(game)
+    unit = getattr(g, "solo_leaderboard", "best") if g else "best"
+    return LeaderboardResponse(entries=entries, score_unit=unit)

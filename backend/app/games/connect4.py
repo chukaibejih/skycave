@@ -155,6 +155,7 @@ class Connect4(BaseGame):
     mode = TURN_BASED
     solo_enabled = True
     supports_difficulty = True  # solo Caver has Easy / Normal / Hard
+    solo_leaderboard = "wins"  # win/lose game: rank the solo board by wins, not a 1/0 "best"
 
     def init_turn_state(self, player_ids: list[str]) -> dict[str, Any]:
         a, b = player_ids[0], player_ids[1]

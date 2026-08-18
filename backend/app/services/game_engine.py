@@ -955,10 +955,18 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
         from app.core.database import AsyncSessionLocal
         from app.models import PersonalBest
 
+        # Win/lose games ("wins") rank their solo board by career wins, so the
+        # personal best accumulates the win flag instead of taking the max.
+        wins_board = bool(game) and getattr(game, "solo_leaderboard", "best") == "wins"
+
         async with AsyncSessionLocal() as db:
             pb = await db.get(PersonalBest, (pid, room["game_type"]))
             prev_best = pb.best_score if pb else None
-            is_best = prev_best is None or score > prev_best
+            if wins_board:
+                # "is_best" == the total moved, which for a win counter means a win.
+                is_best = score > 0
+            else:
+                is_best = prev_best is None or score > prev_best
             if pb is None:
                 db.add(
                     PersonalBest(
@@ -970,7 +978,9 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
                 )
             else:
                 pb.plays += 1
-                if score > pb.best_score:
+                if wins_board:
+                    pb.best_score += score  # accumulate wins
+                elif score > pb.best_score:
                     pb.best_score = score
             await db.commit()
             # A new best can change who is #1, so refresh the Hall of Fame reign

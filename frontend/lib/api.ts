@@ -273,7 +273,7 @@ export const getLeaderboard = (opts: {
   period?: LeaderboardPeriod;
   limit?: number;
 }) =>
-  request<{ entries: LeaderboardEntry[] }>(
+  request<{ entries: LeaderboardEntry[]; score_unit: string | null }>(
     `/leaderboard?game=${opts.game}&mode=${opts.mode}` +
       `&period=${opts.period ?? "all"}&limit=${opts.limit ?? 25}`
   );

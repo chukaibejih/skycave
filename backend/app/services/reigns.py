@@ -342,35 +342,47 @@ async def rebuild(db: AsyncSession, *, commit: bool = True) -> int:
             )
         ).all()
 
+        from app.games.registry import get_game
+
+        g = get_game(game)
+        wins_board = bool(g) and getattr(g, "solo_leaderboard", "best") == "wins"
+
         best: dict[str, int] = {}
         leader: str | None = None
         leader_best = 0
         reigns: list[LeaderboardReign] = []
         for pid, raw_score, ts in rows:
             score = raw_score or 0
-            prev = best.get(pid)
-            if prev is not None and score <= prev:
-                continue  # not a personal best - can't move the standings
-            best[pid] = score
+            if wins_board:
+                # Career wins: a loss changes nothing; a win raises the running total.
+                if score <= 0:
+                    continue
+                candidate = best.get(pid, 0) + score
+            else:
+                prev = best.get(pid)
+                if prev is not None and score <= prev:
+                    continue  # not a personal best - can't move the standings
+                candidate = score
+            best[pid] = candidate
             if leader is None:
-                leader, leader_best = pid, score
+                leader, leader_best = pid, candidate
                 reigns.append(
                     LeaderboardReign(
-                        game_type=game, holder_did=pid, best_score=score, started_at=_aware(ts)
+                        game_type=game, holder_did=pid, best_score=candidate, started_at=_aware(ts)
                     )
                 )
             elif pid == leader:
-                leader_best = score  # champ improved own record; one reign
-                reigns[-1].best_score = score
-            elif score > leader_best:
+                leader_best = candidate  # champ extended their lead; one reign
+                reigns[-1].best_score = candidate
+            elif candidate > leader_best:
                 reigns[-1].ended_at = _aware(ts)
-                leader, leader_best = pid, score
+                leader, leader_best = pid, candidate
                 reigns.append(
                     LeaderboardReign(
-                        game_type=game, holder_did=pid, best_score=score, started_at=_aware(ts)
+                        game_type=game, holder_did=pid, best_score=candidate, started_at=_aware(ts)
                     )
                 )
-            # else: a PB that does not reach #1 - no change of standings
+            # else: a personal best that does not reach #1 - no change of standings
         for r in reigns:
             db.add(r)
         total += len(reigns)

@@ -64,6 +64,14 @@ class BaseGame:
     # (one shot per prompt - no retry, no brute-forcing). If False, a miss just
     # flashes and the same prompt stays (player can retry or skip).
     solo_advance_on_miss: bool = False
+    # How the solo leaderboard ranks this game:
+    #   "best" - highest single-run score (a high-score board). Default.
+    #   "wins" - total wins. Win/lose games vs the Caver (Connect 4, Crossing)
+    #            score 1 for a win and 0 for a loss, which is nothing to rank a
+    #            board by (everyone who has ever won ties at 1). For these the
+    #            personal best ACCUMULATES the win flag, so best_score is a career
+    #            win count and the board ranks by who has beaten the Caver most.
+    solo_leaderboard: str = "best"
 
     def solo_metric(self, score: int, game_state: dict[str, Any]) -> str:
         """Human-readable score line for the solo share post / results.
