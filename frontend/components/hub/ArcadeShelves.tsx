@@ -158,7 +158,7 @@ function ShelfRow({
         {games.map((game) => (
           <div
             key={game.type}
-            className="h-[172px] w-[250px] shrink-0 snap-start sm:h-[184px] sm:w-[270px]"
+            className="h-[208px] w-[250px] shrink-0 snap-start sm:h-[218px] sm:w-[270px]"
           >
             <GameCard game={game} onPlay={onPlay} />
           </div>
