@@ -287,6 +287,14 @@ function PodiumCard({ entry, total, solo, label, isFirst }: { entry: Leaderboard
           }}
         >
           {isFirst && <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-[var(--color-gold)] opacity-10 blur-xl" />}
+          {/* Hint that the card flips: a small "i" top-left. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-2.5 top-2.5 z-20 flex h-[18px] w-[18px] items-center justify-center rounded-full border font-[var(--font-mono)] text-[10px] font-bold leading-none"
+            style={{ borderColor: "color-mix(in srgb, var(--color-text-secondary) 45%, transparent)", color: "var(--color-text-secondary)" }}
+          >
+            i
+          </div>
           <div className="relative z-10 font-[var(--font-display)] text-lg font-bold sm:text-xl" style={{ color }}>#{entry.rank}</div>
           <div className="relative z-10 mt-2 sm:mt-3">
             <Link href={`/u/${entry.handle}`}>
@@ -342,8 +350,10 @@ function PodiumCard({ entry, total, solo, label, isFirst }: { entry: Leaderboard
 function PodiumStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-white/10 py-2 last:border-0">
-      <span className="font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</span>
-      <span className="font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">{value}</span>
+      {/* Inline colours: the Tailwind arbitrary text-[var(--...)] class doesn't
+          win here, which is what left the values dark/unreadable. */}
+      <span className="font-[var(--font-mono)] text-[9px] uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
+      <span className="font-[var(--font-display)] text-base font-bold tabular-nums" style={{ color: "var(--color-text-primary)" }}>{value}</span>
     </div>
   );
 }
