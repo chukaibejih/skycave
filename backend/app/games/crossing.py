@@ -36,7 +36,8 @@ class Crossing(BaseGame):
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
-    listed = True  # live on the hub
+    listed = False  # retired 2026-08-18 (replaced by Freeze); hidden from the hub,
+    # still reachable by direct link and its history/leaderboard stay intact
     versus_enabled = False  # solo-only for now (no 1v1)
     supports_difficulty = True  # solo Caver has Easy / Normal / Hard
     solo_leaderboard = "wins"  # win/lose game: rank the solo board by wins, not a 1/0 "best"
