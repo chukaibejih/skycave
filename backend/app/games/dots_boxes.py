@@ -105,6 +105,7 @@ class DotsAndBoxes(BaseGame):
     type = "dots_boxes"
     name = "Dots and Boxes"
     tagline = "Close a box, go again. Most boxes wins."
+    category = "strategy"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True

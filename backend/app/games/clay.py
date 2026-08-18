@@ -220,6 +220,7 @@ class Clay(BaseGame):
     type = "clay"
     name = "Clay"
     tagline = "Shape the spinning pot to match the target. Closest wins."
+    category = "casual"
     mode = SIMULTANEOUS
     total_rounds = 1
     round_time = 45.0      # every mode runs on the same 45s clock

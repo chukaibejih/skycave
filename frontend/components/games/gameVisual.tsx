@@ -19,6 +19,7 @@ export const GAME_ACCENT: Record<string, string> = {
   uno: "var(--color-primary)",
   mancala: "var(--color-gold)",
   crossing: "var(--color-primary)",
+  freeze: "var(--color-cyan)",
 };
 
 export const GAME_META: Record<string, { code: string; stat: string }> = {
@@ -37,7 +38,31 @@ export const GAME_META: Record<string, { code: string; stat: string }> = {
   clay: { code: "CLY", stat: "pottery" },
   mancala: { code: "MNC", stat: "seeds" },
   crossing: { code: "CRX", stat: "race" },
+  freeze: { code: "FRZ", stat: "timing" },
 };
+
+export const GAME_CATEGORY: Record<string, string> = {
+  flag_rush: "speed",
+  reaction_grid: "speed",
+  color_clash: "speed",
+  mad_math: "speed",
+  freeze: "speed",
+  word_duel: "words",
+  word_hunt: "words",
+  outline_quiz: "words",
+  geoguess: "words",
+  connect4: "strategy",
+  mancala: "strategy",
+  dots_boxes: "strategy",
+  tile_takeover: "strategy",
+  uno: "casual",
+  clay: "casual",
+  crossing: "casual",
+};
+
+export function getGameCategory(game: { type: string; category?: string }): string {
+  return game.category ?? GAME_CATEGORY[game.type] ?? "casual";
+}
 
 // Lightweight inline glyph per game (no icon dependency).
 export function GameGlyph({ type, color }: { type: string; color: string }) {
@@ -57,6 +82,16 @@ export function GameGlyph({ type, color }: { type: string; color: string }) {
           <circle cx="19" cy="5" r="1.7" />
           <circle cx="19" cy="12" r="1.7" />
           <circle cx="19" cy="19" r="1.7" />
+        </svg>
+      );
+    case "freeze":
+      // a marker (solid bar) sliding a rail toward a target zone - the game in
+      // miniature: stop it as close to the middle as you can.
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12h18" />
+          <rect x="13.5" y="7.5" width="5" height="9" rx="1.2" />
+          <path d="M7 6.5V17.5" strokeWidth="2.6" />
         </svg>
       );
     case "geoguess":

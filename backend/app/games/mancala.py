@@ -169,6 +169,7 @@ class Mancala(BaseGame):
     type = "mancala"
     name = "Mancala"
     tagline = "Sow the seeds. Bank the most."
+    category = "strategy"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True

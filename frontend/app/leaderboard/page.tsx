@@ -245,49 +245,106 @@ function rankColor(rank: number): string {
 }
 
 function PodiumCard({ entry, total, solo, label, isFirst }: { entry: LeaderboardEntry; total: boolean; solo: boolean; label: string; isFirst?: boolean }) {
+  const [flipped, setFlipped] = useState(false);
   const color = rankColor(entry.rank);
   const size = isFirst ? 56 : 44;
   const padding = isFirst ? "p-3 sm:p-6" : "p-2 sm:p-4";
+  const tenureLabel = `AT #${entry.rank} FOR`;
+
+  const flip = () => setFlipped((value) => !value);
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      flip();
+    }
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: entry.rank * 0.1 }}
-      className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[24px] border border-white/10 bg-black/40 backdrop-blur-xl ${padding}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${entry.display_name ?? entry.handle}, rank ${entry.rank}. ${flipped ? "Showing stats" : "Show stats"}`}
+      onClick={flip}
+      onKeyDown={onKeyDown}
+      className="min-w-0 flex-1 [perspective:1000px]"
       style={{
         maxWidth: "240px",
-        boxShadow: isFirst ? `0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 40px ${color}22` : "0 10px 20px rgba(0,0,0,0.3)",
       }}
     >
-      {isFirst && (
-        <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-[var(--color-gold)] opacity-10 blur-xl" />
-      )}
-      <div className="relative z-10 font-[var(--font-display)] text-lg font-bold sm:text-xl" style={{ color }}>
-        #{entry.rank}
-      </div>
-      <div className="relative z-10 mt-2 sm:mt-3">
-        <Link href={`/u/${entry.handle}`}>
-          <Avatar id={entry.did} name={entry.display_name ?? entry.handle} avatarUrl={entry.avatar_url} size={size} />
-        </Link>
-      </div>
-      <div className="relative z-10 w-full mt-2 text-center sm:mt-3">
-        <Link href={`/u/${entry.handle}`} className="block w-full truncate font-[var(--font-display)] text-sm font-bold transition-opacity hover:opacity-80 sm:text-base" style={{ color, fontSize: isFirst ? "clamp(0.85rem, 3.5vw, 1.25rem)" : "clamp(0.75rem, 3vw, 1rem)" }}>
-          {entry.display_name ?? entry.handle}
-        </Link>
-        <div className="hidden truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">
-          @{entry.handle}
+      <div
+        className="relative min-h-[220px] w-full transition-transform duration-500 [transform-style:preserve-3d]"
+        style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+      >
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-center rounded-[24px] border border-white/10 bg-black/40 backdrop-blur-xl ${padding}`}
+          style={{
+            backfaceVisibility: "hidden",
+            boxShadow: isFirst ? `0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 40px ${color}22` : "0 10px 20px rgba(0,0,0,0.3)",
+          }}
+        >
+          {isFirst && <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-[var(--color-gold)] opacity-10 blur-xl" />}
+          <div className="relative z-10 font-[var(--font-display)] text-lg font-bold sm:text-xl" style={{ color }}>#{entry.rank}</div>
+          <div className="relative z-10 mt-2 sm:mt-3">
+            <Link href={`/u/${entry.handle}`}>
+              <Avatar id={entry.did} name={entry.display_name ?? entry.handle} avatarUrl={entry.avatar_url} size={size} />
+            </Link>
+          </div>
+          <div className="relative z-10 mt-2 w-full text-center sm:mt-3">
+            <Link href={`/u/${entry.handle}`} className="block w-full truncate font-[var(--font-display)] text-sm font-bold transition-opacity hover:opacity-80 sm:text-base" style={{ color, fontSize: isFirst ? "clamp(0.85rem, 3.5vw, 1.25rem)" : "clamp(0.75rem, 3vw, 1rem)" }}>
+              {entry.display_name ?? entry.handle}
+            </Link>
+            <div className="hidden truncate font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] sm:block">@{entry.handle}</div>
+          </div>
+          <div className="relative z-10 mt-2 text-center sm:mt-4">
+            <div className="font-[var(--font-display)] text-lg font-bold sm:text-2xl" style={{ color: isFirst ? color : "var(--color-primary)" }}>
+              {solo || total ? entry.total_score.toLocaleString() : entry.games_won}
+            </div>
+            <div className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)] sm:text-[10px]">
+              {total ? "points" : solo ? label : "wins"}
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="relative z-10 mt-2 text-center sm:mt-4">
-        <div className="font-[var(--font-display)] text-lg font-bold sm:text-2xl" style={{ color: isFirst ? color : "var(--color-primary)" }}>
-          {solo || total ? entry.total_score.toLocaleString() : entry.games_won}
-        </div>
-        <div className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)] sm:text-[10px]">
-          {total ? "points" : solo ? label : "wins"}
+
+        <div
+          className={`absolute inset-0 flex flex-col justify-center rounded-[24px] border border-white/10 bg-black/60 backdrop-blur-xl ${padding}`}
+          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", boxShadow: isFirst ? `0 20px 40px rgba(0,0,0,0.5), 0 0 40px ${color}22` : "0 10px 20px rgba(0,0,0,0.3)" }}
+        >
+          <div className="mb-3 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.16em]" style={{ color }}>STATS</div>
+          {solo ? (
+            <>
+              <PodiumStat label="personal best" value={entry.total_score.toLocaleString()} />
+              <PodiumStat label="runs" value={entry.games_played.toLocaleString()} />
+            </>
+          ) : total ? (
+            <>
+              <PodiumStat label="total points" value={entry.total_score.toLocaleString()} />
+              <PodiumStat label="plays" value={entry.games_played.toLocaleString()} />
+              <PodiumStat label="1v1 wins" value={entry.games_won.toLocaleString()} />
+            </>
+          ) : (
+            <>
+              <PodiumStat label="wins" value={entry.games_won.toLocaleString()} />
+              <PodiumStat label="games played" value={entry.games_played.toLocaleString()} />
+              <PodiumStat label="win rate" value={`${Math.round(entry.win_rate * 100)}%`} />
+            </>
+          )}
+          <PodiumStat label={tenureLabel} value={`${entry.position_days} ${entry.position_days === 1 ? "day" : "days"}`} />
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function PodiumStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 border-b border-white/10 py-2 last:border-0">
+      <span className="font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</span>
+      <span className="font-[var(--font-display)] text-base font-bold text-[var(--color-text-primary)]">{value}</span>
+    </div>
   );
 }
 

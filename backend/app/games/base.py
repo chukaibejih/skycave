@@ -36,6 +36,8 @@ class BaseGame:
     result_delay: float = 2.5
     mode: str = RACE
     points_per_round: int = 1
+    # Category in the hub catalogue: "speed" | "words" | "strategy" | "casual"
+    category: str = "casual"
     # Shown in the hub game catalogue. An unlisted game is fully registered and
     # playable by direct link (/play/<slug>, invites, results), just hidden from
     # the hub - used to soft-test a new game before its public launch.

@@ -36,6 +36,7 @@ class GameInfo(BaseModel):
     type: str
     name: str
     tagline: str
+    category: str = "casual"
     total_rounds: int
     mode: str  # "race" | "simultaneous"
     min_players: int = 2
@@ -324,6 +325,7 @@ class LeaderboardEntry(BaseModel):
     games_won: int
     total_score: int
     win_rate: float
+    position_days: int = 0
 
 
 class LeaderboardResponse(BaseModel):

@@ -61,6 +61,7 @@ class WordDuel(BaseGame):
     type = "word_duel"
     name = "Word Duel"
     tagline = "Same 6 letters. Longest real word wins the round."
+    category = "words"
     total_rounds = 5
     round_time = 22.0
     result_delay = 4.5

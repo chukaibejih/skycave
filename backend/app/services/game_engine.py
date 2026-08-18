@@ -559,10 +559,13 @@ async def _solo_handle(room: dict[str, Any], game, player_id: str, action: dict)
             await _serve_timed_prompt(room, game)
             return False
         if game.check(public, secret, action):
-            gs["scores"][player_id] = gs["scores"].get(player_id, 0) + 1
+            # A correct answer adds +1 by default; a game can weight it (Freeze
+            # scores each freeze by how close it landed) via optional solo_points().
+            add = game.solo_points(public, secret, action) if hasattr(game, "solo_points") else 1
+            gs["scores"][player_id] = gs["scores"].get(player_id, 0) + add
             await rooms.save_room(room)
             await manager.broadcast(room_id, events.message(
-                events.PLAYER_ACTION, {"player_id": player_id, "correct": True}
+                events.PLAYER_ACTION, {"player_id": player_id, "correct": True, "delta": add}
             ))
             await _serve_timed_prompt(room, game)
         else:
@@ -904,6 +907,12 @@ async def _persist_game(
                 user.games_won += 1
 
         await db.commit()
+        try:
+            from app.services import position_reigns
+
+            await position_reigns.reconcile(db, room["game_type"])
+        except Exception:  # noqa: BLE001 - tenure tracking must never fail a game
+            logger.exception("leaderboard position reconcile failed for %s", room["game_type"])
 
 
 async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
@@ -993,8 +1002,10 @@ async def _persist_solo(room: dict[str, Any]) -> dict[str, Any]:
             if is_best:
                 try:
                     from app.services import reigns
+                    from app.services import position_reigns
 
                     await reigns.reconcile(db, room["game_type"])
+                    await position_reigns.reconcile(db, room["game_type"])
                 except Exception:  # noqa: BLE001
                     logger.exception("reign reconcile failed for %s", room["game_type"])
         summary["is_best"] = is_best

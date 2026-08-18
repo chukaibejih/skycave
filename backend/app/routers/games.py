@@ -16,6 +16,7 @@ _GAMES: list[GameInfo] = [
         type=g.type,
         name=g.name,
         tagline=g.tagline,
+        category=g.category,
         total_rounds=g.total_rounds,
         mode=g.mode,
         versus_enabled=g.versus_enabled,

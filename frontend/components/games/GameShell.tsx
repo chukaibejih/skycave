@@ -23,6 +23,7 @@ const Clay = dynamic(() => import("./Clay").then((m) => m.Clay), { ssr: false })
 const Uno = dynamic(() => import("./Uno").then((m) => m.Uno), { ssr: false });
 const Mancala = dynamic(() => import("./Mancala").then((m) => m.Mancala), { ssr: false });
 const Crossing = dynamic(() => import("./Crossing").then((m) => m.Crossing), { ssr: false });
+const Freeze = dynamic(() => import("./Freeze").then((m) => m.Freeze), { ssr: false });
 
 export function GameShell() {
   const {
@@ -122,6 +123,7 @@ export function GameShell() {
           {game.game_type === "reaction_grid" && <ReactionGrid {...gameProps} />}
           {game.game_type === "mad_math" && <MadMath {...gameProps} />}
           {game.game_type === "word_hunt" && <WordHunt {...gameProps} />}
+          {game.game_type === "freeze" && <Freeze {...gameProps} />}
         </>
       )}
     </div>

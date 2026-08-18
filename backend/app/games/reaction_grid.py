@@ -23,6 +23,7 @@ class ReactionGrid(BaseGame):
     type = "reaction_grid"
     name = "Reaction Grid"
     tagline = "Watch the sequence, tap it back. First correct wins."
+    category = "speed"
     total_rounds = 6
     round_time = 16.0
     result_delay = 2.0

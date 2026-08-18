@@ -98,9 +98,14 @@ class Uno(BaseGame):
     type = "uno"
     name = "Uno"
     tagline = "Match colour or number. First to empty their hand wins."
+    category = "casual"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
+    # Win/loss game: the solo board ranks by career wins vs the Caver, not the
+    # biggest single-win margin (which is what a high-score board would reward).
+    # Same treatment as Connect 4 / Crossing. Uno has no Easy, so every win counts.
+    solo_leaderboard = "wins"
     # No difficulty levels: Uno is luck-dominated, so a weaker bot doesn't lose
     # meaningfully more (self-play Easy vs Normal is ~50/50). A picker here would
     # be cosmetic, so it's left off.

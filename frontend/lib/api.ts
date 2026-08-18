@@ -263,6 +263,7 @@ export interface LeaderboardEntry {
   games_won: number;
   total_score: number;
   win_rate: number;
+  position_days: number;
 }
 export type LeaderboardPeriod = "all" | "week";
 // "total" = cumulative points across every mode (used by Clay).

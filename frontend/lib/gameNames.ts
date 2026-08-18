@@ -15,6 +15,7 @@ export const GAME_NAME: Record<string, string> = {
   uno: "Uno",
   mancala: "Mancala",
   crossing: "Crossing",
+  freeze: "Freeze",
 };
 export const gameName = (t: string) => GAME_NAME[t] ?? t;
 
