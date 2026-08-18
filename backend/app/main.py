@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.database import AsyncSessionLocal
 from app.core.redis_client import close_redis, get_redis
 from app.routers import (
     internal,
@@ -32,6 +33,11 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Seed top-three tenure for boards that existed before position tracking.
+    async with AsyncSessionLocal() as db:
+        from app.services.position_reigns import seed_existing
+
+        await seed_existing(db)
     # Warm the Redis connection so the first request doesn't pay the cost.
     await get_redis().ping()
     yield

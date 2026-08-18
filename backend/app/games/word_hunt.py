@@ -98,6 +98,7 @@ class WordHunt(BaseGame):
     type = "word_hunt"
     name = "Word Hunt"
     tagline = "Trace words in the grid. Longest hunt wins."
+    category = "words"
     total_rounds = 3
     round_time = 30.0
     result_delay = 4.5

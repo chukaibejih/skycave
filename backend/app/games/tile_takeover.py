@@ -55,6 +55,7 @@ class TileTakeover(BaseGame):
     type = "tile_takeover"
     name = "Tile Takeover"
     tagline = "Flood the board. Claim the most tiles."
+    category = "strategy"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True

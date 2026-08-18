@@ -24,13 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.redis_client import get_redis
 from app.games.registry import get_game
-from app.models import GameSession, PersonalBest, User
+from app.models import GameSession, LeaderboardPosition, PersonalBest, User
 from app.models.game_session import HEAD_TO_HEAD_MODES
 from app.schemas.rest import LeaderboardEntry, LeaderboardResponse
 
 router = APIRouter(tags=["leaderboard"])
 
-CACHE_PREFIX = "leaderboard:v3"
+CACHE_PREFIX = "leaderboard:v4"
 CACHE_TTL = 60  # seconds
 WEEK = timedelta(days=7)
 
@@ -73,8 +73,32 @@ async def _users_by_did(db: AsyncSession, dids: list[str]) -> dict[str, User]:
     }
 
 
+async def _position_days(
+    db: AsyncSession, game: str, mode: str, period: str, dids: list[str]
+) -> dict[str, int]:
+    if not dids:
+        return {}
+    rows = (
+        await db.execute(
+            select(LeaderboardPosition.holder_did, LeaderboardPosition.started_at).where(
+                LeaderboardPosition.game_type == game,
+                LeaderboardPosition.mode == mode,
+                LeaderboardPosition.period == period,
+                LeaderboardPosition.ended_at.is_(None),
+                LeaderboardPosition.holder_did.in_(dids),
+            )
+        )
+    ).all()
+    now = datetime.now(timezone.utc)
+    return {
+        did: max(0, (now - (started if started.tzinfo else started.replace(tzinfo=timezone.utc))).days)
+        for did, started in rows
+    }
+
+
 async def _aggregate(
-    db: AsyncSession, conds: list, order_by: list, limit: int
+    db: AsyncSession, conds: list, order_by: list, limit: int,
+    game: str, mode: str, period: str,
 ) -> LeaderboardResponse:
     """Union both player sides of game_sessions, group by DID, rank by `order_by`."""
 
@@ -107,6 +131,7 @@ async def _aggregate(
     )
     rows = (await db.execute(agg)).all()
     users = await _users_by_did(db, [row.pid for row in rows])
+    tenure = await _position_days(db, game, mode, period, [row.pid for row in rows])
 
     entries = []
     for i, row in enumerate(rows):
@@ -123,6 +148,7 @@ async def _aggregate(
                 games_won=won,
                 total_score=int(row.total or 0),
                 win_rate=round(won / played, 3) if played else 0.0,
+                position_days=tenure.get(row.pid, 0),
             )
         )
     return LeaderboardResponse(entries=entries)
@@ -133,7 +159,7 @@ async def _versus(db: AsyncSession, game: str, period: str, limit: int) -> Leade
     if period == "week":
         conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
     # wins first, cumulative score breaks ties
-    return await _aggregate(db, conds, [desc("won"), desc("total")], limit)
+    return await _aggregate(db, conds, [desc("won"), desc("total")], limit, game, "versus", period)
 
 
 async def _total(db: AsyncSession, game: str, period: str, limit: int) -> LeaderboardResponse:
@@ -143,7 +169,7 @@ async def _total(db: AsyncSession, game: str, period: str, limit: int) -> Leader
     conds = [GameSession.game_type == game]
     if period == "week":
         conds.append(GameSession.created_at >= datetime.now(timezone.utc) - WEEK)
-    return await _aggregate(db, conds, [desc("total")], limit)
+    return await _aggregate(db, conds, [desc("total")], limit, game, "total", period)
 
 
 async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:
@@ -164,6 +190,7 @@ async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:
         )
     ).scalars().all()
     users = await _users_by_did(db, [pb.player_id for pb in rows])
+    tenure = await _position_days(db, game, "solo", "all", [pb.player_id for pb in rows])
 
     entries = []
     for i, pb in enumerate(rows):
@@ -179,6 +206,7 @@ async def _solo(db: AsyncSession, game: str, limit: int) -> LeaderboardResponse:
                 games_won=0,  # not meaningful for solo
                 total_score=pb.best_score,  # best single-run score, or career wins
                 win_rate=0.0,
+                position_days=tenure.get(pb.player_id, 0),
             )
         )
     g = get_game(game)

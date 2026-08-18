@@ -32,6 +32,7 @@ export interface GameInfo {
   type: string;
   name: string;
   tagline: string;
+  category?: string;
   total_rounds: number;
   mode: "race" | "simultaneous" | "turn_based";
   min_players: number;

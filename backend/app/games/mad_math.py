@@ -50,6 +50,7 @@ class MadMath(BaseGame):
     type = "mad_math"
     name = "Mad Math"
     tagline = "Solve it first. Rapid mental math."
+    category = "speed"
     total_rounds = 10
     round_time = 8.0
     result_delay = 2.2

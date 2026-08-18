@@ -29,6 +29,7 @@ class FlagRush(BaseGame):
     type = "flag_rush"
     name = "Flag Rush"
     tagline = "Name the country. First correct takes the point."
+    category = "speed"
     total_rounds = 10
     round_time = 10.0
     result_delay = 2.0

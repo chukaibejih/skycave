@@ -25,6 +25,7 @@ class ColorClash(BaseGame):
     type = "color_clash"
     name = "Color Clash"
     tagline = "Tap the ink color, not the word. First correct wins."
+    category = "speed"
     total_rounds = 10
     round_time = 8.0
     result_delay = 2.4

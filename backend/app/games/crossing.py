@@ -32,6 +32,7 @@ class Crossing(BaseGame):
     type = "crossing"  # internal slug; the public name is decided separately
     name = "Crossing"
     tagline = "Race your three across. No jumping."
+    category = "strategy"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True

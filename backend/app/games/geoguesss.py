@@ -248,6 +248,7 @@ class GeoGuess(BaseGame):
     type = "geoguess"
     name = "GeoGuess 1v1"
     tagline = "Drop a pin. Closest to the target wins the round."
+    category = "words"
     total_rounds = 5
     round_time = 25.0
     result_delay = 5.0

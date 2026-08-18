@@ -38,6 +38,7 @@ class OutlineQuiz(BaseGame):
     type = "outline_quiz"
     name = "Outline Quiz"
     tagline = "Name the country from its outline. First correct wins."
+    category = "words"
     total_rounds = 10
     round_time = 10.0
     result_delay = 2.0

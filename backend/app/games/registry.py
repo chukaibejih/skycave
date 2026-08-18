@@ -12,6 +12,7 @@ from app.games.connect4 import Connect4
 from app.games.crossing import Crossing
 from app.games.dots_boxes import DotsAndBoxes
 from app.games.flag_rush import FlagRush
+from app.games.freeze import Freeze
 from app.games.geoguesss import GeoGuess
 from app.games.mad_math import MadMath
 from app.games.mancala import Mancala
@@ -40,6 +41,7 @@ _GAMES: dict[str, BaseGame] = {
         Uno(),
         Mancala(),
         Crossing(),
+        Freeze(),
     )
 }
 

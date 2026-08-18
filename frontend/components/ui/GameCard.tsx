@@ -14,6 +14,7 @@ const NEW_SINCE: Record<string, string> = {
   uno: "2026-07-22",   // launch day - move this if the merge slips
   mancala: "2026-07-25",  // launch day - move this if the merge slips
   crossing: "2026-08-10",  // launch day
+  freeze: "2026-08-18",   // launch day
 };
 export function isNewGame(type: string): boolean {
   const since = NEW_SINCE[type];
@@ -37,7 +38,7 @@ export const GameCard = memo(function GameCard({
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onPlay(game)}
-      className="group relative flex min-h-[152px] overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 text-left transition-colors active:border-[color:var(--accent)] sm:min-h-[168px] sm:p-4"
+      className="group relative flex h-full w-full overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 text-left transition-colors active:border-[color:var(--accent)] sm:p-4"
       style={{ ["--accent" as string]: accent }}
     >
       <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-active:opacity-100">
@@ -48,7 +49,7 @@ export const GameCard = memo(function GameCard({
       </div>
       <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent),transparent)] opacity-70" />
 
-      <div className="relative flex w-full flex-col">
+      <div className="relative flex h-full w-full flex-col justify-between">
         <div className="flex items-start justify-between">
           <div
             className="flex h-11 w-11 items-center justify-center rounded-xl border"

@@ -9,6 +9,7 @@ import { SignalFlow } from "@/components/hub/SignalFlow";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { TournamentBanner } from "@/components/tournament/TournamentBanner";
+import { ArcadeShelves } from "@/components/hub/ArcadeShelves";
 import { createRoom, listGames } from "@/lib/api";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -17,7 +18,7 @@ import type { GameInfo, Identity } from "@/lib/types";
 // Paint before the first frame on the client (no "syncing" flash) but fall back to
 // a plain effect on the server, where layout effects do not run.
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
-const GAMES_CACHE = "skycave_games";
+const GAMES_CACHE = "skycave_games_v2";
 
 export default function Home() {
   const router = useRouter();
@@ -162,34 +163,14 @@ export default function Home() {
       {/* The Cave is hidden from the hub for now. The component and its /cave
           routes are untouched, so restoring it is putting this section back. */}
 
-      <section className="pb-12">
-        <div className="mb-5 flex items-end justify-between gap-4">
-          <div>
-            <p className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
-              choose your duel
-            </p>
-            <h2 className="mt-2 font-[var(--font-display)] text-2xl font-semibold">
-              Game dock
-            </h2>
-          </div>
-          <p className="hidden max-w-xs text-right text-sm text-[var(--color-text-secondary)] sm:block">
-            Tap a game, then pick 1v1 or solo.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        {/* NEW games float to the top of the dock; a stable sort keeps the rest in
-            order. They drop back automatically once their NEW window expires. */}
-        {/* The catalog already arrives newest-first (see routers/games.py). */}
-        {games.map((g) => (
-          <GameCard key={g.type} game={g} onPlay={launch} />
-        ))}
-        {games.length === 0 && (
+      <section className="pt-4 pb-12">
+        {games.length > 0 ? (
+          <ArcadeShelves games={games} onPlay={launch} />
+        ) : (
           <div className="panel col-span-full rounded-[22px] py-16 text-center text-sm text-[var(--color-text-secondary)]">
             syncing game dock...
           </div>
         )}
-        </div>
       </section>
 
       <CoffeeFooter />

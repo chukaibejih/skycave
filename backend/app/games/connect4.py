@@ -151,6 +151,7 @@ class Connect4(BaseGame):
     type = "connect4"
     name = "Connect 4"
     tagline = "Drop discs. Line up four."
+    category = "strategy"
     total_rounds = 1
     mode = TURN_BASED
     solo_enabled = True
