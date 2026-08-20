@@ -5,9 +5,11 @@ and are scored by how close you stop it to the target. There is no countdown: th
 marker is always moving THROUGH the target, never resting on it, so every freeze
 is a live catch.
 
-1v1 is SIMULTANEOUS: both players face the identical seeded motion, each commits
-one freeze, and the round goes to whoever stopped closer (best of five). Solo is a
-60-second sprint - how many near-perfect freezes can you land?
+1v1 is SIMULTANEOUS: both players face the identical seeded motion and share the
+marker - when one player freezes, the other sees the pin land and can play safe or
+chase it under the round clock. Each freeze banks accuracy points; across the
+rounds the higher TOTAL accuracy takes the match (precision, not a count of rounds
+won). Solo is a 60-second sprint - how many near-perfect freezes can you land?
 
 The motion lives on the CLIENT: it renders pos(t) from the seed in ``public`` (so
 both players see identical movement), and on freeze it reports the marker's
@@ -28,12 +30,16 @@ from app.games.base import SIMULTANEOUS, BaseGame
 # only names one + a speed; the marker math lives in Freeze.tsx. Ordered roughly
 # easy -> hard so a versus game ramps and a long solo run keeps getting tougher.
 PATTERNS: list[dict[str, Any]] = [
-    {"id": "sweep", "speed": 0.45},   # steady glide, end to end
-    {"id": "sweep", "speed": 0.75},   # same, quicker
-    {"id": "bounce", "speed": 0.65},  # ping-pong off the ends
-    {"id": "accel", "speed": 0.6},    # eases slow-fast-slow across the track
-    {"id": "reverse", "speed": 0.7},  # doubles back partway
-    {"id": "fast", "speed": 1.05},    # blink and you miss it
+    {"id": "sweep", "speed": 0.45},     # steady glide, end to end
+    {"id": "pendulum", "speed": 0.55},  # sinusoidal swing, slowest at both ends
+    {"id": "bounce", "speed": 0.6},     # hangs at the ends, like a ball
+    {"id": "wobble", "speed": 0.6},     # serpentine: advances then doubles back
+    {"id": "accel", "speed": 0.65},     # eases slow-fast-slow across the track
+    {"id": "drift", "speed": 0.6},      # organic wander, never a straight sweep
+    {"id": "step", "speed": 0.7},       # ratchets in stutter-steps with tiny holds
+    {"id": "reverse", "speed": 0.7},    # a wobble that fakes you out
+    {"id": "jitter", "speed": 0.55},    # twitchy fine shake on a slow sweep
+    {"id": "fast", "speed": 1.05},      # blink and you miss it
 ]
 
 # Closeness falls from 100% at the target to 0% this far away (half the track).
@@ -78,7 +84,8 @@ class Freeze(BaseGame):
     tagline = "Stop it as close to the target as you can."
     category = "speed"
     total_rounds = 7           # best of seven
-    round_time = 6.0           # seconds to commit a freeze (the marker loops within it)
+    round_time = 10.0          # seconds to commit a freeze: room to watch the shared
+    #                            marker, see the opponent lock, and react/chase
     result_delay = 4.0
     mode = SIMULTANEOUS
     # Solo: a 60-second sprint scored by accuracy points (see solo_points). Default
@@ -109,25 +116,36 @@ class Freeze(BaseGame):
         }
         return public, {"target": target}
 
-    # --- 1v1: SIMULTANEOUS, scored by closeness ------------------------------
+    # --- 1v1: SIMULTANEOUS, total accuracy + shared marker -------------------
     def resolve(
         self,
         public: dict[str, Any],
         secret: dict[str, Any],
         actions: dict[str, dict[str, Any]],
     ) -> dict[str, int]:
-        """Round point to whoever froze strictly closer. A no-show or an exact
-        tie awards nobody (the match winner is whoever takes more rounds)."""
+        """Each player BANKS accuracy points for their own freeze (0 below the
+        floor, up to _MAX dead-on) - the same ramp solo uses. The engine sums
+        these across the rounds, so the match goes to the higher TOTAL accuracy,
+        not a count of rounds won: every point of precision counts, and a blowout
+        round is worth more than a hair-close one."""
         target = float(secret["target"])
-        pcts: dict[str, int] = {}
-        for pid, action in actions.items():
-            off = _offset(action, target)
-            pcts[pid] = _pct(off) if off is not None else -1
-        best = max(pcts.values(), default=-1)
-        winners = [pid for pid, p in pcts.items() if p == best and p >= 0]
-        if best < 0 or len(winners) != 1:
-            return {pid: 0 for pid in actions}
-        return {pid: (1 if pid == winners[0] else 0) for pid in actions}
+        return {pid: _points(_offset(action, target)) for pid, action in actions.items()}
+
+    def commit_reveal(
+        self,
+        public: dict[str, Any],
+        secret: dict[str, Any],
+        action: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """The shared marker: when a player freezes, show the opponent ONLY where
+        the pin landed, so they can play safe or chase it under the round clock.
+        The target is already public, so the opponent judges closeness itself;
+        no answer leaks here."""
+        try:
+            pos = float(action["pos"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return {"pos": round(min(1.0, max(0.0, pos)), 4)}
 
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
         return {"target": secret["target"]}

@@ -36,6 +36,7 @@ export function GameShell() {
     submitted,
     roundEndsAt,
     boardState,
+    opponentFreeze,
     sendAction,
     isSpectator,
   } = useRoom();
@@ -78,6 +79,7 @@ export function GameShell() {
     result: roundResult,
     players: room.players,
     meId,
+    opponentFreeze,
     solo,
     onAction: act,
   };

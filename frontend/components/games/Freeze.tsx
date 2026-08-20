@@ -40,6 +40,9 @@ interface Props {
   players?: PlayerSlot[];
   meId?: string;
   solo?: boolean;
+  /** Freeze shared marker: where the opponent's pin landed this round (0..1),
+   * revealed the instant they freeze so you can play safe or chase it. */
+  opponentFreeze?: number | null;
 }
 
 const P_COLOR = ["#8b7cff", "#ff6b6b"];
@@ -70,6 +73,7 @@ const tri = (x: number) => {
 };
 const smooth = (x: number) => x * x * (3 - 2 * x);
 const smoother = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /** Marker position in [0,1] at local time `t` (seconds) for a seeded pattern. */
 function motion(pattern: string, t: number, seed: number, speed: number): number {
@@ -83,6 +87,29 @@ function motion(pattern: string, t: number, seed: number, speed: number): number
     case "reverse":
       // A wobble on top of the sweep so it doubles back and fakes you out.
       return tri(phase0 + t * speed + 0.4 * Math.sin(t * (2 + speed * 2)));
+    case "pendulum":
+      // A clean sinusoidal swing: slowest at both ends, quickest through the middle.
+      return 0.5 - 0.5 * Math.cos((phase0 + t * speed) * Math.PI);
+    case "wobble":
+      // A stronger serpentine than reverse: advances then doubles back harder.
+      return tri(phase0 + t * speed + 0.6 * Math.sin(t * (1.5 + speed * 2)));
+    case "drift": {
+      // Organic wander around the middle from two seeded harmonics - never a
+      // straight sweep, but always smooth, so it stays catchable rather than luck.
+      const a = 0.6 + mulberry32(seed ^ 0x9e3779b9)();
+      const b = 1.6 + mulberry32(seed ^ 0x85ebca6b)() * 2;
+      return clamp01(0.5 + 0.32 * Math.sin(a * speed * t) + 0.16 * Math.sin(b * speed * t + 1));
+    }
+    case "step": {
+      // Ratchets forward in eased quarter-steps with a tiny hold at each end of a
+      // step - the moment to catch it is during a pause.
+      const s = phase0 + t * speed;
+      const base = Math.floor(s * 4) / 4;
+      return tri(base + smoother((s * 4) % 1) / 4);
+    }
+    case "jitter":
+      // A slow sweep with a fast fine shake, so a precise freeze takes nerve.
+      return clamp01(raw + 0.05 * Math.sin(t * 22));
     default: // "sweep" | "fast"
       return raw;
   }
@@ -97,6 +124,7 @@ export function Freeze({
   players = [],
   meId,
   solo,
+  opponentFreeze,
 }: Props) {
   const active = phase === "active";
   const markerRef = useRef<HTMLDivElement | null>(null);
@@ -168,8 +196,11 @@ export function Freeze({
   const target = active ? roundData.target : answer?.target ?? roundData.target;
   const targetW = roundData.target_w ?? 0.04;
   const colorFor = (pid: string) => P_COLOR[players.findIndex((p) => p.id === pid)] ?? "#9aa3ba";
+  const oppId = players.find((p) => p.id !== meId)?.id;
+  const scores = ((result as unknown as { scores?: Record<string, number> })?.scores ?? {}) as Record<string, number>;
 
   const live = active && frozenPos === null; // marker is moving
+  const oppLocked = active && opponentFreeze != null; // their pin is down; the marker's still yours to catch
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
@@ -187,7 +218,15 @@ export function Freeze({
 
         {/* Prompt line (fixed height) */}
         <div className="pointer-events-none flex h-5 items-center font-[var(--font-mono)] text-[11px] uppercase tracking-[0.22em] text-[var(--color-text-secondary)]">
-          {active ? (submitted ? (solo ? "next…" : "locked in") : "freeze on the target") : "the freeze"}
+          {active
+            ? submitted
+              ? solo
+                ? "next…"
+                : "locked in"
+              : oppLocked
+                ? "opponent locked · beat it"
+                : "freeze on the target"
+            : "the freeze"}
         </div>
 
         {/* The track */}
@@ -202,6 +241,18 @@ export function Freeze({
               style={{ willChange: "transform", transform: place(frozenPos ?? posRef.current) }}
             >
               <Marker color={frozenPos != null ? colorFor(meId ?? "") : "#f5f7ff"} live={live} />
+            </div>
+          )}
+
+          {/* The opponent's pin, shown the instant they freeze (the shared
+              marker). It sits under yours (z-10) so your live catch stays on top,
+              and it's the mark you're deciding whether to play safe against or chase. */}
+          {active && opponentFreeze != null && oppId && (
+            <div
+              className="absolute left-0 top-1/2 z-10"
+              style={{ transform: `translate(${opponentFreeze * trackWRef.current - 3}px, -50%)` }}
+            >
+              <Marker color={colorFor(oppId)} live={false} dim />
             </div>
           )}
 
@@ -292,7 +343,7 @@ export function Freeze({
       {!active && !solo && (
         <div className="relative z-10 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
           <div className="mx-auto w-full max-w-md">
-            <RevealPanel freezes={freezes} players={players} meId={meId} colorFor={colorFor} />
+            <RevealPanel freezes={freezes} players={players} meId={meId} colorFor={colorFor} scores={scores} />
           </div>
         </div>
       )}
@@ -344,56 +395,84 @@ function RevealPanel({
   players,
   meId,
   colorFor,
+  scores,
 }: {
   freezes: Record<string, Freeze1>;
   players: PlayerSlot[];
   meId?: string;
   colorFor: (pid: string) => string;
+  scores: Record<string, number>;
 }) {
   const rows = players.map((p) => ({ player: p, f: freezes[p.id] })).filter((r) => r.f);
-  const winner = rows.find((r) => (r.f!.points ?? 0) > 0)?.player;
-  const iWon = !!winner && winner.id === meId;
-  const verdict = winner
-    ? iWon
-      ? "You take the round"
-      : `${winner.display_name} takes it`
-    : "Dead heat";
+  // Match is decided by TOTAL accuracy, so the header is the running total race;
+  // the rows show what each player banked THIS round.
+  const me = players.find((p) => p.id === meId);
+  const opp = players.find((p) => p.id !== meId);
+  const myTotal = me ? scores[me.id] ?? 0 : 0;
+  const oppTotal = opp ? scores[opp.id] ?? 0 : 0;
+  const iLead = myTotal > oppTotal;
+  const level = myTotal === oppTotal;
+  // Who banked more this round (accent only; not a round "win").
+  const roundBest = Math.max(0, ...rows.map((r) => r.f!.points ?? 0));
   return (
     <div
       className="rounded-[var(--radius-card)] border bg-[var(--color-surface)]/95 p-4 backdrop-blur-md"
       style={{
-        borderColor: iWon
+        borderColor: iLead
           ? "color-mix(in srgb, var(--color-success) 50%, transparent)"
           : "var(--color-border)",
-        boxShadow: iWon ? "0 0 26px color-mix(in srgb, var(--color-success) 16%, transparent)" : "none",
+        boxShadow: iLead ? "0 0 26px color-mix(in srgb, var(--color-success) 16%, transparent)" : "none",
       }}
     >
-      <div
-        className="mb-3 text-center font-[var(--font-display)] text-lg font-black tracking-tight"
-        style={{ color: iWon ? "var(--color-success)" : "var(--color-text-primary)" }}
-      >
-        {verdict}
+      {/* The match total race. */}
+      <div className="mb-1 flex items-center justify-center gap-3 font-[var(--font-display)] tracking-tight">
+        <span
+          className="text-3xl font-black tabular-nums"
+          style={{ color: iLead ? "var(--color-success)" : "var(--color-text-primary)" }}
+        >
+          {myTotal}
+        </span>
+        <span className="text-sm font-bold text-[var(--color-text-secondary)]">
+          {opp ? "You" : ""}
+        </span>
+        <span className="text-lg font-bold text-[var(--color-text-secondary)]">–</span>
+        {opp && (
+          <>
+            <span className="max-w-[7rem] truncate text-sm font-bold text-[var(--color-text-secondary)]">
+              {opp.display_name}
+            </span>
+            <span
+              className="text-3xl font-black tabular-nums"
+              style={{ color: !iLead && !level ? "var(--color-warm)" : "var(--color-text-primary)" }}
+            >
+              {oppTotal}
+            </span>
+          </>
+        )}
       </div>
+      <div className="mb-3 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
+        {level ? "level on accuracy" : iLead ? "you lead the match" : "you're chasing"}
+      </div>
+
       <div className="space-y-2.5">
         {rows.map(({ player, f }) => {
-          const won = (f!.points ?? 0) > 0;
+          const pts = f!.points ?? 0;
+          const banked = pts > 0 && pts === roundBest;
           return (
             <div key={player.id} className="flex items-center justify-between gap-3">
               <span className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold text-[var(--color-text-primary)]">
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: colorFor(player.id) }} />
                 {player.id === meId ? "You" : player.display_name}
-                {won && <span style={{ color: "var(--color-success)" }}>★</span>}
               </span>
               <span className="flex shrink-0 items-baseline gap-3">
                 <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-                  {f!.pos == null ? "no freeze" : `${f!.px} px`}
+                  {f!.pos == null ? "no freeze" : `${f!.pct}% · ${f!.px}px`}
                 </span>
                 <span
-                  className="font-[var(--font-display)] text-3xl font-black leading-none tabular-nums"
-                  style={{ color: won ? "var(--color-success)" : "var(--color-text-primary)" }}
+                  className="w-16 text-right font-[var(--font-display)] text-2xl font-black leading-none tabular-nums"
+                  style={{ color: banked ? "var(--color-success)" : pts > 0 ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
                 >
-                  {f!.pct}
-                  <span className="text-lg font-bold">%</span>
+                  {pts > 0 ? `+${pts}` : "0"}
                 </span>
               </span>
             </div>

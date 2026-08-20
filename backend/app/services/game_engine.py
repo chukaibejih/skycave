@@ -301,13 +301,18 @@ async def handle_action(
                 return  # immutable: refresh/reconnect can't improve a submitted guess
             gs["round_actions"][player_id] = action
             await rooms.save_room(room)
-            # Let the opponent know a guess landed, without revealing it.
+            # Let the opponent know a guess landed. Most games reveal nothing; a
+            # game may opt to expose a safe view of the commit via commit_reveal
+            # (Freeze shows the frozen mark, so the opponent sees the pin land and
+            # can react - the shared marker). The target/answer is never sent.
+            payload: dict[str, Any] = {"player_id": player_id, "submitted": True}
+            if hasattr(game, "commit_reveal"):
+                shown = game.commit_reveal(public, secret, action)
+                if shown is not None:
+                    payload["reveal"] = shown
             await manager.broadcast(
                 room_id,
-                events.message(
-                    events.PLAYER_ACTION,
-                    {"player_id": player_id, "submitted": True},
-                ),
+                events.message(events.PLAYER_ACTION, payload),
                 exclude=player_id,
             )
             participants = _participant_ids(room)

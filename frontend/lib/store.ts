@@ -97,6 +97,7 @@ interface RoomState {
   submitted: boolean;
   roundEndsAt: number | null;
   opponentSubmitted: boolean;
+  opponentFreeze: number | null; // Freeze shared marker: where the opponent's pin landed this round (0..1), or null
   soloWords: string[]; // accepted words this solo Word Duel session
   boardState: import("./types").BoardState | null; // turn-based board (Tile Takeover)
   privateBoard: import("./types").UnoHand | null; // your own hidden slice (Uno hand)
@@ -137,6 +138,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   submitted: false,
   roundEndsAt: null,
   opponentSubmitted: false,
+  opponentFreeze: null,
   soloWords: [],
   boardState: null,
   privateBoard: null,
@@ -331,6 +333,7 @@ export const useRoom = create<RoomState>((set, get) => ({
         submitted: false,
         roundEndsAt: endsAt,
 	        opponentSubmitted: false,
+        opponentFreeze: null,
 	        game: s.game
 	          ? {
               ...s.game,
@@ -365,7 +368,13 @@ export const useRoom = create<RoomState>((set, get) => ({
         if (Array.isArray(data.used)) patch.soloWords = data.used as string[];
         set(patch);
       } else if (data.submitted) {
-        set({ opponentSubmitted: true });
+        // Freeze shares the marker: the opponent's commit carries where their pin
+        // landed, so this client can render it live and react.
+        const patch: Partial<RoomState> = { opponentSubmitted: true };
+        if (data.reveal && typeof data.reveal.pos === "number") {
+          patch.opponentFreeze = data.reveal.pos as number;
+        }
+        set(patch);
       }
     });
 
@@ -430,6 +439,7 @@ export const useRoom = create<RoomState>((set, get) => ({
       submitted: false,
       roundEndsAt: null,
 	      opponentSubmitted: false,
+      opponentFreeze: null,
       justJoined: false,
     }),
 }));
