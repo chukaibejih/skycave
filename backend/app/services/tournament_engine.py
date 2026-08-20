@@ -24,12 +24,13 @@ from datetime import datetime, time, timedelta, timezone
 
 # The pool for tournament fixtures. GeoGuess, Flag Rush and Outline Quiz are out
 # for the first event; Reaction Grid and Mad Math are out until they have been
-# played head to head at all (they have zero 1v1 games ever).
+# played head to head at all (they have zero 1v1 games ever). Color Clash was
+# subbed out for Freeze (total-accuracy + shared marker) ahead of this cup.
 GAME_POOL = (
     "tile_takeover",
     "connect4",
     "word_hunt",
-    "color_clash",
+    "freeze",
     "mancala",
     "clay",
     "dots_boxes",
