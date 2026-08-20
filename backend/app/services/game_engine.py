@@ -218,6 +218,40 @@ async def _on_timeout(room_id: str, round_number: int) -> None:
         await _finish_round_locked(room, winner_id=None, timed_out=True)
 
 
+async def _versus_words(
+    room: dict[str, Any], game, player_id: str, action: dict[str, Any],
+    public: dict[str, Any], secret: dict[str, Any],
+) -> None:
+    """A head-to-head word game (Word Hunt / Word Duel 1v1): both players work the
+    SAME board for the whole round, every valid word accumulates, and the round
+    ends only on the timer - never early - so one player finishing can't truncate
+    the other. Mirrors the solo 'words' accumulator, but round-scoped, per player,
+    and deduped per player. Held under the room lock by the caller."""
+    room_id = room["id"]
+    gs = room["game"]
+    word = str(action.get("word", "")).strip().upper()
+    slot = gs["round_actions"].setdefault(player_id, {"words": [], "score": 0})
+    used = slot["words"]
+    letters = secret.get("letters") or secret.get("grid") or []
+    delta, accepted = 0, False
+    if word and word not in used:
+        delta = game.solo_word(letters, word)  # validates (dict + trace/anagram) and scores
+        if delta > 0:
+            used.append(word)
+            slot["score"] += delta
+            accepted = True
+    await rooms.save_room(room)
+    # The finder gets their own accepted words + running round score.
+    await manager.send(room_id, player_id, events.message(events.PLAYER_ACTION, {
+        "player_id": player_id, "correct": accepted, "word": word,
+        "delta": delta, "roundScore": slot["score"], "used": used,
+    }))
+    # Everyone gets the live scoreboard (both round scores), so the race is visible.
+    board = {pid: gs["round_actions"].get(pid, {}).get("score", 0)
+             for pid in _participant_ids(room)}
+    await manager.broadcast(room_id, events.message(events.PLAYER_ACTION, {"roundBoard": board}))
+
+
 async def handle_action(
     room_id: str, player_id: str, action: dict[str, Any]
 ) -> None:
@@ -297,6 +331,11 @@ async def handle_action(
             return
         else:
             # --- simultaneous mode ---
+            if getattr(game, "versus_accumulate", False):
+                # Head-to-head word hunt: accumulate every valid word; the round
+                # only ends on the timer (below is the one-commit path for the rest).
+                await _versus_words(room, game, player_id, action, public, secret)
+                return
             if player_id in gs["round_actions"]:
                 return  # immutable: refresh/reconnect can't improve a submitted guess
             gs["round_actions"][player_id] = action

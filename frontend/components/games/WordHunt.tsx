@@ -9,9 +9,9 @@ interface RoundData {
   round_time: number;
 }
 
-interface WordInfo {
-  word: string;
-  valid: boolean;
+interface HuntInfo {
+  words: string[]; // the longest words found (for the reveal)
+  count: number;
   points: number;
 }
 
@@ -170,64 +170,74 @@ function TraceGrid({
   );
 }
 
+function ScorePill({ label, value, color, right }: { label: string; value: number; color: string; right?: boolean }) {
+  return (
+    <div className={`flex flex-col ${right ? "items-end" : "items-start"}`}>
+      <span className="flex items-center gap-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
+        {!right && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}
+        <span className="max-w-[6rem] truncate">{label}</span>
+        {right && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}
+      </span>
+      <span className="font-[var(--font-display)] text-2xl font-black tabular-nums" style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
 export function WordHunt({
   roundData,
   phase,
   result,
   onAction,
-  submitted: submittedFromServer,
   players = [],
   meId,
   solo,
 }: Props) {
   const active = phase === "active";
+  const soloWords = useRoom((s) => s.soloWords);
+  const feedback = useRoom((s) => s.feedback);
+  const roundScores = useRoom((s) => s.roundScores);
+  const [lastTried, setLastTried] = useState<string | null>(null);
+  useEffect(() => setLastTried(null), [roundData.grid]);
 
   if (solo) return <SoloWordHunt grid={roundData.grid} onAction={onAction} />;
 
-  const [submittedLocal, setSubmittedLocal] = useState(false);
-  useEffect(() => setSubmittedLocal(false), [roundData.grid]);
-  const submitted = submittedLocal || !!submittedFromServer;
-
-  const colorFor = (pid: string) =>
-    P_COLOR[players.findIndex((p) => p.id === pid)] ?? "#9aa3ba";
+  // 1v1 is a head-to-head hunt: both work the same grid the whole round, every
+  // valid word accumulates, higher total wins. Same accumulation state as solo.
+  const colorFor = (pid: string) => P_COLOR[players.findIndex((p) => p.id === pid)] ?? "#9aa3ba";
+  const opp = players.find((p) => p.id !== meId);
+  const rejected = feedback === "wrong" && lastTried !== null && !soloWords.includes(lastTried);
 
   if (!active) {
-    const words = (result?.answer as { words?: Record<string, WordInfo> })?.words ?? {};
-    const best = Math.max(0, ...Object.values(words).filter((w) => w.valid).map((w) => w.points));
+    const hunt = (result?.answer as { hunt?: Record<string, HuntInfo> })?.hunt ?? {};
+    const totals = (result as unknown as { scores?: Record<string, number> })?.scores ?? {};
+    const myTotal = meId ? totals[meId] ?? 0 : 0;
+    const oppTotal = opp ? totals[opp.id] ?? 0 : 0;
+    const iLead = myTotal > oppTotal;
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-5 px-5">
-        <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-          best words
+        {/* the match total race */}
+        <div className="flex items-center gap-3 font-[var(--font-display)] tracking-tight">
+          <span className="text-4xl font-black tabular-nums" style={{ color: iLead ? "var(--color-success)" : "var(--color-text-primary)" }}>{myTotal}</span>
+          <span className="text-sm font-bold text-[var(--color-text-secondary)]">You</span>
+          {opp && <span className="text-lg font-bold text-[var(--color-text-secondary)]">–</span>}
+          {opp && <span className="max-w-[7rem] truncate text-sm font-bold text-[var(--color-text-secondary)]">{opp.display_name}</span>}
+          {opp && <span className="text-4xl font-black tabular-nums" style={{ color: !iLead && myTotal !== oppTotal ? "var(--color-warm)" : "var(--color-text-primary)" }}>{oppTotal}</span>}
         </div>
+        <div className="mb-1 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">this grid</div>
         <div className="w-full max-w-md space-y-2">
           {players.map((p) => {
-            const w = words[p.id];
-            const won = w?.valid && w.points === best && best > 0;
+            const h = hunt[p.id];
+            const top = h?.words?.[0];
             return (
-              <div
-                key={p.id}
-                className="flex items-center justify-between rounded-[var(--radius-card)] border px-3 py-2"
-                style={{ borderColor: `${colorFor(p.id)}66` }}
-              >
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: colorFor(p.id) }} />
+              <div key={p.id} className="flex items-center justify-between rounded-[var(--radius-card)] border px-3 py-2" style={{ borderColor: `${colorFor(p.id)}66` }}>
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colorFor(p.id) }} />
                   {p.id === meId ? "you" : p.display_name}
-                  {won && <span className="text-[var(--color-success)]">★</span>}
-                </span>
-                <span className="flex items-baseline gap-3">
-                  <span
-                    className="font-[var(--font-display)] text-base font-bold"
-                    style={{ color: w?.valid ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
-                  >
-                    {w?.word || "-"}
-                  </span>
-                  <span
-                    className="font-[var(--font-display)] text-base font-bold"
-                    style={{ color: w?.valid ? "var(--color-success)" : "var(--color-warm)" }}
-                  >
-                    {w?.valid ? `+${w.points}` : "✕"}
+                  <span className="truncate text-[var(--color-text-secondary)]">
+                    · {h?.count ?? 0} words{top ? ` · ${top}` : ""}
                   </span>
                 </span>
+                <span className="font-[var(--font-display)] text-lg font-bold" style={{ color: "var(--color-success)" }}>+{h?.points ?? 0}</span>
               </div>
             );
           })}
@@ -237,24 +247,30 @@ export function WordHunt({
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5">
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        Trace your best word. Min {MIN} letters.
-      </p>
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-5">
+      {/* live head-to-head scoreboard */}
+      <div className="flex w-full max-w-md items-center justify-between gap-3">
+        <ScorePill label="You" value={(meId && roundScores[meId]) || 0} color={meId ? colorFor(meId) : P_COLOR[0]} />
+        <span className="min-h-[16px] flex-1 text-center font-[var(--font-mono)] text-[11px] uppercase tracking-widest" style={{ color: rejected ? "var(--color-warm)" : "var(--color-text-secondary)" }}>
+          {rejected ? `${lastTried} · no` : "trace every word"}
+        </span>
+        <ScorePill label={opp?.display_name ?? "Rival"} value={(opp && roundScores[opp.id]) || 0} color={opp ? colorFor(opp.id) : P_COLOR[1]} right />
+      </div>
       <TraceGrid
         grid={roundData.grid}
-        disabled={submitted}
         onSubmit={(w) => {
-          if (submitted) return;
           onAction({ word: w });
-          setSubmittedLocal(true);
+          setLastTried(w);
         }}
       />
-      {submitted && (
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          locked in · waiting for opponent…
-        </p>
-      )}
+      <div className="flex max-h-20 w-full max-w-md flex-wrap content-start justify-center gap-1.5 overflow-y-auto">
+        {soloWords.map((w) => (
+          <span key={w} className="rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 font-[var(--font-mono)] text-xs">
+            {w}
+            <span className="ml-1 text-[var(--color-success)]">+{pts(w.length)}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
