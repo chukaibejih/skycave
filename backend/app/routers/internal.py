@@ -407,11 +407,17 @@ async def rotate_tournament(
         play_closes_at=play_closes,
     )
 
-    announced = await _post_to_bluesky(announcement_text)
+    # The signup card is themed from the frontend's current tournament skin, so
+    # it always matches the live look with no hand-made image (mirrors the
+    # champion-card pattern in services/tournament.py). The tournament exists by
+    # now, so the card route can read its registration-close time for the count.
+    card_url = f"{settings.frontend_url.rstrip('/')}/tournament/{t.id}/signup-card"
+    announced = await _post_to_bluesky(announcement_text, image_url=card_url)
     return {
         "status": "created",
         "tournament_id": t.id,
         "registration_closes_at": t.registration_closes_at.isoformat(),
+        "card_url": card_url,
         "announced": announced,
     }
 

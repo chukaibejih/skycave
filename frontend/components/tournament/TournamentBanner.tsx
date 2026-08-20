@@ -103,7 +103,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
       transition={{ type: "spring", stiffness: 200, damping: 24 }}
     >
       <motion.div
-        className="relative overflow-hidden rounded-[22px] border border-white/50"
+        className="relative overflow-hidden rounded-[22px] border border-white/15"
         animate={{ boxShadow: urgent ? CORAL_PULSE : BASE_SHADOW }}
         transition={
           urgent ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }
@@ -111,47 +111,49 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
       >
         {/* SCENE — the participant's entrance (whole scene is the primary link). */}
         <Link href={href} className="group relative block" style={{ minHeight: 268, background: TOURNEY.sky }}>
-          {/* Sun, low over the water, with a soft bob. */}
+          {/* The banded retro sun, low on the horizon, with a soft bob. */}
           <motion.div
             aria-hidden
-            className="pointer-events-none absolute right-7 top-6 h-[76px] w-[76px] rounded-full"
+            className="pointer-events-none absolute right-8 h-[120px] w-[120px] rounded-full"
             style={{
-              background: `radial-gradient(circle, ${TOURNEY.sunCore} 0%, ${TOURNEY.sun} 52%, rgba(255,206,106,0) 74%)`,
+              bottom: "30%",
+              background: `radial-gradient(circle, ${TOURNEY.sunCore} 0%, ${TOURNEY.sunTop} 44%, ${TOURNEY.sun} 72%, rgba(255,47,135,0) 82%)`,
             }}
-            animate={{ y: [0, -5, 0], opacity: [0.92, 1, 0.92] }}
+            animate={{ y: [0, -4, 0], opacity: [0.9, 1, 0.9] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           />
 
-          {/* The sea fills the lower third; the sand is a thin shore beneath it. */}
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: "34%", background: TOURNEY.sea }} />
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: "6%", background: TOURNEY.sand }} />
-
-          {/* Drifting foam lines at the waterline. */}
-          <motion.svg
+          {/* The glowing horizon, then the cyan perspective grid below it. */}
+          <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0"
-            style={{ bottom: "31%", height: 22 }}
-            viewBox="0 0 400 22"
+            style={{ bottom: "34%", height: 2, background: TOURNEY.horizon, boxShadow: `0 0 16px ${TOURNEY.horizon}` }}
+          />
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
+            style={{ height: "34%" }}
+            viewBox="0 0 400 120"
             preserveAspectRatio="none"
-            animate={{ x: [0, -16, 0] }}
-            transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
           >
-            <path d="M-20 12 C 40 4, 90 18, 150 11 S 280 4, 420 12" fill="none" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="2" />
-            <path d="M-20 18 C 60 12, 120 22, 200 16 S 340 10, 420 18" fill="none" stroke="#ffffff" strokeOpacity="0.32" strokeWidth="2" />
-          </motion.svg>
-          {/* Foam where the sea meets the sand. */}
-          <div aria-hidden className="pointer-events-none absolute inset-x-0" style={{ bottom: "6%", height: 2, background: "rgba(255,255,255,0.65)" }} />
+            {[-360, -200, -100, -40, 40, 100, 200, 360, 560, -560].map((x, i) => (
+              <line key={i} x1="200" y1="0" x2={200 + x} y2="120" stroke={TOURNEY.grid} strokeOpacity="0.4" strokeWidth="1" />
+            ))}
+            {[6, 24, 52, 90, 120].map((y, i) => (
+              <line key={`h${i}`} x1="0" y1={y} x2="400" y2={y} stroke={TOURNEY.grid} strokeOpacity="0.32" strokeWidth="1" />
+            ))}
+          </svg>
 
           <div className="relative z-10 flex min-h-[268px] flex-col p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-[var(--font-mono)] text-[10px] font-semibold uppercase tracking-[0.2em] backdrop-blur-sm"
-                style={{ background: "rgba(255,255,255,0.55)", color: TOURNEY.ink }}
+                style={{ background: TOURNEY.panel, color: TOURNEY.ink }}
               >
                 {live && (
                   <motion.span
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: urgent ? TOURNEY.coral : "#0e8aa0" }}
+                    style={{ background: urgent ? TOURNEY.coral : TOURNEY.accentSoft }}
                     animate={{ opacity: [1, 0.25, 1], scale: [1, 1.2, 1] }}
                     transition={{ duration: urgent ? 0.85 : 1.3, repeat: Infinity }}
                   />
@@ -167,11 +169,11 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
               {t.name}
             </h2>
 
-            <p className="mt-2 text-xs font-medium leading-snug sm:text-sm" style={{ color: "#0a5566" }}>
+            <p className="mt-2 text-xs font-medium leading-snug sm:text-sm" style={{ color: TOURNEY.accentSoft }}>
               Free to enter &middot; 1v1 weekend bracket &middot; Crowned Monday
             </p>
 
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide" style={{ color: urgent ? TOURNEY.coral : "#0a6072" }}>
+            <p className="mt-3 text-xs font-bold uppercase tracking-wide" style={{ color: urgent ? TOURNEY.coral : TOURNEY.inkSoft }}>
               {label}
               {spots && ` · ${spots}`}
             </p>
@@ -180,7 +182,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
               <div className="mt-4">
                 <div
                   className="inline-flex rounded-[14px] px-3 py-2 backdrop-blur-sm"
-                  style={{ background: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.7)" }}
+                  style={{ background: TOURNEY.panel, border: `1px solid ${TOURNEY.accent}` }}
                 >
                   <BannerClock to={s.countdownTo} />
                 </div>
@@ -192,7 +194,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="inline-flex h-11 items-center justify-center rounded-[13px] px-5 text-sm font-bold shadow-[0_6px_16px_rgba(4,48,63,0.25)]"
-                style={{ background: urgent ? TOURNEY.coral : TOURNEY.sun, color: urgent ? "#fff" : TOURNEY.ink }}
+                style={{ background: urgent ? TOURNEY.coral : TOURNEY.sun, color: "#12042e" }}
               >
                 {cta}
                 <span aria-hidden className="ml-1.5 transition-transform duration-300 group-hover:translate-x-1">
@@ -206,18 +208,18 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
         {/* LIVE STRIP — additive; its own links, so it never nests inside the scene link. */}
         {(showLive || showNext) && (
           <div
-            className="relative border-t border-white/50 px-4 py-3"
-            style={{ background: "rgba(255,255,255,0.42)", backdropFilter: "blur(6px)" }}
+            className="relative border-t border-white/10 px-4 py-3"
+            style={{ background: TOURNEY.panel, backdropFilter: "blur(6px)" }}
           >
             {showLive ? (
               <>
                 <div
                   className="mb-1.5 flex items-center gap-1.5 px-1 font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.18em]"
-                  style={{ color: "#0a5566" }}
+                  style={{ color: TOURNEY.inkSoft }}
                 >
                   <motion.span
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: "#e5533d" }}
+                    style={{ background: TOURNEY.coral }}
                     animate={{ opacity: [1, 0.3, 1], scale: [1, 1.25, 1] }}
                     transition={{ duration: 1.1, repeat: Infinity }}
                   />
@@ -237,7 +239,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
                       </span>
                       <span
                         className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm"
-                        style={{ background: TOURNEY.sun, color: TOURNEY.ink }}
+                        style={{ background: TOURNEY.sun, color: "#12042e" }}
                       >
                         Watch →
                       </span>
@@ -245,14 +247,14 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
                   ))}
                 </div>
                 {extraLive > 0 && (
-                  <Link href="/tournament" className="mt-1.5 block px-1.5 text-[11px] font-semibold" style={{ color: "#0a6072" }}>
+                  <Link href="/tournament" className="mt-1.5 block px-1.5 text-[11px] font-semibold" style={{ color: TOURNEY.inkSoft }}>
                     +{extraLive} more live · watch all →
                   </Link>
                 )}
               </>
             ) : (
               nextOpen && (
-                <div className="flex items-center gap-1.5 px-1 py-0.5 text-[12px] font-semibold" style={{ color: "#0a5566" }}>
+                <div className="flex items-center gap-1.5 px-1 py-0.5 text-[12px] font-semibold" style={{ color: TOURNEY.inkSoft }}>
                   <span aria-hidden>⏳</span>
                   <span>
                     {shortRound(nextOpen.round, maxRound).label}{" "}
