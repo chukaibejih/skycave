@@ -16,22 +16,30 @@ import type { Tournament } from "@/lib/api";
  * hub card) always wears this; only the status label shifts colour to carry the
  * state of the event. Swapping the whole world for a new week is this one object.
  *
- * This week: ocean / beach - turquoise water into warm sand, a sun over the sea.
- * (Week one was orange; keep past palettes in the git history, not here.)
+ * This week: Neon Arcade - a synthwave night. Deep purple sky, a banded retro
+ * sun, a cyan perspective grid, magenta horizon glow. DARK scene, so the ink is
+ * light. (Past palettes, including ocean/beach, live in git history, not here.)
+ *
+ * The scene is dark, so text colours are routed through `ink` / `inkSoft` rather
+ * than hardcoded: swapping this object re-themes the whole tournament world,
+ * card and announcement image included.
  */
 export const TOURNEY = {
-  accent: "#0fb5c9", // ocean turquoise, the world's signature (chrome on dark pages)
-  accentSoft: "#5fe6da", // a lighter aqua for text and pips on dark chrome
-  gradient: "linear-gradient(135deg, #17b9c9 0%, #46d6c6 46%, #ffe1a8 100%)", // sea into sand, for buttons
-  ink: "#053244", // deep teal-navy text, holds on the bright scene and gradient
+  accent: "#ff2fb9", // neon magenta, the world's signature (chrome on dark pages)
+  accentSoft: "#45e0ff", // electric cyan for text and pips on dark chrome
+  gradient: "linear-gradient(135deg, #ff2fb9 0%, #a13bff 52%, #39d0ff 100%)", // for buttons
+  ink: "#f7f2ff", // near-white: this is a DARK scene, so ink is light
+  inkSoft: "#c8b6f0", // muted lavender for secondary lines on the night
+  panel: "rgba(12,4,32,0.6)", // dark glass behind the countdown, so light numerals read
 
-  // The hub card is a bright beach scene, not a dark glass card. These build it.
-  sky: "linear-gradient(180deg, #8ad9ee 0%, #cdeef0 62%, #eaf6ec 100%)",
-  sea: "linear-gradient(180deg, #4bd0cb 0%, #12a0bd 100%)",
-  sand: "linear-gradient(180deg, #ffe7ba 0%, #f2d18c 100%)",
-  sun: "#ffce6a", // the low sun
-  sunCore: "#fff6d8", // its bright centre
-  coral: "#e5533d", // warm highlight / urgency on the bright scene
+  // A synthwave night, not a beach. These build the scene.
+  sky: "linear-gradient(180deg, #1b0640 0%, #2a0a55 56%, #3a0a5c 100%)", // the night
+  horizon: "#ff4fd8", // the glowing horizon line where grid meets sky
+  grid: "#39d0ff", // the cyan perspective grid
+  sun: "#ff2f87", // the retro sun, lower band
+  sunTop: "#ff9a3c", // the retro sun, upper band
+  sunCore: "#ffe14d", // its hot centre
+  coral: "#ff2f87", // urgency pop, still hot on the dark scene
 } as const;
 
 export type TournamentPhase = "open" | "live" | "finals" | "finished";
