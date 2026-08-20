@@ -770,10 +770,10 @@ async def start(
 
 class CreateTournament(BaseModel):
     name: str = "Skycave Weekend Tournament"
-    # The full field. The bracket supports up to MAX_FIELD (64); a smaller turnout
-    # just fills fewer seats and the rest become round-one byes, so opening at the
-    # ceiling costs nothing and never has to be resized mid-week.
-    max_players: int = 64
+    # The seat cap for entries. The bracket still supports up to MAX_FIELD (64)
+    # and scales down to whatever field shows up, so this is purely the entry
+    # limit; capped at 16 for now for a smaller, tighter field.
+    max_players: int = 16
     # Launch flag: start the visible countdown from now instead of the default
     # Wednesday gate. Use for the very first event, opened mid-week, so it counts
     # down from the moment it goes live. Leave false for normal weeks.

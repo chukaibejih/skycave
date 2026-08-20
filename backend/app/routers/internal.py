@@ -390,7 +390,7 @@ async def rotate_tournament(
             "status": "dry_run",
             "would_create": {
                 "name": "Skycave Weekend Tournament",
-                "max_players": 64,
+                "max_players": 16,
                 "registration_closes_at": closes.isoformat(),
                 "play_opens_at": opens.isoformat(),
                 "play_closes_at": play_closes.isoformat(),
@@ -401,7 +401,7 @@ async def rotate_tournament(
     t = await svc.create(
         db,
         name="Skycave Weekend Tournament",
-        max_players=64,
+        max_players=16,
         registration_closes_at=closes,
         play_opens_at=opens,
         play_closes_at=play_closes,
