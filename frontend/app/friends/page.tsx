@@ -99,7 +99,7 @@ export default function FriendsPage() {
             label: "Invite friends on Bluesky",
             onClick: () =>
               shareToBluesky(
-                `come play with me on skycave 👇 fast 1v1 games, no account needed\n\nhttps://skycave.space`
+                `come play with me on skycave 👇 fast 1v1 games\n\nhttps://skycave.space`
               ),
           }}
         />

@@ -31,7 +31,7 @@ def invite_text(game_name: str, room_id: str) -> str:
     # tone so it still reads like a person, not a notification.
     return (
         f"come play me in {game_name} on Skycave. tap the link to jump straight "
-        f"in, no account needed:\n\n{invite_url(room_id)}"
+        f"in:\n\n{invite_url(room_id)}"
     )
 
 

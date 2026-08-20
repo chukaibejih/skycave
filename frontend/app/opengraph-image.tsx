@@ -125,9 +125,8 @@ export default function Image() {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
             <div style={{ display: "flex", color: MUTED, fontSize: 30, letterSpacing: 1 }}>skycave.space</div>
-            <div style={{ display: "flex", color: MUTED, fontSize: 26 }}>no account needed</div>
           </div>
         </div>
       </div>
