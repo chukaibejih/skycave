@@ -32,9 +32,9 @@ from app.models.announcement import AnnouncementOutbox
 
 logger = logging.getLogger("skycave.tournament.posts")
 
-# Bluesky's real ceiling is 300, but the sidecar appends the community hashtags
-# (#blacksky #blackskygamers, ~27 chars) to every post. Compose under a lower
-# limit so those tags always fit and a maxed-out draw post never loses them.
+# Bluesky's real ceiling is 300, but the sidecar appends Skycave's hashtag
+# (#skycave, ~10 chars) to every post. Compose under a lower limit so the tag
+# always fits and a maxed-out draw post never loses it.
 BSKY_LIMIT = 270
 SITE = "skycave.space"
 
@@ -114,7 +114,7 @@ def _fit(lead: str, body: list[str], tail: str) -> str:
 # Post-length budgets for a thread (the draw and wide rounds). The first post
 # leaves room for the hashtags the sidecar appends; continuation posts carry
 # none, so they use the full ceiling.
-THREAD_FIRST_LIMIT = BSKY_LIMIT  # 270, room for #blacksky #blackskygamers
+THREAD_FIRST_LIMIT = BSKY_LIMIT  # 270, room for #skycave
 THREAD_CONT_LIMIT = 297
 
 

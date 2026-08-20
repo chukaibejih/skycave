@@ -68,13 +68,18 @@ export async function resolveActor(handle: string): Promise<BskyActor | null> {
   }
 }
 
-// Player share posts carry NO Skycave hashtags. Only the first-party
-// @skycave.space account tags its own posts (#blacksky #blackskygamers, added by
-// the sidecar/backend). A player composes in Bluesky and adds whatever tags they
-// choose, so the Blacksky / #blackskygamers feeds stay for the people they are
-// meant for rather than pulling in everyone who shares a game.
+// Every Skycave post and share carries Skycave's own hashtags by default, in
+// prep for Skycave's own feed: first-party @skycave.space posts get them from
+// the sidecar, and player shares get them here. Appended on their own line, and
+// only when they fit under Bluesky's 300-grapheme composer limit, so a long
+// share never lands over the limit (the tag is dropped rather than truncating
+// the player's own text).
+export const SHARE_TAGS = "#skycave";
 export function composeIntentUrl(text: string): string {
-  return `${COMPOSE}?text=${encodeURIComponent(text)}`;
+  const full = `${text}\n\n${SHARE_TAGS}`;
+  // Array.from counts by code point (emoji = 1), conservative vs graphemes.
+  const withTags = Array.from(full).length <= 300 ? full : text;
+  return `${COMPOSE}?text=${encodeURIComponent(withTags)}`;
 }
 
 /** Open the Bluesky composer pre-filled with `text`. */

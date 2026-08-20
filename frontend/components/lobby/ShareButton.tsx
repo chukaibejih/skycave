@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { shareToBluesky } from "@/lib/bluesky";
+import { shareToBluesky, composeIntentUrl } from "@/lib/bluesky";
 
 interface Props {
   text: string;
@@ -15,13 +15,15 @@ interface Props {
  * The composer intent only helps people who use the Bluesky app; anyone on
  * Blacksky, deck.blue, or the web (or who cannot use the Bluesky app at all) had
  * no way through. "Copy post" hands them the exact text that would be posted,
- * to paste wherever they post. No Skycave hashtags are added - the player adds
- * their own tags in the composer.
+ * Skycave hashtags included, to paste wherever they post.
  */
 export function ShareButton({ text, label = "Post to Bluesky", full = true }: Props) {
   const [copied, setCopied] = useState(false);
-  // The exact post text; the player adds any tags themselves in the composer.
-  const fullText = text;
+  // The exact post text, with Skycave's default hashtags, so a copied post
+  // matches what the composer would open with. Strip the intent URL wrapper.
+  const fullText = decodeURIComponent(
+    composeIntentUrl(text).split("?text=")[1] ?? text
+  );
 
   const post = () => {
     // Copy as a fallback (the app composer does not always take the deep link),

@@ -367,8 +367,8 @@ export function Clay() {
    */
   const shareCard = async () => {
     // A solo run carries "beat my score" + the play link, so anyone can tap in
-    // to beat it. No Skycave hashtags are added on any path - the player adds
-    // their own tags in the composer / share sheet.
+    // to beat it. shareToBluesky adds Skycave's default hashtags in the composer;
+    // the manual save-and-attach path shares the same base text.
     const base = isSolo
       ? `${shareLine}\n\nbeat my score:\n${playUrl("clay")}`
       : `${shareLine}\n\nskycave.space`;

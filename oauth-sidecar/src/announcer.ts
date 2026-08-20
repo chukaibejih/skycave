@@ -15,11 +15,12 @@ export function announcerConfigured(): boolean {
   return Boolean(HANDLE && APP_PASSWORD);
 }
 
-// Every post from @skycave.space carries these, so the hub and the tournament
-// all surface under the same community tags. RichText.detectFacets turns them
-// into real hashtag facets. Added only when there is room under the 300
-// grapheme ceiling, so a full post never fails to send because of the tags.
-const TAGS = "#blacksky #blackskygamers";
+// Every post from @skycave.space carries Skycave's own hashtags, so the hub and
+// the tournament all surface under one tag, in prep for Skycave's own feed.
+// RichText.detectFacets turns them into real hashtag facets. Added only when
+// there is room under the 300 grapheme ceiling, so a full post never fails to
+// send because of the tags.
+const TAGS = "#skycave";
 function withTags(text: string): string {
   const full = `${text}\n\n${TAGS}`;
   // Array.from counts by code point (emoji = 1), close enough to graphemes and

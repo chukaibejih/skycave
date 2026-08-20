@@ -236,7 +236,7 @@ def _fit(text: str) -> str:
 # tagged, and a small pool of approved variants selected deterministically so a
 # rare event never sounds like the same bot every time.
 
-# Leave room for the sidecar's appended "#blacksky #blackskygamers" under the 300
+# Leave room for the sidecar's appended "#skycave" under the 300
 # ceiling; a variant that overflows (long handles) is dropped from the draw.
 _TAKEOVER_LIMIT = 272
 

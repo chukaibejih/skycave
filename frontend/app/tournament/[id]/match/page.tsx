@@ -390,7 +390,7 @@ function NudgeOpponent({ m }: { m: MyMatch }) {
   const onCooldown = sentAt !== null && Date.now() - sentAt < COOLDOWN_MS;
 
   // The @mention becomes a real notification once posted; the link auto-links.
-  // composeIntentUrl appends the community hashtags, same as every other post.
+  // composeIntentUrl appends Skycave's default hashtags, same as every other post.
   const text = `@${opp.handle} I'm checked in for our ${m.tournament_name} match. Come settle it 👀 skycave.space/tournament`;
   const href = composeIntentUrl(text);
 
