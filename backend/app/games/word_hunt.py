@@ -5,11 +5,15 @@ A word only counts if it's a real word AND can be traced through adjacent cells
 apart from Word Duel's loose anagram. The client enforces adjacency while you
 drag; the server re-validates the traced path independently (never trust the
 client). Solo: find as many as you can in the time limit, points accumulate.
-1v1: same grid, each player's best word is scored, higher points wins the round.
+1v1: head-to-head - both players work the SAME grid for the whole round, every
+valid word accumulates, and the higher TOTAL across the grids takes the match
+(the engine sums each round's score). Boards are pre-checked for richness so no
+round lands on a dud.
 """
 from __future__ import annotations
 
 import random
+from bisect import bisect_left
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -94,15 +98,71 @@ def _points(length: int) -> int:
     return 11  # 8+
 
 
+# --- board richness: guarantee every board can make plenty of words -----------
+MIN_BOARD_WORDS = 18  # reroll a board until it can trace at least this many words
+
+
+@lru_cache
+def _sorted_words() -> tuple[str, ...]:
+    return tuple(sorted(_words()))
+
+
+def _has_prefix(sw: tuple[str, ...], p: str) -> bool:
+    """Does any dictionary word start with `p`? Binary search, so the DFS below
+    prunes dead paths without holding a separate prefix set in memory."""
+    i = bisect_left(sw, p)
+    return i < len(sw) and sw[i].startswith(p)
+
+
+def _count_words(grid: list[str], cap: int) -> int:
+    """How many distinct dictionary words the grid can trace, counting up to `cap`
+    then stopping early. Prefix-pruned DFS keeps even a sparse board fast."""
+    sw = _sorted_words()
+    words = _words()
+    found: set[str] = set()
+
+    def dfs(idx: int, used: frozenset[int], s: str) -> None:
+        if len(found) >= cap:
+            return
+        if len(s) >= MIN_WORD_LEN and s in words:
+            found.add(s)
+        for n in _neighbors(idx):
+            if n in used:
+                continue
+            ns = s + grid[n]
+            if _has_prefix(sw, ns):
+                dfs(n, used | {n}, ns)
+
+    for i in range(len(grid)):
+        if len(found) >= cap:
+            break
+        if _has_prefix(sw, grid[i]):
+            dfs(i, frozenset({i}), grid[i])
+    return len(found)
+
+
+def _rich_grid() -> list[str]:
+    """A board that can make at least MIN_BOARD_WORDS words, so no round is a dud.
+    Bounded reroll: after a few tries it takes what it has (still playable) rather
+    than looping forever."""
+    grid = _deal_grid()
+    for _ in range(15):
+        if _count_words(grid, MIN_BOARD_WORDS) >= MIN_BOARD_WORDS:
+            return grid
+        grid = _deal_grid()
+    return grid
+
+
 class WordHunt(BaseGame):
     type = "word_hunt"
     name = "Word Hunt"
-    tagline = "Trace words in the grid. Longest hunt wins."
+    tagline = "Trace words in the grid. Biggest haul wins."
     category = "words"
     total_rounds = 3
     round_time = 30.0
     result_delay = 4.5
     mode = SIMULTANEOUS
+    versus_accumulate = True  # 1v1 is a head-to-head hunt: every word counts, total wins
     solo_kind = "words"  # one grid, find as many as you can; score accumulates
     solo_duration = 80.0
 
@@ -115,9 +175,9 @@ class WordHunt(BaseGame):
         return f"{score} pts · {words} words"
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        grid = _deal_grid()
+        grid = _rich_grid()  # guaranteed to make plenty of words
         public = {"grid": grid, "cols": GRID_N, "round_time": self.round_time}
-        # "letters" feeds the solo word-accumulation state (see game_engine).
+        # "letters" feeds the word-accumulation state (solo + 1v1; see game_engine).
         secret = {"grid": grid, "letters": grid}
         return public, secret
 
@@ -127,11 +187,14 @@ class WordHunt(BaseGame):
         secret: dict[str, Any],
         actions: dict[str, dict[str, Any]],
     ) -> dict[str, int]:
+        """Head-to-head: each player's round score is the sum over every valid word
+        they traced (deduped as they went). The engine adds these across the grids,
+        so the match goes to the higher TOTAL, not a single best word."""
         grid = secret["grid"]
         scores: dict[str, int] = {}
         for player_id, action in actions.items():
-            word = str(action.get("word", "")).strip().upper()
-            scores[player_id] = _points(len(word)) if _is_valid(grid, word) else 0
+            words = action.get("words") or []
+            scores[player_id] = sum(_points(len(w)) for w in words if _is_valid(grid, w))
         return scores
 
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
@@ -145,13 +208,13 @@ class WordHunt(BaseGame):
         points: dict[str, int],
     ) -> dict[str, Any]:
         grid = secret["grid"]
-        words: dict[str, Any] = {}
+        hunt: dict[str, Any] = {}
         for player_id, action in actions.items():
-            word = str(action.get("word", "")).strip().upper()
-            valid = _is_valid(grid, word)
-            words[player_id] = {
-                "word": word,
-                "valid": valid,
-                "points": _points(len(word)) if valid else 0,
+            valid = [w for w in (action.get("words") or []) if _is_valid(grid, w)]
+            valid.sort(key=len, reverse=True)
+            hunt[player_id] = {
+                "words": valid[:10],       # the longest ten, for the reveal
+                "count": len(valid),
+                "points": points.get(player_id, 0),
             }
-        return {"words": words}
+        return {"hunt": hunt}

@@ -1,16 +1,18 @@
-"""Word Duel - both players get the same 6 letters, longest valid word wins.
+"""Word Duel - both players get the same 6 letters; make as many words as you can.
 
-Simultaneous mode: each player submits their best word; the server validates it
-(real word + only uses the dealt letters) and scores it by length. Both players
-can score; the longer valid word takes the round. Skill-based, infinite letter
-combinations. The dictionary (Scrabble word list) is bundled server-side; the
-client never needs it.
+1v1 is a head-to-head hunt: both players get the identical 6 letters and, for the
+whole round, submit every word they can make (real word + only the dealt letters,
+respecting multiplicity), each scored by length. Points accumulate, and the higher
+TOTAL across the rounds takes the match (the engine sums each round). Solo is the
+same, solo. The dictionary (Scrabble word list) is bundled server-side; the client
+never needs it. Letter sets are pre-checked so a round is never word-poor.
 """
 from __future__ import annotations
 
 import random
 from collections import Counter
 from functools import lru_cache
+from itertools import permutations
 from pathlib import Path
 from typing import Any
 
@@ -57,15 +59,45 @@ def _is_valid(word: str, letters: list[str]) -> bool:
     return word in _words()
 
 
+# --- letter-set richness: never deal a word-poor hand ------------------------
+MIN_DUEL_WORDS = 8  # reroll the hand until it can make at least this many words
+
+
+def _formable_count(letters: list[str], cap: int) -> int:
+    """How many distinct dictionary words the 6 letters can spell, up to `cap`.
+    Cheap: at most a couple thousand permutations of the hand's subsets."""
+    words = _words()
+    found: set[str] = set()
+    for k in range(MIN_WORD_LEN, len(letters) + 1):
+        for perm in permutations(letters, k):
+            w = "".join(perm)
+            if w in words:
+                found.add(w)
+                if len(found) >= cap:
+                    return len(found)
+    return len(found)
+
+
+def _rich_letters() -> list[str]:
+    """A hand that can make at least MIN_DUEL_WORDS words, so no round is a dud."""
+    letters = _deal_letters()
+    for _ in range(20):
+        if _formable_count(letters, MIN_DUEL_WORDS) >= MIN_DUEL_WORDS:
+            return letters
+        letters = _deal_letters()
+    return letters
+
+
 class WordDuel(BaseGame):
     type = "word_duel"
     name = "Word Duel"
-    tagline = "Same 6 letters. Longest real word wins the round."
+    tagline = "Same 6 letters. Make the most, highest total wins."
     category = "words"
     total_rounds = 5
     round_time = 22.0
     result_delay = 4.5
     mode = SIMULTANEOUS
+    versus_accumulate = True  # 1v1 is a head-to-head hunt: every word counts, total wins
     solo_kind = "words"  # one letter set, 60s; submit many words, score accumulates
 
     def solo_word(self, letters: list[str], word: str) -> int:
@@ -78,7 +110,7 @@ class WordDuel(BaseGame):
         return f"{score} pts · {words} words"
 
     def new_round(self, round_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        letters = _deal_letters()
+        letters = _rich_letters()  # guaranteed to make a decent number of words
         public = {"letters": letters, "round_time": self.round_time}
         secret = {"letters": letters}
         return public, secret
@@ -89,11 +121,14 @@ class WordDuel(BaseGame):
         secret: dict[str, Any],
         actions: dict[str, dict[str, Any]],
     ) -> dict[str, int]:
+        """Head-to-head: each player's round score is the summed length of every
+        valid word they made (deduped as they went). The engine adds these across
+        the rounds, so the match goes to the higher TOTAL, not a single best word."""
         letters = secret["letters"]
         scores: dict[str, int] = {}
         for player_id, action in actions.items():
-            word = str(action.get("word", "")).strip().upper()
-            scores[player_id] = len(word) if _is_valid(word, letters) else 0
+            words = action.get("words") or []
+            scores[player_id] = sum(len(w) for w in words if _is_valid(w, letters))
         return scores
 
     def reveal(self, public: dict[str, Any], secret: dict[str, Any]) -> dict[str, Any]:
@@ -107,12 +142,13 @@ class WordDuel(BaseGame):
         points: dict[str, int],
     ) -> dict[str, Any]:
         letters = secret["letters"]
-        words: dict[str, Any] = {}
+        hunt: dict[str, Any] = {}
         for player_id, action in actions.items():
-            word = str(action.get("word", "")).strip().upper()
-            words[player_id] = {
-                "word": word,
-                "valid": _is_valid(word, letters),
-                "length": len(word),
+            valid = [w for w in (action.get("words") or []) if _is_valid(w, letters)]
+            valid.sort(key=len, reverse=True)
+            hunt[player_id] = {
+                "words": valid[:10],       # the longest ten, for the reveal
+                "count": len(valid),
+                "points": points.get(player_id, 0),
             }
-        return {"words": words}
+        return {"hunt": hunt}

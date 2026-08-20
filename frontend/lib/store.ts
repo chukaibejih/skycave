@@ -98,7 +98,8 @@ interface RoomState {
   roundEndsAt: number | null;
   opponentSubmitted: boolean;
   opponentFreeze: number | null; // Freeze shared marker: where the opponent's pin landed this round (0..1), or null
-  soloWords: string[]; // accepted words this solo Word Duel session
+  soloWords: string[]; // accepted words this round (solo, and 1v1 head-to-head word games)
+  roundScores: Record<string, number>; // live per-round scoreboard for head-to-head word games (pid -> round score)
   boardState: import("./types").BoardState | null; // turn-based board (Tile Takeover)
   privateBoard: import("./types").UnoHand | null; // your own hidden slice (Uno hand)
   justJoined: boolean; // pulse the portal -> GO transition in the lobby
@@ -140,6 +141,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   opponentSubmitted: false,
   opponentFreeze: null,
   soloWords: [],
+  roundScores: {},
   boardState: null,
   privateBoard: null,
   justJoined: false,
@@ -334,6 +336,8 @@ export const useRoom = create<RoomState>((set, get) => ({
         roundEndsAt: endsAt,
 	        opponentSubmitted: false,
         opponentFreeze: null,
+        soloWords: [],       // per-round reset for head-to-head word games
+        roundScores: {},
 	        game: s.game
 	          ? {
               ...s.game,
@@ -351,6 +355,11 @@ export const useRoom = create<RoomState>((set, get) => ({
 
 	    socket.on(WS.PLAYER_ACTION, (data: any) => {
       const me = useAuth.getState().identity?.id;
+      // Head-to-head word games broadcast the live round scoreboard to everyone.
+      if (data.roundBoard) {
+        set({ roundScores: data.roundBoard as Record<string, number> });
+        return;
+      }
       if (data.player_id && data.player_id === me) {
         const patch: Partial<RoomState> = {};
         if (data.correct === false) {
