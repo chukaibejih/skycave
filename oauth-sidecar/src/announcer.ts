@@ -15,17 +15,26 @@ export function announcerConfigured(): boolean {
   return Boolean(HANDLE && APP_PASSWORD);
 }
 
-// Every post from @skycave.space carries Skycave's own hashtags, so the hub and
-// the tournament all surface under one tag, in prep for Skycave's own feed.
-// RichText.detectFacets turns them into real hashtag facets. Added only when
-// there is room under the 300 grapheme ceiling, so a full post never fails to
-// send because of the tags.
-const TAGS = "#skycave";
+// Skycave's own tag rides every post (in prep for Skycave's own feed). A post
+// that does NOT tag a player also carries the Blacksky community tags for reach;
+// a post that @-mentions a player skips them, so a tagged player never drags the
+// whole community into their notifications (the Blacksky community's request).
+// RichText.detectFacets turns all of these into real hashtag/mention facets.
+const SKYCAVE = "#skycave";
+const COMMUNITY = "#blacksky #blackskygamers";
+// A Bluesky mention is @handle with at least one dot (name.bsky.social,
+// name.blacksky.app). "skycave.space/..." has no leading @, so it never matches.
+const MENTIONS_PLAYER = /@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9.-]+/i;
 function withTags(text: string): string {
-  const full = `${text}\n\n${TAGS}`;
-  // Array.from counts by code point (emoji = 1), close enough to graphemes and
-  // conservative, so we never overshoot the real limit.
-  return Array.from(full).length <= 300 ? full : text;
+  // No player tagged -> add the community tags; otherwise just Skycave's tag.
+  const full = MENTIONS_PLAYER.test(text)
+    ? `${text}\n\n${SKYCAVE}`
+    : `${text}\n\n${SKYCAVE} ${COMMUNITY}`;
+  // Array.from counts by code point (emoji = 1), conservative vs graphemes.
+  if (Array.from(full).length <= 300) return full;
+  // Community tags pushed it over the 300 ceiling: keep at least #skycave.
+  const minimal = `${text}\n\n${SKYCAVE}`;
+  return Array.from(minimal).length <= 300 ? minimal : text;
 }
 
 let agent: AtpAgent | null = null;

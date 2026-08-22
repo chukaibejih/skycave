@@ -380,9 +380,9 @@ async def rotate_tournament(
     # "the next" tournament, not "this weekend's" (which read wrong once the
     # signup post moved to a Saturday).
     announcement_text = (
-        "Registration is now open for the next Skycave Tournament! 🏆\n\n"
-        "Claim your seat before registration closes on Thursday.\n\n"
-        "Claim your spot here: skycave.space/tournament"
+        "REGISTRATION IS NOW OPEN FOR THE NEXT SKYCAVE TOURNAMENT! 🏆\n\n"
+        "CLAIM YOUR SEAT BEFORE REGISTRATION CLOSES ON THURSDAY.\n\n"
+        "CLAIM YOUR SPOT HERE: skycave.space/tournament"  # URL stays lowercase so the link resolves
     )
 
     if dry_run:
