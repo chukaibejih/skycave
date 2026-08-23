@@ -28,7 +28,7 @@ import { useAuth } from "@/lib/store";
  * unsettled, so the creator watches the opponent arrive and the score climb
  * without touching anything.
  */
-const POLL_MS = 4_000;
+const POLL_MS = 3_000;
 const INK = "var(--color-text-primary)";
 const MUTED = "var(--color-text-secondary)";
 
@@ -281,17 +281,27 @@ function ShareToInvite({ s }: { s: Series }) {
 
   return (
     <div className="space-y-3">
-      <Waiting>Waiting for your opponent to join</Waiting>
+      {/* Action first: the creator's whole job here is to get the link out. */}
       <a href={composeIntentUrl(text)} target="_blank" rel="noopener noreferrer" className="block">
         <Big tone="primary">Invite on Bluesky</Big>
       </a>
       <button
         onClick={copy}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-[14px] border text-sm font-semibold transition-[filter] active:brightness-95"
+        className="flex h-12 w-full items-center justify-center gap-2 truncate rounded-[14px] border px-4 text-sm font-semibold transition-[filter] active:brightness-95"
         style={{ borderColor: "var(--color-border)", background: "var(--color-surface)", color: INK }}
       >
         {copied ? "Link copied" : `Copy link · ${seriesUrlDisplay(s.id)}`}
       </button>
+      {/* Status second, quieter: says why they are sharing, without competing. */}
+      <div className="flex items-center justify-center gap-2 pt-1 text-xs text-[var(--color-text-secondary)]">
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: "var(--color-cyan)" }}
+          animate={{ opacity: [1, 0.25, 1] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        />
+        Waiting for your opponent to join
+      </div>
     </div>
   );
 }

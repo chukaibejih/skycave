@@ -73,7 +73,7 @@ export function CreateSeriesFab() {
               onClick={() => !busy && setOpen(false)}
             />
             <motion.div
-              className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4"
+              className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md px-4 pt-4 pb-[max(env(safe-area-inset-bottom),16px)]"
               initial={{ y: "110%" }}
               animate={{ y: 0 }}
               exit={{ y: "110%" }}
@@ -175,7 +175,7 @@ function FormatCard({
         borderColor: active ? "var(--color-primary)" : "var(--color-border)",
         background: active
           ? "color-mix(in srgb, var(--color-primary) 12%, var(--color-surface))"
-          : "var(--color-bg)",
+          : "var(--color-base)",
       }}
     >
       <span className="font-[var(--font-display)] text-base font-bold">{label}</span>
