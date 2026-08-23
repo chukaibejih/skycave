@@ -528,3 +528,50 @@ export interface HallOfFame {
 
 /** The all-time Hall of Fame. Public; cached server-side. */
 export const getHallOfFame = () => request<HallOfFame>("/hall-of-fame");
+
+// ── Head-to-head series ──
+// A standalone best-of-3/5 between two players across random games. Reuses the
+// tournament leg engine (each leg is a versus room) without a bracket.
+export interface SeriesPlayer {
+  did: string;
+  name: string;
+  avatar_url: string | null;
+  wins: number;
+}
+export interface SeriesResult {
+  game_type: string;
+  winner_did: string | null;
+  room_id: string;
+}
+export interface Series {
+  id: string;
+  status: "open" | "live" | "finished";
+  format: "bo3" | "bo5";
+  wins_needed: number;
+  player1: SeriesPlayer | null;
+  player2: SeriesPlayer | null;
+  games: string[];
+  game_names: string[];
+  results: SeriesResult[];
+  current_leg: number;
+  current_game: string | null;
+  current_game_name: string | null;
+  current_room_id: string | null;
+  winner_did: string | null;
+  you: "player1" | "player2" | null;
+}
+
+/** Open a new series and become player 1. Guests allowed. */
+export const createSeries = (format: "bo3" | "bo5") =>
+  request<Series>("/series", { method: "POST", body: JSON.stringify({ format }) });
+
+/** The series state. Public, so a shared link opens for anyone. */
+export const getSeries = (id: string) => request<Series>(`/series/${id}`);
+
+/** Take the open second seat. */
+export const joinSeries = (id: string) =>
+  request<Series>(`/series/${id}/join`, { method: "POST" });
+
+/** Open (or rejoin) the room for the current leg. */
+export const nextSeriesGame = (id: string) =>
+  request<{ room_id: string }>(`/series/${id}/next-game`, { method: "POST" });

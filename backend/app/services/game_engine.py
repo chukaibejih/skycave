@@ -856,6 +856,35 @@ async def end_game(room_id: str) -> None:
         except Exception:  # noqa: BLE001 - the bracket must not break the game
             logger.exception("failed to record tournament leg for room %s", room_id)
 
+    smatch = room.get("series_match")
+    if smatch:
+        try:
+            await _record_series_leg(room, smatch, winner_id, scores)
+        except Exception:  # noqa: BLE001 - the series must not break the game
+            logger.exception("failed to record series leg for room %s", room_id)
+
+
+async def _record_series_leg(
+    room: dict[str, Any],
+    smatch: dict[str, Any],
+    winner_id: str | None,
+    scores: dict[str, int],
+) -> None:
+    """Report a finished series leg home. Same shape as the tournament leg: after
+    the broadcast and persist, so it can never delay the players' result."""
+    from app.core.database import AsyncSessionLocal
+    from app.services import series as ssvc
+
+    async with AsyncSessionLocal() as db:
+        await ssvc.record_result(
+            db,
+            smatch["id"],
+            int(smatch["leg"]),
+            room_id=room["id"],
+            winner_did=winner_id,
+            scores=scores,
+        )
+
 
 async def _record_tournament_leg(
     room: dict[str, Any],

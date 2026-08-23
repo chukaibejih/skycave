@@ -103,6 +103,9 @@ class RoomResponse(BaseModel):
     # leg, game_index}. It's what lets the room and its results page send the
     # player back to their series instead of dumping them at the hub.
     tournament: dict | None = None
+    # Set when this room is a leg of a standalone series: {id, leg}. Same purpose
+    # as `tournament` above, for the series flow.
+    series_match: dict | None = None
     game: GameSummary | None = None
 
 

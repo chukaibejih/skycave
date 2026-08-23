@@ -55,6 +55,7 @@ def _to_response(room: dict, game_name: str) -> RoomResponse:
         expires_at=room.get("expires_at"),
         series=room.get("series", {}),
         tournament=room.get("tournament"),
+        series_match=room.get("series_match"),
         game=summary,
     )
 

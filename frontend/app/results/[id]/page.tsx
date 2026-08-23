@@ -172,21 +172,29 @@ export default function ResultsPage() {
   // A tournament leg is already counted the moment it ends, so "rematch" would
   // be a game that means nothing. The only move from here is back to the series.
   const fixture = room.tournament ?? null;
+  // A standalone series leg behaves the same way: counted on the spot, and the
+  // next move is back to the series, not a rematch.
+  const smatch = room.series_match ?? null;
+  const inLeg = fixture || smatch;
 
   // Headline reads from the viewer's perspective when they played, else names
   // the winner. The trailing period is intentional - it gives it finality.
-  // A tournament leg never offers to run it back: the score is already in the
-  // bracket, and the next thing that happens is the next game of the series.
+  // A leg of a tournament/series never offers to run it back: the score is
+  // already recorded, and the next thing is the next game of the series.
   const tail = fixture
     ? "It is already in the bracket."
-    : "Run it back, or save the image for sharing.";
+    : smatch
+      ? "It is already in the series."
+      : "Run it back, or save the image for sharing.";
   let headline: string;
   let subtext: string;
   if (!winnerId) {
     headline = "Dead heat.";
     subtext = fixture
       ? "The scores are level, so this one gets replayed."
-      : `The scores are level. ${tail}`;
+      : smatch
+        ? "Level scores. Nobody takes this one, so it is on to the next game."
+        : `The scores are level. ${tail}`;
   } else if (iAmPlayer) {
     const won = winnerId === meId;
     headline = won ? "You win." : "You lost.";
@@ -210,7 +218,7 @@ export default function ResultsPage() {
   return (
     <main className="mx-auto grid min-h-[100dvh] w-full max-w-6xl items-center gap-8 px-5 py-10 lg:grid-cols-[0.9fr_1.1fr]">
       <section>
-        {fixture && (
+        {inLeg && (
           <span
             className="mb-4 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em]"
             style={{
@@ -218,7 +226,9 @@ export default function ResultsPage() {
               color: "var(--color-cyan)",
             }}
           >
-            Tournament · game {fixture.game_index + 1} of 3
+            {fixture
+              ? `Tournament · game ${fixture.game_index + 1} of 3`
+              : `Series · game ${(smatch!.leg ?? 0) + 1}`}
           </span>
         )}
         <h1 className="font-[var(--font-display)] text-5xl font-bold leading-none text-[#F0F0FF] sm:text-6xl">
@@ -249,9 +259,13 @@ export default function ResultsPage() {
             Download score card
           </button>
 
-          {fixture ? (
+          {inLeg ? (
             <button
-              onClick={() => router.push(`/tournament/${fixture.id}/match`)}
+              onClick={() =>
+                router.push(
+                  fixture ? `/tournament/${fixture.id}/match` : `/series/${smatch!.id}`,
+                )
+              }
               style={{ background: "var(--color-cyan)", color: "#05060a" }}
               className="flex h-[52px] w-full items-center justify-center rounded-[12px] font-[var(--font-body)] text-base font-bold"
             >

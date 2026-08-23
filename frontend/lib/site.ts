@@ -8,3 +8,9 @@ export const roomUrl = (code: string) => `https://${SITE}/room/${code}`;
 
 /** Same link without the scheme, for display in tight UI. */
 export const roomUrlDisplay = (code: string) => `${SITE}/room/${code}`;
+
+/** Full shareable URL for a series. */
+export const seriesUrl = (code: string) => `https://${SITE}/series/${code}`;
+
+/** Series link without the scheme, for display in tight UI. */
+export const seriesUrlDisplay = (code: string) => `${SITE}/series/${code}`;

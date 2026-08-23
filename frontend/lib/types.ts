@@ -81,6 +81,13 @@ export interface Room {
     leg: number;
     game_index: number;
   } | null;
+  // Set when this room is one leg of a standalone series. Like `tournament`, its
+  // presence sends the end-of-game screen back to the series instead of a
+  // rematch that would count for nothing.
+  series_match?: {
+    id: string;
+    leg: number;
+  } | null;
 }
 
 // Turn-based board (Tile Takeover). Sent via GAME_STATE / ROOM_STATE.

@@ -54,6 +54,10 @@ def _public_room(room: dict, player_id: str) -> dict:
         # screen has no idea it just played a tournament leg and offers a
         # rematch that counts for nothing.
         "tournament": room.get("tournament"),
+        # Same idea as tournament: marks this room as one leg of a standalone
+        # series, so the end-of-game screen sends the player back to the series
+        # instead of offering a rematch.
+        "series_match": room.get("series_match"),
         "game": None,
     }
     game = room.get("game")

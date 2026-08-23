@@ -2,7 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { getMyMatch, startMatchGame, type MyMatch } from "@/lib/api";
+import {
+  getMyMatch,
+  getSeries,
+  nextSeriesGame,
+  startMatchGame,
+  type MyMatch,
+  type Series,
+} from "@/lib/api";
 import { useAuth, useRoom } from "@/lib/store";
 
 const INK = "#F0F0FF";
@@ -54,6 +61,21 @@ export function GameOver({ roomId }: { roomId: string }) {
       <TournamentGameOver
         roomId={roomId}
         tournamentId={room.tournament.id}
+        headline={headline}
+        players={room.players}
+        scores={gameEnd.scores}
+        myId={myId}
+      />
+    );
+  }
+
+  // A standalone series leg ends the same way: nothing to rematch, and the next
+  // move is the next game of the series.
+  if (room.series_match) {
+    return (
+      <SeriesGameOver
+        roomId={roomId}
+        seriesId={room.series_match.id}
         headline={headline}
         players={room.players}
         scores={gameEnd.scores}
@@ -338,6 +360,202 @@ function TournamentGameOver({
               style={{ color: MUTED }}
             >
               bracket
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </main>
+  );
+}
+
+/**
+ * The end of a standalone series leg. Same shape as the tournament version: it
+ * waits until the series has actually counted this room before showing the score,
+ * so "2-1" is the truth and not a guess, then offers the one next move.
+ */
+function SeriesGameOver({
+  roomId,
+  seriesId,
+  headline,
+  players,
+  scores,
+  myId,
+}: {
+  roomId: string;
+  seriesId: string;
+  headline: string;
+  players: { id: string; display_name: string }[];
+  scores: Record<string, number>;
+  myId: string;
+}) {
+  const router = useRouter();
+  const [s, setS] = useState<Series | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const counted = !!s && s.results.some((r) => r.room_id === roomId);
+
+  const load = useCallback(async () => {
+    try {
+      setS(await getSeries(seriesId));
+    } catch {
+      /* keep polling; a blip must not strand the player here */
+    }
+  }, [seriesId]);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 1500);
+    return () => clearInterval(iv);
+  }, [load]);
+
+  const mine = s && (s.player1?.did === myId ? s.player1 : s.player2);
+  const theirs = s && (s.player1?.did === myId ? s.player2 : s.player1);
+  const myWins = mine?.wins ?? 0;
+  const theirWins = theirs?.wins ?? 0;
+  const over = s?.status === "finished";
+  const iWon = over && s?.winner_did === myId;
+
+  const next = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { room_id } = await nextSeriesGame(seriesId);
+      if (room_id && room_id !== roomId) {
+        router.push(`/room/${room_id}`);
+        return;
+      }
+      router.push(`/series/${seriesId}`);
+    } catch {
+      setError("Could not open the next game. Try your series page.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-5 py-10">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 26 }}
+      >
+        <span
+          className="inline-flex items-center rounded-full border px-3 py-1 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em]"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-cyan) 45%, transparent)",
+            color: "var(--color-cyan)",
+          }}
+        >
+          {s ? `Series · best of ${s.wins_needed * 2 - 1}` : "Series"}
+        </span>
+
+        <h1
+          className="mt-3 font-[var(--font-display)] text-5xl font-bold leading-none"
+          style={{ color: INK }}
+        >
+          {headline}
+        </h1>
+
+        {/* This game's scoreline. */}
+        <div className="mt-5 flex flex-col gap-2">
+          {players.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between rounded-[10px] border px-4 py-2.5"
+              style={{ borderColor: LINE }}
+            >
+              <span className="text-sm" style={{ color: p.id === myId ? INK : MUTED }}>
+                {p.id === myId ? "You" : p.display_name}
+              </span>
+              <span
+                className="font-[var(--font-mono)] text-base font-semibold"
+                style={{ color: INK }}
+              >
+                {scores[p.id] ?? 0}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Where the series now stands. */}
+        <div
+          className="mt-5 rounded-[12px] border px-4 py-3.5"
+          style={{ borderColor: LINE, background: "#0f1018" }}
+        >
+          {!counted ? (
+            <p className="text-sm" style={{ color: MUTED }}>
+              Putting this on the series...
+            </p>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm" style={{ color: MUTED }}>
+                  Series vs {theirs?.name ?? "your opponent"}
+                </span>
+                <span
+                  className="font-[var(--font-display)] text-2xl font-bold tabular-nums"
+                  style={{ color: INK }}
+                >
+                  {myWins} - {theirWins}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[13px] leading-5" style={{ color: MUTED }}>
+                {over
+                  ? iWon
+                    ? "That takes the series. Nicely done."
+                    : s?.winner_did
+                      ? "That is the series. Good run."
+                      : "All games played. It ends level."
+                  : myWins === theirWins
+                    ? "All square. The next game breaks the tie."
+                    : myWins > theirWins
+                      ? `You lead. ${s!.wins_needed - myWins} more to take it.`
+                      : `You trail. ${s!.wins_needed - theirWins} more and they take it.`}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-2.5">
+          <button
+            onClick={over ? () => router.push(`/series/${seriesId}`) : next}
+            disabled={!counted || busy}
+            className="flex h-[52px] w-full items-center justify-center rounded-[12px] text-base font-bold transition-[filter] active:brightness-95 disabled:opacity-60"
+            style={{
+              background: counted ? "var(--color-primary)" : "transparent",
+              border: counted ? "none" : `1px solid ${LINE}`,
+              color: counted ? "#05060a" : MUTED,
+            }}
+          >
+            {!counted
+              ? "One moment..."
+              : busy
+                ? "Opening the room..."
+                : over
+                  ? "See the result"
+                  : `Start game ${(s?.current_leg ?? 0) + 1}: ${s?.current_game_name ?? ""}`}
+          </button>
+
+          {error && (
+            <p className="text-center text-sm" style={{ color: "var(--color-warm)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="flex items-center justify-center gap-4 pt-1">
+            <button
+              onClick={() => router.push(`/results/${roomId}`)}
+              className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base"
+              style={{ borderColor: LINE, color: INK }}
+            >
+              Post result
+            </button>
+            <button
+              onClick={() => router.push(`/series/${seriesId}`)}
+              className="flex h-12 items-center justify-center px-3 text-sm"
+              style={{ color: MUTED }}
+            >
+              series
             </button>
           </div>
         </div>

@@ -200,7 +200,8 @@ export default function RoomPage() {
   // here - EXCEPT in a tournament, where the only next step is the next game of
   // the series. There, Clay must go through GameOver like every other game, or a
   // player who drew Clay gets stranded on the result with no way forward.
-  const clayInTournament = room?.game_type === "clay" && !!room?.tournament;
+  const clayInTournament =
+    room?.game_type === "clay" && (!!room?.tournament || !!room?.series_match);
   if (
     ready &&
     gameEnd &&

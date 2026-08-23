@@ -22,6 +22,7 @@ from app.routers import (
     hall_of_fame,
     leaderboard,
     rooms,
+    series,
     share,
     users,
 )
@@ -73,6 +74,7 @@ app.include_router(hall_of_fame.router)
 app.include_router(friends.router)
 app.include_router(cave.router)
 app.include_router(tournaments.router)
+app.include_router(series.router)
 app.include_router(internal.router)
 
 

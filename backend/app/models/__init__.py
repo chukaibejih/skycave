@@ -7,6 +7,7 @@ from app.models.personal_best import PersonalBest
 from app.models.leaderboard_reign import LeaderboardReign
 from app.models.leaderboard_position import LeaderboardPosition
 from app.models.feedback import Feedback
+from app.models.series import Series
 from app.models.tournament import (
     Tournament,
     TournamentEntrant,
@@ -30,6 +31,7 @@ __all__ = [
     "LeaderboardReign",
     "LeaderboardPosition",
     "Feedback",
+    "Series",
     "Tournament",
     "TournamentEntrant",
     "TournamentMatch",
