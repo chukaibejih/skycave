@@ -423,8 +423,10 @@ function Big({
     tone === "cyan"
       ? { background: "var(--color-cyan)", color: "#05060a" }
       : {
-          background: "linear-gradient(140deg, var(--color-primary), var(--color-cyan))",
-          color: "#05060a",
+          // Skycave purple with a stroke, in sync with the challenge button.
+          background: "var(--color-primary)",
+          border: "1.5px solid color-mix(in srgb, #ffffff 28%, var(--color-primary))",
+          color: "#ffffff",
         };
   return (
     <button
