@@ -10,7 +10,6 @@ import { AuthModal } from "@/components/ui/AuthModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { TournamentBanner } from "@/components/tournament/TournamentBanner";
 import { ArcadeShelves } from "@/components/hub/ArcadeShelves";
-import { ChallengeFab } from "@/components/hub/ChallengeFab";
 import { createRoom, listGames } from "@/lib/api";
 import { gameSlug } from "@/lib/solo";
 import { useAuth } from "@/lib/store";
@@ -175,8 +174,6 @@ export default function Home() {
       </section>
 
       <CoffeeFooter />
-
-      <ChallengeFab />
 
       {creating && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-md">
