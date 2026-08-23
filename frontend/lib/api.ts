@@ -552,6 +552,7 @@ export interface Series {
   player2: SeriesPlayer | null;
   games: string[];
   game_names: string[];
+  hosts: string[]; // host did per leg (index = leg); empty until both players in
   results: SeriesResult[];
   current_leg: number;
   current_game: string | null;

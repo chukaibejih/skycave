@@ -45,6 +45,7 @@ class SeriesOut(BaseModel):
     player2: PlayerOut | None = None
     games: list[str] = []
     game_names: list[str] = []
+    hosts: list[str] = []  # host did per leg (index = leg); empty until both in
     results: list[dict] = []
     current_leg: int = 0
     current_game: str | None = None
@@ -101,6 +102,7 @@ def _serialize(s: Series, viewer_did: str | None) -> SeriesOut:
         player2=p2,
         games=s.games or [],
         game_names=[_game_name(g) for g in (s.games or [])],
+        hosts=svc.hosts(s),
         results=s.results or [],
         current_leg=leg,
         current_game=cur,

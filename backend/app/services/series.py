@@ -67,6 +67,18 @@ def current_game(s: Series) -> str | None:
     return games[i] if i < len(games) else None
 
 
+def hosts(s: Series) -> list[str]:
+    """Host did per leg (index = leg). Hosting alternates each game, same as the
+    tournament, so the reflex-game tilt evens out. Empty until both players are
+    in, since it takes both dids to decide."""
+    if not (s.player1_did and s.player2_did):
+        return []
+    return [
+        eng.host_for_game(s.player1_did, s.player2_did, i)
+        for i in range(len(s.games or []))
+    ]
+
+
 async def create(
     db: AsyncSession, creator, wins_needed: int, games: list[str] | None = None
 ) -> Series:

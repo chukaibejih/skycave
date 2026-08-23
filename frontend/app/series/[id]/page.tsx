@@ -223,6 +223,7 @@ export default function SeriesPage({ params }: { params: Promise<{ id: string }>
               you={s.you}
               p1={s.player1}
               p2={s.player2}
+              hostDid={s.hosts?.[i] ?? null}
             />
           ))}
         </div>
@@ -400,7 +401,7 @@ function Decided({
         Download result card
       </button>
 
-      <Link href="/" className="block pt-1">
+      <Link href="/?new=series" className="block pt-1">
         <Big tone="cyan">Start another series</Big>
       </Link>
     </div>
@@ -508,6 +509,7 @@ function GameRow({
   you,
   p1,
   p2,
+  hostDid,
 }: {
   index: number;
   name: string;
@@ -516,6 +518,7 @@ function GameRow({
   you: "player1" | "player2" | null;
   p1: SeriesPlayer | null;
   p2: SeriesPlayer | null;
+  hostDid: string | null;
 }) {
   const myDid = you === "player1" ? p1?.did : you === "player2" ? p2?.did : null;
   const decided = !!result;
@@ -527,6 +530,18 @@ function GameRow({
         ? p1?.name
         : p2?.name
       : null;
+
+  // Who opens the room for this leg (hosting alternates each game). Only worth
+  // saying for legs still to play; a finished leg's host no longer matters.
+  const hostName =
+    hostDid === p1?.did ? p1?.name : hostDid === p2?.did ? p2?.name : null;
+  const hostLabel = hostDid
+    ? myDid && hostDid === myDid
+      ? "you host"
+      : hostName
+        ? `${hostName} hosts`
+        : ""
+    : "";
 
   const tone = decided
     ? draw
@@ -544,9 +559,9 @@ function GameRow({
     else if (you) label = youWon ? "you won" : "you lost";
     else label = `${winnerName} won`;
   } else if (current) {
-    label = "up next";
+    label = hostLabel ? `up next · ${hostLabel}` : "up next";
   } else {
-    label = "not played yet";
+    label = hostLabel || "not played yet";
   }
 
   return (

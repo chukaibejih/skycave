@@ -32,6 +32,20 @@ export function CreateSeriesFab() {
 
   const need = format === "bo5" ? 5 : 3;
 
+  // Deep-link: landing on /?new=series (e.g. "Start another series" from a
+  // finished series) opens the sheet straight away, then cleans the URL so a
+  // refresh does not reopen it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "series") {
+      setOpen(true);
+      params.delete("new");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
+
   // The pool = the versus-capable catalog (same set the backend draws from).
   // Read the hub's cache first for an instant list, then revalidate.
   useEffect(() => {
