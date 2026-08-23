@@ -67,12 +67,28 @@ def current_game(s: Series) -> str | None:
     return games[i] if i < len(games) else None
 
 
-async def create(db: AsyncSession, creator, wins_needed: int) -> Series:
-    """Draw the games up front and open the series for an opponent to join."""
+async def create(
+    db: AsyncSession, creator, wins_needed: int, games: list[str] | None = None
+) -> Series:
+    """Open a series. The creator may pick the games; otherwise they're drawn.
+
+    A picked list must be the right length and all real 1v1 games (order is
+    kept, so the creator's sequence is the play order). Anything invalid falls
+    back to a clean error rather than a half-honored pick.
+    """
     wins_needed = 3 if int(wins_needed) >= 3 else 2  # bo5 or bo3
     length = wins_needed * 2 - 1
     pool = _pool()
-    games = random.sample(list(pool), k=min(length, len(pool)))
+    if games:
+        chosen: list[str] = []
+        for g in games:
+            if g in pool and g not in chosen:
+                chosen.append(g)
+        if len(chosen) != length:
+            raise SeriesError("bad_games", f"Pick {length} different games.")
+        games = chosen
+    else:
+        games = random.sample(list(pool), k=min(length, len(pool)))
 
     for _ in range(6):
         sid = new_room_id(6)

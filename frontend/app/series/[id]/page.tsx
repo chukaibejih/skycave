@@ -6,7 +6,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackButton } from "@/components/nav/BackButton";
 import { AuthModal } from "@/components/ui/AuthModal";
+import { ShareButton } from "@/components/lobby/ShareButton";
 import { composeIntentUrl } from "@/lib/bluesky";
+import { downloadSeriesCard, type SeriesLeg } from "@/lib/scorecard-image";
 import { seriesUrl, seriesUrlDisplay } from "@/lib/site";
 import {
   ApiError,
@@ -177,7 +179,7 @@ export default function SeriesPage({ params }: { params: Promise<{ id: string }>
             exit={{ opacity: 0 }}
           >
             {decided ? (
-              <Decided won={iWon} spectator={!iAmPlayer} winnerName={nameOfWinner(s)} />
+              <Decided s={s} viewerDid={identity?.id ?? null} won={iWon} spectator={!iAmPlayer} />
             ) : openSeat && !iAmPlayer ? (
               <Big onClick={join} disabled={busy} tone="primary">
                 {busy ? "Joining..." : "Accept the challenge"}
@@ -307,16 +309,68 @@ function ShareToInvite({ s }: { s: Series }) {
 }
 
 function Decided({
+  s,
+  viewerDid,
   won,
   spectator,
-  winnerName,
 }: {
+  s: Series;
+  viewerDid: string | null;
   won: boolean;
   spectator: boolean;
-  winnerName: string;
 }) {
-  const tone = won ? "var(--color-success)" : spectator ? "var(--color-cyan)" : "var(--color-warm)";
-  const label = spectator ? `${winnerName} won the series.` : won ? "You won the series." : "You lost the series.";
+  const winnerName = nameOfWinner(s);
+  const level = !s.winner_did;
+  const tone = level
+    ? "var(--color-text-secondary)"
+    : won
+      ? "var(--color-success)"
+      : spectator
+        ? "var(--color-cyan)"
+        : "var(--color-warm)";
+  const label = level
+    ? "The series ends level."
+    : spectator
+      ? `${winnerName} won the series.`
+      : won
+        ? "You won the series."
+        : "You lost the series.";
+
+  const p1w = s.player1?.wins ?? 0;
+  const p2w = s.player2?.wins ?? 0;
+  const best = s.wins_needed * 2 - 1;
+  const url = seriesUrl(s.id);
+
+  // Share text from the viewer's point of view, so it reads as their own post.
+  const mineFirst = viewerDid === s.player1?.did;
+  const myW = mineFirst ? p1w : p2w;
+  const theirW = mineFirst ? p2w : p1w;
+  const oppName = mineFirst ? s.player2?.name : s.player1?.name;
+  const shareText = level
+    ? `Our best-of-${best} series ended level on Skycave. ${url}`
+    : spectator
+      ? `${winnerName} took the best-of-${best} series ${Math.max(p1w, p2w)}-${Math.min(p1w, p2w)} on Skycave. ${url}`
+      : won
+        ? `Won my best-of-${best} series ${myW}-${theirW} on Skycave 🏆 ${url}`
+        : `Lost a close one, ${oppName} took the best-of-${best} ${theirW}-${myW}. Run it back? ${url}`;
+
+  const legs: SeriesLeg[] = (s.results || []).map((r, i) => ({
+    name: s.game_names[i] ?? r.game_type,
+    winner:
+      r.winner_did === s.player1?.did ? "p1" : r.winner_did === s.player2?.did ? "p2" : "draw",
+  }));
+
+  const download = () =>
+    downloadSeriesCard({
+      p1Name: s.player1?.name ?? "Player 1",
+      p2Name: s.player2?.name ?? "Player 2",
+      p1Wins: p1w,
+      p2Wins: p2w,
+      winnerName: level ? null : winnerName,
+      best,
+      legs,
+    });
+
   return (
     <div className="space-y-3">
       <div
@@ -329,7 +383,24 @@ function Decided({
       >
         {label}
       </div>
-      <Link href="/" className="block">
+
+      <ShareButton text={shareText} label="Post the result" full />
+
+      <button
+        onClick={download}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-[14px] border text-sm font-semibold transition-[filter] active:brightness-95"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-surface)", color: INK }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" x2="12" y1="15" y2="3" />
+        </svg>
+        Download result card
+      </button>
+
+      <Link href="/" className="block pt-1">
         <Big tone="cyan">Start another series</Big>
       </Link>
     </div>

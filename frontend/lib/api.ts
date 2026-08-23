@@ -561,9 +561,13 @@ export interface Series {
   you: "player1" | "player2" | null;
 }
 
-/** Open a new series and become player 1. Guests allowed. */
-export const createSeries = (format: "bo3" | "bo5") =>
-  request<Series>("/series", { method: "POST", body: JSON.stringify({ format }) });
+/** Open a new series and become player 1. Guests allowed. Omit `games` for a
+ * random draw, or pass an exact-length list of game types to pick them. */
+export const createSeries = (format: "bo3" | "bo5", games?: string[]) =>
+  request<Series>("/series", {
+    method: "POST",
+    body: JSON.stringify(games && games.length ? { format, games } : { format }),
+  });
 
 /** The series state. Public, so a shared link opens for anyone. */
 export const getSeries = (id: string) => request<Series>(`/series/${id}`);

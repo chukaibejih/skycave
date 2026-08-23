@@ -1,10 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthModal } from "@/components/ui/AuthModal";
-import { createSeries } from "@/lib/api";
+import { createSeries, listGames } from "@/lib/api";
 import { useAuth } from "@/lib/store";
+import type { GameInfo } from "@/lib/types";
+
+const GAMES_CACHE = "skycave_games_v2"; // shared with the hub's catalog cache
 
 /**
  * The one way to start a head-to-head series from the hub. A floating action
@@ -22,16 +25,51 @@ export function CreateSeriesFab() {
   const [open, setOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [format, setFormat] = useState<"bo3" | "bo5">("bo3");
+  const [pick, setPick] = useState<"random" | "choose">("random");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [games, setGames] = useState<GameInfo[]>([]);
   const [busy, setBusy] = useState(false);
+
+  const need = format === "bo5" ? 5 : 3;
+
+  // The pool = the versus-capable catalog (same set the backend draws from).
+  // Read the hub's cache first for an instant list, then revalidate.
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(GAMES_CACHE);
+      if (cached) setGames((JSON.parse(cached) as GameInfo[]).filter((g) => g.versus_enabled !== false));
+    } catch {
+      /* ignore */
+    }
+    listGames()
+      .then((g) => setGames(g.filter((x) => x.versus_enabled !== false)))
+      .catch(() => {});
+  }, []);
+
+  // Switching to a shorter format drops extra picks so the count stays valid.
+  useEffect(() => {
+    setPicked((cur) => (cur.length > need ? cur.slice(0, need) : cur));
+  }, [need]);
+
+  const toggle = (type: string) => {
+    setPicked((cur) => {
+      if (cur.includes(type)) return cur.filter((t) => t !== type);
+      if (cur.length >= need) return cur; // at the limit; drop one first
+      return [...cur, type];
+    });
+  };
+
+  const chooseIncomplete = pick === "choose" && picked.length !== need;
 
   const create = async () => {
     if (!identity) {
       setAuthOpen(true);
       return;
     }
+    if (chooseIncomplete) return;
     setBusy(true);
     try {
-      const s = await createSeries(format);
+      const s = await createSeries(format, pick === "choose" ? picked : undefined);
       router.push(`/series/${s.id}`);
     } catch {
       setBusy(false);
@@ -123,16 +161,83 @@ export function CreateSeriesFab() {
                   />
                 </div>
 
+                {/* Games: leave it to chance, or pick the exact lineup + order. */}
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
+                    Games
+                  </span>
+                  <div
+                    className="flex rounded-full border p-0.5"
+                    style={{ borderColor: "var(--color-border)" }}
+                  >
+                    <Seg label="Random" active={pick === "random"} onClick={() => setPick("random")} />
+                    <Seg label="Pick" active={pick === "choose"} onClick={() => setPick("choose")} />
+                  </div>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {pick === "choose" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                        Tap {need} games in the order you want to play them
+                        <span style={{ color: picked.length === need ? "var(--color-success)" : "var(--color-primary)" }}>
+                          {" "}· {picked.length}/{need}
+                        </span>
+                      </p>
+                      <div className="mt-2.5 flex max-h-[184px] flex-wrap gap-2 overflow-y-auto py-1">
+                        {games.map((g) => {
+                          const idx = picked.indexOf(g.type);
+                          const on = idx !== -1;
+                          const atLimit = picked.length >= need && !on;
+                          return (
+                            <button
+                              key={g.type}
+                              onClick={() => toggle(g.type)}
+                              disabled={atLimit}
+                              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-40"
+                              style={{
+                                borderColor: on ? "var(--color-primary)" : "var(--color-border)",
+                                background: on
+                                  ? "color-mix(in srgb, var(--color-primary) 16%, var(--color-surface))"
+                                  : "var(--color-base)",
+                                color: on ? "var(--color-primary)" : "var(--color-text-primary)",
+                              }}
+                            >
+                              {on && (
+                                <span className="grid h-4 w-4 place-items-center rounded-full text-[10px] font-bold"
+                                      style={{ background: "var(--color-primary)", color: "#05060a" }}>
+                                  {idx + 1}
+                                </span>
+                              )}
+                              {g.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <button
                   onClick={create}
-                  disabled={busy}
+                  disabled={busy || chooseIncomplete}
                   className="mt-5 flex h-[54px] w-full items-center justify-center rounded-[16px] text-base font-bold transition-[filter] active:brightness-95 disabled:opacity-70"
                   style={{
                     background: "linear-gradient(140deg, var(--color-primary), var(--color-cyan))",
                     color: "#05060a",
                   }}
                 >
-                  {busy ? "Setting it up..." : "Create & get a link"}
+                  {busy
+                    ? "Setting it up..."
+                    : chooseIncomplete
+                      ? `Pick ${need - picked.length} more`
+                      : "Create & get a link"}
                 </button>
                 <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
                   You will get a link to send to your opponent.
@@ -156,6 +261,21 @@ export function CreateSeriesFab() {
   );
 }
 
+function Seg({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+      style={{
+        background: active ? "var(--color-primary)" : "transparent",
+        color: active ? "#05060a" : "var(--color-text-secondary)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function FormatCard({
   label,
   sub,
@@ -176,6 +296,9 @@ function FormatCard({
         background: active
           ? "color-mix(in srgb, var(--color-primary) 12%, var(--color-surface))"
           : "var(--color-base)",
+        // Native <button> does not inherit `color`; without this the label
+        // falls back to the UA black and vanishes on the dark sheet.
+        color: active ? "var(--color-primary)" : "var(--color-text-primary)",
       }}
     >
       <span className="font-[var(--font-display)] text-base font-bold">{label}</span>

@@ -56,6 +56,7 @@ class SeriesOut(BaseModel):
 
 class CreateSeriesIn(BaseModel):
     format: str = "bo3"  # "bo3" | "bo5"
+    games: list[str] | None = None  # creator's pick; omitted = random draw
 
 
 def _serialize(s: Series, viewer_did: str | None) -> SeriesOut:
@@ -117,7 +118,10 @@ async def create_series(
     db: AsyncSession = Depends(get_db),
 ) -> SeriesOut:
     wins_needed = 3 if body.format == "bo5" else 2
-    s = await svc.create(db, identity, wins_needed)
+    try:
+        s = await svc.create(db, identity, wins_needed, games=body.games)
+    except svc.SeriesError as e:
+        raise HTTPException(status_code=400, detail=e.message)
     return _serialize(s, identity.id)
 
 

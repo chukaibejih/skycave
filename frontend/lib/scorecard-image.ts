@@ -172,3 +172,112 @@ export function downloadScoreCard(data: CardData, filename = "skycave-scorecard.
     URL.revokeObjectURL(url);
   }, "image/png");
 }
+
+// ── Series result card ──
+// A whole head-to-head series on one card: the final set score, who took it,
+// and the game-by-game lineup. Same palette and canvas-only approach as above.
+export interface SeriesLeg {
+  name: string;
+  winner: "p1" | "p2" | "draw";
+}
+export interface SeriesCardData {
+  p1Name: string;
+  p2Name: string;
+  p1Wins: number;
+  p2Wins: number;
+  winnerName: string | null; // null = level
+  best: number; // games in the series (bo3 = 3)
+  legs: SeriesLeg[];
+}
+
+export function renderSeriesCard(data: SeriesCardData): HTMLCanvasElement {
+  const W = 1200;
+  const H = 630;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = C.base;
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W * 0.85, 0, 0, W * 0.85, 0, W * 0.7);
+  glow.addColorStop(0, "rgba(108,99,255,0.22)");
+  glow.addColorStop(1, "rgba(108,99,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  const p1Lead = data.p1Wins > data.p2Wins;
+  const p2Lead = data.p2Wins > data.p1Wins;
+
+  // Eyebrow
+  ctx.textAlign = "left";
+  ctx.fillStyle = C.muted;
+  ctx.font = "700 26px system-ui, sans-serif";
+  ctx.fillText(`SERIES · BEST OF ${data.best}`, 120, 96);
+
+  // Headline
+  ctx.fillStyle = C.text;
+  ctx.font = "800 66px system-ui, sans-serif";
+  const head = data.winnerName ? `${trunc(ctx, data.winnerName, 780)} takes it.` : "It ends level.";
+  ctx.fillText(head, 120, 180);
+
+  // The scoreline: NAME  wins - wins  NAME
+  const midY = 300;
+  ctx.font = "700 40px system-ui, sans-serif";
+  ctx.fillStyle = p1Lead ? C.success : C.text;
+  ctx.textAlign = "left";
+  ctx.fillText(trunc(ctx, data.p1Name, 360), 120, midY);
+  ctx.fillStyle = p2Lead ? C.success : C.text;
+  ctx.textAlign = "right";
+  ctx.fillText(trunc(ctx, data.p2Name, 360), W - 120, midY);
+
+  ctx.textAlign = "center";
+  ctx.font = "800 84px system-ui, sans-serif";
+  ctx.fillStyle = C.text;
+  ctx.fillText(`${data.p1Wins} - ${data.p2Wins}`, W / 2, midY + 14);
+
+  // The lineup, one row per game, with who took it.
+  let y = 388;
+  ctx.font = "600 28px system-ui, sans-serif";
+  for (let i = 0; i < data.legs.length; i++) {
+    const leg = data.legs[i];
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.muted;
+    ctx.fillText(`${i + 1}`, 120, y);
+    ctx.fillStyle = C.text;
+    ctx.fillText(trunc(ctx, leg.name, 560), 168, y);
+    ctx.textAlign = "right";
+    if (leg.winner === "draw") {
+      ctx.fillStyle = C.muted;
+      ctx.fillText("drawn", W - 120, y);
+    } else {
+      const who = leg.winner === "p1" ? data.p1Name : data.p2Name;
+      ctx.fillStyle = C.success;
+      ctx.fillText(trunc(ctx, `${who} won`, 420), W - 120, y);
+    }
+    y += 52;
+  }
+
+  // Footer
+  ctx.fillStyle = C.muted;
+  ctx.font = "500 22px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("Skycave", 120, H - 44);
+  ctx.textAlign = "right";
+  ctx.fillText("skycave.space", W - 120, H - 44);
+
+  return canvas;
+}
+
+export function downloadSeriesCard(data: SeriesCardData, filename = "skycave-series.png") {
+  const canvas = renderSeriesCard(data);
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, "image/png");
+}
