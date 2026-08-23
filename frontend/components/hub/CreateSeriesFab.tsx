@@ -40,7 +40,10 @@ export function CreateSeriesFab() {
 
   return (
     <>
-      {/* The button. Sits above the footer, clear of the thumb's home row. */}
+      {/* Right-edge aligned with the global Feedback pill (right-3) and lifted
+          to sit directly above it, so the two floating actions read as one
+          deliberate stack instead of colliding. The bright gradient circle
+          carries the primary weight; Feedback stays a muted pill below it. */}
       <motion.button
         onClick={() => setOpen(true)}
         aria-label="Start a series"
@@ -49,7 +52,7 @@ export function CreateSeriesFab() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 320, damping: 22, delay: 0.4 }}
         whileTap={{ scale: 0.92 }}
-        className="fixed bottom-6 right-5 z-40 grid h-14 w-14 place-items-center rounded-full sm:bottom-8 sm:right-8"
+        className="fixed right-3 z-40 grid h-14 w-14 place-items-center rounded-full bottom-[calc(max(env(safe-area-inset-bottom),14px)_+_56px)]"
         style={{
           background: "linear-gradient(140deg, var(--color-primary), var(--color-cyan))",
           boxShadow: "0 10px 34px var(--color-primary-glow), 0 2px 10px rgba(0,0,0,0.4)",
