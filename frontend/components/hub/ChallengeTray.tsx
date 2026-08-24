@@ -34,7 +34,6 @@ interface ChallengeTrayProps {
 
 export function ChallengeTray({ open, onClose }: ChallengeTrayProps) {
   const router = useRouter();
-  const { identity } = useAuth();
   const [view, setView] = useState<TrayView>("menu");
 
   // Series config state
@@ -59,9 +58,12 @@ export function ChallengeTray({ open, onClose }: ChallengeTrayProps) {
   };
 
   // A challenge is fine for guests, but it still needs an identity to create the
-  // room/series. Gate here and resume the exact action once signed in.
+  // room/series. Gate here and resume the exact action once signed in. Read the
+  // LIVE store value (not the render closure): after a guest signs in, onAuthed
+  // resumes the action synchronously, before this component re-renders, so the
+  // closured `identity` would still be null and the gate would loop.
   const gate = (action: () => void): boolean => {
-    if (identity) return true;
+    if (useAuth.getState().identity) return true;
     setPending(() => action);
     setAuthOpen(true);
     return false;

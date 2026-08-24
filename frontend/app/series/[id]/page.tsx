@@ -73,7 +73,9 @@ export default function SeriesPage({ params }: PageProps) {
   }, [s, load]);
 
   const join = async () => {
-    if (!identity) {
+    // Live store value, not the render closure: onAuthed resumes join()
+    // synchronously after a guest signs in, before this re-renders.
+    if (!useAuth.getState().identity) {
       setAuthOpen(true);
       return;
     }
