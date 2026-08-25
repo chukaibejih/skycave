@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
-import { FeedbackButton } from "@/components/ui/FeedbackButton";
+import { ChallengeButton } from "@/components/ui/ChallengeButton";
 import { ChampionInit } from "@/components/ChampionInit";
 import "./globals.css";
 
@@ -62,7 +62,7 @@ export default function RootLayout({
       <body>
         {children}
         <ChampionInit />
-        <FeedbackButton />
+        <ChallengeButton />
       </body>
     </html>
   );
