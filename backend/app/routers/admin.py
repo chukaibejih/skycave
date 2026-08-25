@@ -20,7 +20,7 @@ from app.core.database import get_db
 from app.core.deps import AdminAuth
 from app.core.redis_client import get_redis
 from app.core.security import create_admin_token
-from app.models import Feedback, GameSession, Room, User
+from app.models import Feedback, GameSession, Room, Series, User
 from app.models.game_session import HEAD_TO_HEAD_MODES, SINGLE_PLAYER_MODES
 from app.schemas.rest import (
     AdminFeedbackResponse,
@@ -867,3 +867,124 @@ async def admin_close_registration(
     await tsvc.lock_and_draw(db, t)
     logger.info("admin closed registration + drew tournament %s", tid)
     return {"tournament": tid, "status": t.status}
+
+
+# --------------------------------------------------------------------------- #
+# Series (standalone head-to-head, not a tournament fixture)
+# --------------------------------------------------------------------------- #
+
+class AdminSeriesRow(BaseModel):
+    id: str
+    status: str
+    format: str            # "bo3" | "bo5"
+    player1_handle: str
+    player2_handle: str | None
+    p1_wins: int
+    p2_wins: int
+    games: list[str]       # game display names, in play order
+    current_game: str | None
+    winner_handle: str | None
+    created_at: datetime
+
+
+class AdminSeriesSummary(BaseModel):
+    total: int
+    open: int
+    live: int
+    finished: int
+
+
+class AdminSeriesResponse(BaseModel):
+    summary: AdminSeriesSummary
+    series: list[AdminSeriesRow]
+    total: int             # rows matching the current filter (for the pager)
+
+
+def _series_row(s: Series) -> AdminSeriesRow:
+    from app.games.registry import get_game
+
+    results = s.results or []
+    p1w = sum(1 for r in results if r.get("winner_did") == s.player1_did)
+    p2w = sum(1 for r in results if s.player2_did and r.get("winner_did") == s.player2_did)
+    games = s.games or []
+    leg = len(results)
+    winner = (
+        s.player1_handle if s.winner_did == s.player1_did
+        else s.player2_handle if s.winner_did and s.winner_did == s.player2_did
+        else None
+    )
+
+    def _name(t: str) -> str:
+        g = get_game(t)
+        return g.name if g else t
+
+    return AdminSeriesRow(
+        id=s.id,
+        status=s.status,
+        format="bo5" if s.wins_needed >= 3 else "bo3",
+        player1_handle=s.player1_handle or "-",
+        player2_handle=s.player2_handle,
+        p1_wins=p1w,
+        p2_wins=p2w,
+        games=[_name(g) for g in games],
+        current_game=_name(games[leg]) if s.status != "finished" and leg < len(games) else None,
+        winner_handle=winner,
+        created_at=s.created_at,
+    )
+
+
+@router.get("/series", response_model=AdminSeriesResponse)
+async def admin_series(
+    _: AdminAuth,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(None, description="open | live | finished"),
+    q: str | None = Query(None, description="search either player's handle"),
+) -> AdminSeriesResponse:
+    # Summary counts span every series, independent of the row filter.
+    by_status = dict(
+        (
+            await db.execute(select(Series.status, func.count()).group_by(Series.status))
+        ).all()
+    )
+    summary = AdminSeriesSummary(
+        total=sum(by_status.values()),
+        open=by_status.get("open", 0),
+        live=by_status.get("live", 0),
+        finished=by_status.get("finished", 0),
+    )
+
+    conds = []
+    if status:
+        conds.append(Series.status == status)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        conds.append(or_(Series.player1_handle.ilike(like), Series.player2_handle.ilike(like)))
+
+    total = await db.scalar(select(func.count()).select_from(Series).where(*conds)) or 0
+    rows = (
+        await db.execute(
+            select(Series).where(*conds).order_by(desc(Series.created_at)).limit(limit).offset(offset)
+        )
+    ).scalars().all()
+    return AdminSeriesResponse(summary=summary, series=[_series_row(s) for s in rows], total=total)
+
+
+@router.delete("/series/{sid}")
+async def admin_delete_series(
+    sid: str, _: AdminAuth, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Delete a series orchestration record. Its legs are ordinary GameSessions
+    and are left untouched (deleting a stray/abandoned series never rewrites any
+    player's stats). Logged first as an audit snapshot."""
+    s = await db.get(Series, sid)
+    if s is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    logger.info(
+        "admin delete series id=%s status=%s p1=%s p2=%s games=%s results=%s",
+        s.id, s.status, s.player1_did, s.player2_did, s.games, s.results,
+    )
+    await db.delete(s)
+    await db.commit()
+    return {"deleted": sid}

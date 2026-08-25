@@ -185,6 +185,38 @@ export const recomputeUser = (did: string) =>
   );
 export const deleteGame = (id: number) => adminSend(`/admin/games/${id}`, "DELETE");
 
+// ── Series (standalone head-to-head) ──
+export interface SeriesAdminRow {
+  id: string;
+  status: "open" | "live" | "finished";
+  format: "bo3" | "bo5";
+  player1_handle: string;
+  player2_handle: string | null;
+  p1_wins: number;
+  p2_wins: number;
+  games: string[];
+  current_game: string | null;
+  winner_handle: string | null;
+  created_at: string;
+}
+export interface SeriesAdminResponse {
+  summary: { total: number; open: number; live: number; finished: number };
+  series: SeriesAdminRow[];
+  total: number;
+}
+export const getAdminSeries = (
+  limit = 25,
+  offset = 0,
+  opts: { status?: string; q?: string } = {},
+) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (opts.status) p.set("status", opts.status);
+  if (opts.q) p.set("q", opts.q);
+  return adminGet<SeriesAdminResponse>(`/admin/series?${p}`);
+};
+export const deleteAdminSeries = (id: string) =>
+  adminSend(`/admin/series/${encodeURIComponent(id)}`, "DELETE");
+
 export interface TournamentAdminRow {
   id: string;
   name: string;

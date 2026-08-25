@@ -21,6 +21,10 @@ import {
   closeRegistration,
   recomputeUser,
   deleteGame,
+  getAdminSeries,
+  deleteAdminSeries,
+  type SeriesAdminRow,
+  type SeriesAdminResponse,
   type UserSort,
   type TournamentMatches,
   type TournamentAdminRow,
@@ -57,7 +61,7 @@ const GAME_NAME: Record<string, string> = {
 };
 const gname = (t: string) => GAME_NAME[t] ?? t;
 
-type Section = "overview" | "users" | "games" | "tournaments" | "feedback";
+type Section = "overview" | "users" | "games" | "series" | "tournaments" | "feedback";
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
@@ -69,8 +73,10 @@ export default function AdminPage() {
   const [games, setGames] = useState<{ total: number; games: GameRow[] } | null>(null);
   const [feedback, setFeedback] = useState<{ total: number; feedback: FeedbackRow[] } | null>(null);
   const [tournaments, setTournaments] = useState<TournamentsAdmin | null>(null);
+  const [series, setSeries] = useState<SeriesAdminResponse | null>(null);
   const [usersOff, setUsersOff] = useState(0);
   const [gamesOff, setGamesOff] = useState(0);
+  const [seriesOff, setSeriesOff] = useState(0);
   const [fbOff, setFbOff] = useState(0);
 
   // Filters / search / sort
@@ -80,6 +86,8 @@ export default function AdminPage() {
   const [gamesType, setGamesType] = useState("");
   const [gamesMode, setGamesMode] = useState("");
   const [gamesQ, setGamesQ] = useState("");
+  const [seriesStatus, setSeriesStatus] = useState("");
+  const [seriesQ, setSeriesQ] = useState("");
   const [fbHideResolved, setFbHideResolved] = useState(false);
   const [note, setNote] = useState<string | null>(null); // transient action result
 
@@ -124,6 +132,13 @@ export default function AdminPage() {
       .catch(handleErr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, authed, gamesOff, gamesType, gamesMode, gamesQ]);
+  useEffect(() => {
+    if (!authed || section !== "series") return;
+    getAdminSeries(PAGE, seriesOff, { status: seriesStatus || undefined, q: seriesQ || undefined })
+      .then(setSeries)
+      .catch(handleErr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, authed, seriesOff, seriesStatus, seriesQ]);
   useEffect(() => {
     if (!authed || section !== "feedback") return;
     getFeedback(FB_PAGE, fbOff, fbHideResolved ? false : undefined)
@@ -197,6 +212,22 @@ export default function AdminPage() {
         prev ? { ...prev, total: prev.total - 1, games: prev.games.filter((g) => g.id !== id) } : prev,
       );
       setNote(`Deleted game #${id} · affected players recomputed.`);
+    } catch (e) {
+      handleErr(e);
+      setNote(`Delete failed: ${(e as Error).message}`);
+    }
+  };
+
+  const onDeleteSeries = async (id: string) => {
+    if (!window.confirm(`Delete series ${id}? Its individual games are kept; only the series record is removed.`)) return;
+    try {
+      await deleteAdminSeries(id);
+      setSeries((prev) =>
+        prev
+          ? { ...prev, total: prev.total - 1, series: prev.series.filter((s) => s.id !== id) }
+          : prev,
+      );
+      setNote(`Deleted series ${id}.`);
     } catch (e) {
       handleErr(e);
       setNote(`Delete failed: ${(e as Error).message}`);
@@ -285,7 +316,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="mb-6 flex gap-2">
-        {(["overview", "users", "games", "tournaments", "feedback"] as Section[]).map((s) => (
+        {(["overview", "users", "games", "series", "tournaments", "feedback"] as Section[]).map((s) => (
           <button
             key={s}
             onClick={() => setSection(s)}
@@ -367,6 +398,45 @@ export default function AdminPage() {
           </div>
           <GamesView games={games?.games ?? null} onDelete={onDeleteGame} />
           <Pager loaded={!!games} offset={gamesOff} pageSize={PAGE} total={games?.total ?? 0} onChange={setGamesOff} />
+        </>
+      )}
+      {section === "series" && (
+        <>
+          {series && (
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ["Total", series.summary.total],
+                ["Open", series.summary.open],
+                ["Live", series.summary.live],
+                ["Finished", series.summary.finished],
+              ] as [string, number][]).map(([label, value]) => (
+                <div key={label} className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+                  <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</div>
+                  <div className="mt-1 font-[var(--font-display)] text-2xl font-bold">{value.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mb-3 flex flex-wrap gap-2">
+            <select
+              value={seriesStatus}
+              onChange={(e) => { setSeriesStatus(e.target.value); setSeriesOff(0); }}
+              className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            >
+              <option value="">All statuses</option>
+              {["open", "live", "finished"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <input
+              value={seriesQ}
+              onChange={(e) => { setSeriesQ(e.target.value); setSeriesOff(0); }}
+              placeholder="Search player…"
+              className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <SeriesView series={series?.series ?? null} onDelete={onDeleteSeries} />
+          <Pager loaded={!!series} offset={seriesOff} pageSize={PAGE} total={series?.total ?? 0} onChange={setSeriesOff} />
         </>
       )}
       {section === "tournaments" && (
@@ -846,6 +916,68 @@ function GamesView({ games, onDelete }: { games: GameRow[] | null; onDelete: (id
           </tr>
         );
       })}
+    </Table>
+  );
+}
+
+function SeriesView({
+  series,
+  onDelete,
+}: {
+  series: SeriesAdminRow[] | null;
+  onDelete: (id: string) => void;
+}) {
+  if (!series) return <Loading />;
+  if (series.length === 0) return <Empty label="No series match." />;
+  const statusColor: Record<string, string> = {
+    open: "var(--color-cyan)",
+    live: "var(--color-success)",
+    finished: "var(--color-text-secondary)",
+  };
+  return (
+    <Table head={["Created", "Match", "Bo", "Status", "Score", "Games", "Winner", ""]}>
+      {series.map((s) => (
+        <tr key={s.id} className="border-t border-[var(--color-border)]">
+          <Td className="whitespace-nowrap text-[var(--color-text-secondary)]">
+            {new Date(s.created_at).toLocaleString()}
+          </Td>
+          <Td className="font-[var(--font-mono)] whitespace-nowrap">
+            <span className="text-[var(--color-primary)]">{s.player1_handle}</span>
+            <span className="text-[var(--color-text-secondary)]"> vs </span>
+            <span className="text-[var(--color-warm)]">{s.player2_handle ?? "open seat"}</span>
+          </Td>
+          <Td className="uppercase text-[var(--color-text-secondary)]">{s.format}</Td>
+          <Td>
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide"
+              style={{ background: `color-mix(in srgb, ${statusColor[s.status]} 16%, transparent)`, color: statusColor[s.status] }}
+            >
+              {s.status}
+            </span>
+          </Td>
+          <Td className="font-[var(--font-mono)] whitespace-nowrap tabular-nums">
+            {s.p1_wins} - {s.p2_wins}
+          </Td>
+          <Td className="max-w-[280px] text-xs text-[var(--color-text-secondary)]">
+            {s.games.join(" · ")}
+            {s.current_game && (
+              <span className="ml-1 text-[var(--color-cyan)]">▶ {s.current_game}</span>
+            )}
+          </Td>
+          <Td className={s.winner_handle ? "text-[var(--color-success)]" : "text-[var(--color-text-secondary)]"}>
+            {s.winner_handle ?? "-"}
+          </Td>
+          <Td>
+            <button
+              onClick={() => onDelete(s.id)}
+              title={`Delete series ${s.id} (its games are kept)`}
+              className="whitespace-nowrap rounded-[8px] border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:border-[var(--color-warm)] hover:text-[var(--color-warm)]"
+            >
+              Delete
+            </button>
+          </Td>
+        </tr>
+      ))}
     </Table>
   );
 }
