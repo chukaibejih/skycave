@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { shareToBluesky } from "@/lib/bluesky";
 import { playUrl } from "@/lib/solo";
+import { SoloLeaderboard } from "@/components/ui/SoloLeaderboard";
 import { useAuth, useRoom } from "@/lib/store";
 
 // Clay's gameplay is a canvas; the server issues the target and scores the
@@ -537,6 +538,10 @@ export function Clay() {
               </p>
             )}
           </div>
+
+          {isSolo && (
+            <SoloLeaderboard gameType={room?.game_type ?? "clay"} gameName="Clay" meId={meId} />
+          )}
         </motion.div>
       </main>
     );

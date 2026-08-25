@@ -5,8 +5,8 @@ import { motion } from "framer-motion";
 import { ScoreCard } from "@/components/ui/ScoreCard";
 import { ShareButton } from "@/components/lobby/ShareButton";
 import { Button } from "@/components/ui/Button";
-import { Avatar } from "@/components/ui/Avatar";
-import { createRoom, getLeaderboard, getRoom, getScorecard, type LeaderboardEntry } from "@/lib/api";
+import { SoloLeaderboard } from "@/components/ui/SoloLeaderboard";
+import { createRoom, getRoom, getScorecard } from "@/lib/api";
 import { BlueskyConnect } from "@/components/ui/BlueskyConnect";
 import { downloadScoreCard } from "@/lib/scorecard-image";
 import { resolveSoloBest, soloShareText, gameSlug } from "@/lib/solo";
@@ -329,108 +329,6 @@ function Centered({ children }: { children: React.ReactNode }) {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-6 text-center">
       {children}
     </main>
-  );
-}
-
-function rankColor(rank: number): string {
-  if (rank === 1) return "var(--color-gold)";
-  if (rank === 2) return "#cbd5e1";
-  if (rank === 3) return "#e0a678";
-  return "#8888AA";
-}
-
-/**
- * The game's solo leaderboard, shown under a solo result (a player asked for
- * it). Its own fetch so it never blocks the result rendering; a scrollable list
- * that highlights the viewer's row when they're on the board.
- */
-function SoloLeaderboard({
-  gameType,
-  gameName,
-  meId,
-}: {
-  gameType: string;
-  gameName: string;
-  meId: string | null | undefined;
-}) {
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
-  const [unit, setUnit] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    getLeaderboard({ game: gameType, mode: "solo", limit: 50 })
-      .then((r) => {
-        if (!alive) return;
-        setEntries(r.entries);
-        setUnit(r.score_unit);
-      })
-      .catch(() => alive && setEntries([]));
-    return () => {
-      alive = false;
-    };
-  }, [gameType]);
-
-  if (entries === null) {
-    return (
-      <p className="mx-auto mt-16 max-w-md text-center font-[var(--font-body)] text-sm text-[#8888AA]">
-        Loading the leaderboard...
-      </p>
-    );
-  }
-  if (entries.length === 0) return null;
-
-  const myRank = meId ? entries.find((e) => e.did === meId)?.rank ?? null : null;
-
-  return (
-    <section className="mx-auto mt-16 w-full max-w-md">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h2 className="font-[var(--font-display)] text-xl font-bold text-[#F0F0FF]">
-          {gameName} leaderboard
-        </h2>
-        <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[#8888AA]">
-          {myRank ? `you're #${myRank}` : unit ?? "top runs"}
-        </span>
-      </div>
-      <div
-        className="max-h-[420px] overflow-y-auto rounded-[16px] border bg-[#13131A]"
-        style={{ borderColor: "#2A2A3A" }}
-      >
-        {entries.map((e) => {
-          const isMe = !!meId && e.did === meId;
-          return (
-            <div
-              key={e.did}
-              className="flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0"
-              style={{
-                borderColor: "#2A2A3A",
-                background: isMe ? "rgba(108,99,255,0.14)" : "transparent",
-              }}
-            >
-              <span
-                className="w-6 shrink-0 text-center font-[var(--font-display)] text-sm font-bold tabular-nums"
-                style={{ color: rankColor(e.rank) }}
-              >
-                {e.rank}
-              </span>
-              <Avatar id={e.did} name={e.display_name ?? e.handle} avatarUrl={e.avatar_url} size={30} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[#F0F0FF]">
-                  {isMe ? "You" : e.display_name ?? e.handle}
-                </div>
-                {e.handle && e.handle !== "guest" && (
-                  <div className="truncate font-[var(--font-mono)] text-[10px] text-[#8888AA]">
-                    @{e.handle}
-                  </div>
-                )}
-              </div>
-              <span className="shrink-0 font-[var(--font-display)] text-sm font-bold tabular-nums text-[#F0F0FF]">
-                {e.total_score.toLocaleString()}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
