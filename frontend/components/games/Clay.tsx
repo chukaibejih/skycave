@@ -504,18 +504,39 @@ export function Clay() {
                 Download
               </button>
             </div>
-            <div className="flex items-center justify-center gap-4 pt-1">
-              {isSolo ? (
+            {isSolo ? (
+              // Two equal actions: replay Clay, or head to the hub for another
+              // game. "new game" was silent muted text before.
+              <div className="grid grid-cols-2 gap-2 pt-1">
                 <a
                   href="/play/clay"
-                  className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base"
+                  className="flex h-12 items-center justify-center gap-2 rounded-[12px] border text-base transition-[filter] active:brightness-95"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
                 >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 2v6h6" />
+                    <path d="M3 13a9 9 0 1 0 3-7.7L3 8" />
+                  </svg>
                   Play again
                 </a>
-              ) : (
-                // Same room, same opponent - the rematch keeps a 1v1 alive
-                // instead of dumping both players back to the hub.
+                <Link
+                  href="/"
+                  className="flex h-12 items-center justify-center gap-2 rounded-[12px] border text-base transition-[filter] active:brightness-95"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                  New game
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-4 pt-1">
+                {/* Same room, same opponent - the rematch keeps a 1v1 alive
+                    instead of dumping both players back to the hub. */}
                 <button
                   onClick={sendRematch}
                   disabled={iRequested || !opp}
@@ -527,11 +548,11 @@ export function Clay() {
                 >
                   {iRequested ? "Waiting..." : oppRequested ? "Accept rematch" : "Rematch"}
                 </button>
-              )}
-              <Link href="/" className="flex h-12 items-center justify-center px-3 text-sm text-[var(--color-text-secondary)]">
-                new game
-              </Link>
-            </div>
+                <Link href="/" className="flex h-12 items-center justify-center px-3 text-sm text-[var(--color-text-secondary)]">
+                  new game
+                </Link>
+              </div>
+            )}
             {oppRequested && !iRequested && (
               <p className="text-center text-sm" style={{ color: "var(--color-primary)" }}>
                 {opp?.display_name} wants a rematch.

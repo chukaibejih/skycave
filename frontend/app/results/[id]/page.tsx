@@ -112,20 +112,32 @@ export default function ResultsPage() {
 
           <div className="mt-8 flex flex-col gap-2.5">
             <ShareButton text={text} label="Post to Bluesky" full />
-            <div className="flex items-center justify-center gap-4 pt-1">
+            {/* Two equal secondary actions: replay this game, or head to the
+                hub to pick another. "new game" used to be silent muted text. */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button
                 onClick={() => router.push(`/play/${slug}`)}
                 style={{ borderColor: "#2A2A3A", color: "#F0F0FF" }}
-                className="flex h-12 items-center justify-center rounded-[12px] border px-6 font-[var(--font-body)] text-base"
+                className="flex h-12 items-center justify-center gap-2 rounded-[12px] border font-[var(--font-body)] text-base transition-[filter] active:brightness-95"
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 2v6h6" />
+                  <path d="M3 13a9 9 0 1 0 3-7.7L3 8" />
+                </svg>
                 Play again
               </button>
               <button
                 onClick={() => router.push("/")}
-                style={{ color: "#8888AA" }}
-                className="flex h-12 items-center justify-center px-3 font-[var(--font-body)] text-sm"
+                style={{ borderColor: "#2A2A3A", color: "#F0F0FF" }}
+                className="flex h-12 items-center justify-center gap-2 rounded-[12px] border font-[var(--font-body)] text-base transition-[filter] active:brightness-95"
               >
-                new game
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                New game
               </button>
             </div>
           </div>
