@@ -534,13 +534,13 @@ export function Clay() {
                 </Link>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-4 pt-1">
+              <div className="grid grid-cols-2 gap-2 pt-1">
                 {/* Same room, same opponent - the rematch keeps a 1v1 alive
                     instead of dumping both players back to the hub. */}
                 <button
                   onClick={sendRematch}
                   disabled={iRequested || !opp}
-                  className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base disabled:opacity-60"
+                  className="flex h-12 items-center justify-center rounded-[12px] border text-base disabled:opacity-60"
                   style={{
                     borderColor: oppRequested && !iRequested ? "var(--color-primary)" : "var(--color-border)",
                     color: "var(--color-text-primary)",
@@ -548,8 +548,18 @@ export function Clay() {
                 >
                   {iRequested ? "Waiting..." : oppRequested ? "Accept rematch" : "Rematch"}
                 </button>
-                <Link href="/" className="flex h-12 items-center justify-center px-3 text-sm text-[var(--color-text-secondary)]">
-                  new game
+                <Link
+                  href="/"
+                  className="flex h-12 items-center justify-center gap-2 rounded-[12px] border text-base transition-[filter] active:brightness-95"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                  New game
                 </Link>
               </div>
             )}

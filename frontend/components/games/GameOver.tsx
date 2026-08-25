@@ -140,20 +140,30 @@ export function GameOver({ roomId }: { roomId: string }) {
             {rematchLabel}
           </button>
 
-          <div className="flex items-center justify-center gap-4 pt-1">
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
             <button
               onClick={() => router.push(`/results/${roomId}`)}
-              className="flex h-12 items-center justify-center rounded-[12px] border px-6 text-base"
+              className="flex h-12 items-center justify-center gap-2 rounded-[12px] border text-base transition-[filter] active:brightness-95"
               style={{ borderColor: LINE, color: INK }}
             >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 4v16" />
+                <path d="M4 5h13l-2 4 2 4H4" />
+              </svg>
               Post result
             </button>
             <button
               onClick={() => router.push("/")}
-              className="flex h-12 items-center justify-center px-3 text-sm"
-              style={{ color: MUTED }}
+              className="flex h-12 items-center justify-center gap-2 rounded-[12px] border text-base transition-[filter] active:brightness-95"
+              style={{ borderColor: LINE, color: INK }}
             >
-              new game
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+              New game
             </button>
           </div>
         </div>
