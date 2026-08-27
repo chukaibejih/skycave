@@ -21,19 +21,23 @@ export function announcerConfigured(): boolean {
 // whole community into their notifications (the Blacksky community's request).
 // RichText.detectFacets turns all of these into real hashtag/mention facets.
 const SKYCAVE = "#skycave";
+// The 🎮 emoji lands our posts in the Bluesky "Video Games" feed, which curates
+// on that emoji. Rides along with #skycave on every first-party post.
+const FEED = "🎮";
 const COMMUNITY = "#blacksky #blackskygamers";
 // A Bluesky mention is @handle with at least one dot (name.bsky.social,
 // name.blacksky.app). "skycave.space/..." has no leading @, so it never matches.
 const MENTIONS_PLAYER = /@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9.-]+/i;
 function withTags(text: string): string {
   // No player tagged -> add the community tags; otherwise just Skycave's tag.
+  // The feed emoji rides along in both cases.
   const full = MENTIONS_PLAYER.test(text)
-    ? `${text}\n\n${SKYCAVE}`
-    : `${text}\n\n${SKYCAVE} ${COMMUNITY}`;
+    ? `${text}\n\n${SKYCAVE} ${FEED}`
+    : `${text}\n\n${SKYCAVE} ${FEED} ${COMMUNITY}`;
   // Array.from counts by code point (emoji = 1), conservative vs graphemes.
   if (Array.from(full).length <= 300) return full;
-  // Community tags pushed it over the 300 ceiling: keep at least #skycave.
-  const minimal = `${text}\n\n${SKYCAVE}`;
+  // Community tags pushed it over the 300 ceiling: keep #skycave + the emoji.
+  const minimal = `${text}\n\n${SKYCAVE} ${FEED}`;
   return Array.from(minimal).length <= 300 ? minimal : text;
 }
 
