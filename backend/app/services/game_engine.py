@@ -373,8 +373,116 @@ async def handle_action(
 # so a game like Connect 4 doesn't snap to the score the instant someone wins.
 _TURN_END_HOLD = 2.6
 
+# Rule 1 - inactivity forfeit. In a 1v1 turn game the player on the clock has
+# this long to move; if they don't, they forfeit the game and their opponent
+# wins it. This is what stops a match hanging forever on a player who has gone
+# quiet (a stall or a disconnect on their turn). Solo (vs the AI) is exempt.
+TURN_TIMEOUT = 60.0
 
-async def _send_turn_state(room_id: str, game, state: dict[str, Any]) -> None:
+
+def _arm_move_timer(room: dict[str, Any], gs: dict[str, Any]) -> float | None:
+    """Put the player whose turn it is on the clock (1v1 turn games only).
+
+    Bumps a move sequence so a fire from a previous turn is ignored, sets the
+    deadline for the client countdown, and schedules the forfeit. Returns the
+    deadline epoch (or None when no clock applies: solo/AI or no active turn).
+    Runs under the room lock; the caller saves the room.
+    """
+    if room.get("mode") != "versus" or gs.get("turn_ai"):
+        gs["turn_ends_at"] = None
+        return None
+    state = gs.get("turn_state") or {}
+    cur = state.get("turn")
+    if cur is None:
+        gs["turn_ends_at"] = None
+        return None
+    gs["move_seq"] = int(gs.get("move_seq", 0)) + 1
+    seq = gs["move_seq"]
+    deadline = time.time() + TURN_TIMEOUT
+    gs["turn_ends_at"] = deadline
+    room_id = room["id"]
+    _schedule(room_id, TURN_TIMEOUT, lambda: _turn_timeout(room_id, cur, seq))
+    return deadline
+
+
+async def _turn_timeout(room_id: str, player_id: str, seq: int) -> None:
+    """The player on the clock ran out of time: forfeit the game to the opponent.
+
+    Guarded on the move sequence and the current turn, so a move landing just
+    before the deadline (or a bonus move that came back to the same player)
+    cancels this cleanly instead of forfeiting an active player.
+    """
+    winner = None
+    async with rooms.room_lock(room_id):
+        room = await rooms.get_room(room_id)
+        if room is None or room.get("game") is None:
+            return
+        gs = room["game"]
+        if gs.get("phase") != "active" or int(gs.get("move_seq", -1)) != seq:
+            return  # a move happened; this timer is stale
+        state = gs.get("turn_state") or {}
+        if state.get("turn") != player_id:
+            return  # no longer their turn
+        others = [p["id"] for p in room["players"] if p["id"] != player_id]
+        winner = others[0] if others else None
+        gs["winner_override"] = winner  # forfeit: opponent takes the game
+        gs["forfeit_by"] = player_id
+        gs["turn_ends_at"] = None
+        await rooms.save_room(room)
+        logger.info(
+            "room %s: %s ran out of time on their turn -> forfeit, winner=%s",
+            room_id, player_id, winner,
+        )
+    await end_game(room_id)
+
+
+# Rule 2 - showing up beats absence. In a competitive leg (tournament/series),
+# once one player has readied we do not wait forever for the other: after this
+# grace the game starts anyway, and the move clock (Rule 1) then forfeits an
+# opponent who never actually shows to play. Casual 1v1 has no such clock.
+READY_TIMEOUT = 75.0
+
+
+async def arm_ready_timeout(room_id: str) -> None:
+    """Called when a player readies. If this is a competitive leg with both
+    players present but not both ready, start a grace timer; when it fires the
+    game auto-starts so a no-show opponent forfeits by the move clock."""
+    async with rooms.room_lock(room_id):
+        room = await rooms.get_room(room_id)
+        if room is None or room.get("status") != "waiting":
+            return
+        if room.get("mode") != "versus":
+            return
+        if not (room.get("tournament") or room.get("series_match")):
+            return  # only competitive legs; casual 1v1 can wait as long as it likes
+        players = room["players"]
+        if len(players) < 2 or all(p["ready"] for p in players):
+            return
+        if not any(p["ready"] for p in players):
+            return
+    _schedule(room_id, READY_TIMEOUT, lambda: _ready_timeout_start(room_id))
+
+
+async def _ready_timeout_start(room_id: str) -> None:
+    async with rooms.room_lock(room_id):
+        room = await rooms.get_room(room_id)
+        if room is None or room.get("status") != "waiting":
+            return
+        players = room["players"]
+        if len(players) < 2 or all(p["ready"] for p in players):
+            return  # both readied in time; normal start handles it
+        if not any(p["ready"] for p in players):
+            return  # nobody ever readied; leave it to the round deadline
+        logger.info(
+            "room %s: ready grace elapsed -> auto-start; a no-show opponent will "
+            "forfeit on the move clock (Rule 2)", room_id,
+        )
+    await start_game(room_id)
+
+
+async def _send_turn_state(
+    room_id: str, game, state: dict[str, Any], turn_ends_at: float | None = None
+) -> None:
     """Push a turn-based board out: shared view to the room, private view to each.
 
     Games like Connect 4 hide nothing, so this is just the broadcast. Uno deals
@@ -391,9 +499,12 @@ async def _send_turn_state(room_id: str, game, state: dict[str, Any]) -> None:
         private = game.turn_private(state, pid)
         if private is not None:
             await manager.send(room_id, pid, events.message(events.GAME_PRIVATE, private))
-    await manager.broadcast(
-        room_id, events.message(events.GAME_STATE, game.turn_public(state))
-    )
+    public = game.turn_public(state)
+    if turn_ends_at is not None:
+        # The move clock (Rule 1), so the client can show a countdown on the
+        # player who is on the clock.
+        public = {**public, "turn_ends_at": turn_ends_at}
+    await manager.broadcast(room_id, events.message(events.GAME_STATE, public))
 
 
 async def _turn_begin(room_id: str) -> None:
@@ -407,10 +518,12 @@ async def _turn_begin(room_id: str) -> None:
             return
         gs = room["game"]
         gs["phase"] = "active"
-        await rooms.save_room(room)
         state = gs["turn_state"]
         ai = gs.get("turn_ai")
-    await _send_turn_state(room_id, game, state)
+        # Put the opening player on the move clock (1v1 only); sets turn_ends_at.
+        deadline = _arm_move_timer(room, gs)
+        await rooms.save_room(room)
+    await _send_turn_state(room_id, game, state, deadline)
     # The opening board can already belong to the AI: Uno's first card up can be
     # a skip, reverse or draw-two, which skips the human. Every earlier turn game
     # started with the human, so the AI was only ever kicked off by a human move
@@ -438,9 +551,17 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
         )
         return False
     gs["turn_state"] = new
+    over = game.turn_over(new)
+    next_ai = bool(gs.get("turn_ai")) and new["turn"] == gs.get("turn_ai")
+    # Move made in time: re-arm the clock for the next human turn (this also
+    # cancels the mover's own timer). Clear it when the game is over or the AI
+    # is next.
+    deadline = _arm_move_timer(room, gs) if not over and not next_ai else None
+    if over or next_ai:
+        gs["turn_ends_at"] = None
     await rooms.save_room(room)
-    await _send_turn_state(room_id, game, new)
-    if game.turn_over(new):
+    await _send_turn_state(room_id, game, new, deadline)
+    if over:
         # Hold on the finished board before the score screen (see _TURN_END_HOLD).
         # apply_turn already rejects further moves once there's a winner/full board.
         _schedule(room_id, _TURN_END_HOLD, lambda: end_game(room_id))
@@ -449,7 +570,7 @@ async def _turn_action(room: dict[str, Any], game, player_id: str, action: dict)
     # settles first. The client also queues board updates, so even a long sow is
     # never cut off; this delay just spaces the Caver's reply so it reads as a
     # separate, deliberate turn rather than landing on top of yours.
-    if gs.get("turn_ai") and new["turn"] == gs["turn_ai"]:
+    if next_ai:
         _schedule(room_id, 1.1, lambda: _turn_ai_move(room_id))
     return False
 
@@ -819,6 +940,11 @@ async def end_game(room_id: str) -> None:
         # Running series tally across rematches in this room (versus only). A draw
         # advances nobody. Persisted on the room so a rejoin/reconnect sees it.
         winner_id = None if is_solo else _decide_winner(scores)
+        # Rule 1: a forfeit (opponent ran out of time on their turn) overrides the
+        # board tally - the game is awarded to the player who was still there.
+        override = gs.get("winner_override")
+        if not is_solo and override is not None:
+            winner_id = override
         gs["winner_id"] = winner_id  # so a ROOM_STATE rehydrate keeps the result
         if winner_id:
             series = room.setdefault("series", {})

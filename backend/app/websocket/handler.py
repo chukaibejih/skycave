@@ -203,6 +203,9 @@ async def _handle_ready(room_id: str, player_id: str) -> None:
         and room["status"] == "waiting"
     ):
         await game_engine.start_game(room_id)
+    else:
+        # Rule 2: a competitive leg won't wait forever for a no-show opponent.
+        await game_engine.arm_ready_timeout(room_id)
 
 
 async def _handle_rematch(room_id: str, player_id: str) -> None:
