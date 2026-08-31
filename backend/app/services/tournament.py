@@ -525,7 +525,9 @@ async def sync_fixtures(
         m.status = _match_status(fx, m.opens_at, now, m.status)
 
     champ = eng.champion(fixtures)
-    if champ and t.status != FINISHED:
+    # Finish when the final has a result - a real champion, or a vacated final
+    # (a double no-show, where champ is None and the title is left empty).
+    if eng.final_decided(fixtures) and t.status != FINISHED:
         t.champion_did = champ
         t.status = FINISHED
 
@@ -682,7 +684,9 @@ async def _queue_progress(
             continue
         results = []
         for f in in_round:
-            if not f.winner:
+            # Skip undecided fixtures and void (walkover) ones - a no-contest has
+            # no "winner beat loser" line to post.
+            if not f.winner or f.winner == eng.WALKOVER:
                 continue
             loser = f.p2 if f.winner == f.p1 else f.p1
             w1, w2 = f.wins()
@@ -1051,42 +1055,51 @@ async def apply_forfeits(db: AsyncSession, t: Tournament) -> bool:
     # feeding it is decided, so a single sweep can only ever settle the earliest
     # unresolved round. If the whole weekend has gone by, every round is past its
     # deadline and the bracket has to unwind all the way to a champion in one go.
-    for _ in range(eng.MAX_ROUNDS + 1):
-        moved = False
+    for _ in range(eng.MAX_ROUNDS + 2):
+        # Settle any seat fed by a void (no-contest) feeder first: the present
+        # opponent takes it by walkover, no deadline wait.
+        moved = eng.resolve_walkovers(fixtures)
         for m in rows:
             fx = by_key.get((m.round, m.slot))
-            if fx is None or fx.decided() or not (fx.p1 and fx.p2):
+            if fx is None or fx.decided():
+                continue
+            # Only real two-player fixtures get the deadline ladder. A seat that
+            # is None is still pending; a WALKOVER seat is resolve_walkovers'.
+            if not fx.p1 or not fx.p2 or fx.p1 == eng.WALKOVER or fx.p2 == eng.WALKOVER:
                 continue
             deadline = _aware(m.deadline)
             if deadline is None or now < deadline:
                 continue
 
+            # New fairness ladder (playing decides; showing up beats absence;
+            # check-in ORDER decides nothing):
+            #   1. whoever won more games,
+            #   2. the one who showed up when the other didn't,
+            #   3. if both played and tied on wins, total points,
+            #   4. otherwise a true no-contest -> walkover (or a vacated final).
             w1, w2 = fx.wins()
             present = list(m.checked_in or [])
+            played = len(fx.results) > 0
             if w1 != w2:
                 fx.winner = fx.p1 if w1 > w2 else fx.p2
             elif (fx.p1 in present) != (fx.p2 in present):
                 fx.winner = fx.p1 if fx.p1 in present else fx.p2
-            else:
+            elif played and fx.points()[0] != fx.points()[1]:
                 s1, s2 = fx.points()
-                if s1 != s2:
-                    fx.winner = fx.p1 if s1 > s2 else fx.p2
-                elif fx.p1 in present and fx.p2 in present:
-                    # Both showed up but nothing separates them (tied on wins
-                    # and points). Reward whoever checked in first - they were
-                    # ready and waiting - over raw seed. checked_in is appended
-                    # on check-in, so its order is check-in order.
-                    fx.winner = (
-                        fx.p1 if present.index(fx.p1) < present.index(fx.p2) else fx.p2
-                    )
-                else:
-                    # Neither ever appeared; the seat still has to move, so it
-                    # goes to the higher seed, stated up front.
-                    fx.winner = fx.p1
+                fx.winner = fx.p1 if s1 > s2 else fx.p2
+            else:
+                # Nobody played and we cannot separate them by showing up: a
+                # true double no-show. Never the faster check-in, never raw seed.
+                # Non-final -> walkover (advances nobody; the next-round opponent
+                # takes the slot). Final -> the WALKOVER sentinel leaves the title
+                # vacated (champion() returns None).
+                fx.winner = eng.WALKOVER
             moved = True
             logger.info(
-                "tournament %s r%ds%d timed out, awarded to %s",
-                t.id, m.round, m.slot, fx.winner,
+                "tournament %s r%ds%d timed out, awarded to %s (wins=%s present=%s)",
+                t.id, m.round, m.slot,
+                "WALKOVER/void" if fx.winner == eng.WALKOVER else fx.winner,
+                (w1, w2), len(present),
             )
         if not moved:
             break

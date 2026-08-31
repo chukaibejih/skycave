@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import random
+from itertools import combinations
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
 
@@ -39,6 +40,12 @@ GAME_POOL = (
 
 SERIES_LENGTH = 3
 WINS_NEEDED = 2
+
+# A no-contest fixture (a true double no-show past its deadline) advances nobody.
+# We mark its winner with this sentinel so `advance` still propagates it: a seat
+# fed by a void feeder is a *walkover*, so the present opponent wins automatically
+# (see `resolve_walkovers`). In the final, a void winner means no champion.
+WALKOVER = "__walkover__"
 # A drawn game is replayed, but not forever. After this many replays the series
 # falls back to total points, so a fixture can never stall the bracket.
 MAX_REPLAYS = 2
@@ -103,6 +110,77 @@ def draw_series(rng: random.Random, pool: tuple[str, ...] = GAME_POOL) -> list[s
     games is a better test of range, and a repeat would look like a bug.
     """
     return rng.sample(list(pool), k=min(SERIES_LENGTH, len(pool)))
+
+
+def draw_fixture_games(
+    rng: random.Random, fixture_count: int, pool: tuple[str, ...] = GAME_POOL
+) -> list[list[str]]:
+    """Draw a balanced set of lineups for an entire bracket.
+
+    Sampling every fixture independently makes a small bracket look rigged: a
+    game can be omitted while another appears in most matches.  Instead, give
+    every game either ``floor(3 * fixtures / pool)`` or one additional slot,
+    then deal those slots into three-game fixtures.  The exact games receiving
+    the extra slots and the order within a fixture remain random.
+
+    A fixture never repeats a game.  We also avoid a repeated three-game lineup
+    whenever the pool has enough possible combinations to do so (which covers
+    every normal small bracket); the 64-player maximum has 63 fixtures but only
+    56 possible lineups from an eight-game pool, so duplicates are unavoidable
+    at that scale.
+    """
+    if fixture_count < 0:
+        raise ValueError("fixture_count cannot be negative")
+    if fixture_count == 0:
+        return []
+    if len(pool) < SERIES_LENGTH:
+        raise ValueError("the tournament pool needs at least three games")
+
+    slots = fixture_count * SERIES_LENGTH
+    base, extras = divmod(slots, len(pool))
+    counts = {game: base for game in pool}
+    for game in rng.sample(list(pool), extras):
+        counts[game] += 1
+
+    unique_lineups_possible = fixture_count <= math.comb(len(pool), SERIES_LENGTH)
+    # A locally valid choice can paint the final few fixtures into a corner.
+    # Retrying keeps the draw random while guaranteeing the stronger no-repeat
+    # rule whenever the number of possible lineups permits it.
+    for _attempt in range(128):
+        remaining = counts.copy()
+        lineups: list[list[str]] = []
+        used_lineups: set[frozenset[str]] = set()
+        for fixture_index in range(fixture_count):
+            fixtures_left = fixture_count - fixture_index - 1
+            candidates = [
+                combo
+                for combo in combinations(pool, SERIES_LENGTH)
+                if all(remaining[game] > 0 for game in combo)
+                # Each remaining fixture can contain a game at most once.
+                and all(remaining[game] - (game in combo) <= fixtures_left for game in pool)
+                and (not unique_lineups_possible or frozenset(combo) not in used_lineups)
+            ]
+            if not candidates:
+                break
+
+            # Deal plentiful games first, but choose randomly from the best
+            # options so this is still a draw, not a fixed schedule.
+            rng.shuffle(candidates)
+            scores = [sum(remaining[game] for game in combo) for combo in candidates]
+            best = max(scores)
+            best_candidates = [combo for combo, score in zip(candidates, scores) if score == best]
+            selected = rng.choice(best_candidates)
+            for game in selected:
+                remaining[game] -= 1
+            used_lineups.add(frozenset(selected))
+            lineup = list(selected)
+            rng.shuffle(lineup)
+            lineups.append(lineup)
+        else:
+            assert not any(remaining.values())
+            return lineups
+
+    raise RuntimeError("could not deal balanced tournament games")
 
 
 def host_for_game(match_player1: str, match_player2: str | None, game_index: int) -> str:
@@ -189,12 +267,14 @@ def build_bracket(entrant_dids: list[str], rng: random.Random) -> list[Fixture]:
     rng.shuffle(direct)
     rng.shuffle(playin)
 
+    fixture_count = overflow + main_matches + sum(main >> rnd for rnd in range(2, main_rounds + 1))
+    drawn_games = iter(draw_fixture_games(rng, fixture_count))
     fixtures: list[Fixture] = []
 
     # Play-in (round 0): one match per contested seat.
     for j in range(overflow):
         fixtures.append(
-            Fixture(round=0, slot=j, p1=playin[2 * j], p2=playin[2 * j + 1], games=draw_series(rng))
+            Fixture(round=0, slot=j, p1=playin[2 * j], p2=playin[2 * j + 1], games=next(drawn_games))
         )
 
     # Main-draw round 1. Seat index i maps to (slot i//2, p1 if i even else p2).
@@ -208,14 +288,14 @@ def build_bracket(entrant_dids: list[str], rng: random.Random) -> list[Fixture]:
                 slot=slot,
                 p1=seats[2 * slot],
                 p2=seats[2 * slot + 1],
-                games=draw_series(rng),
+                games=next(drawn_games),
             )
         )
 
     # Empty shells for every later main round, with their games already drawn.
     for rnd in range(2, main_rounds + 1):
         for slot in range(main >> rnd):
-            fixtures.append(Fixture(round=rnd, slot=slot, games=draw_series(rng)))
+            fixtures.append(Fixture(round=rnd, slot=slot, games=next(drawn_games)))
 
     return fixtures
 
@@ -315,12 +395,55 @@ def playable(fixtures: list[Fixture]) -> list[Fixture]:
     return [f for f in fixtures if not f.decided() and f.p1 and f.p2]
 
 
+def resolve_walkovers(fixtures: list[Fixture]) -> bool:
+    """Settle any seat fed by a void (no-contest) feeder.
+
+    A double no-show fixture advances a WALKOVER sentinel instead of a player.
+    When it lands in a downstream seat, the *present* opponent takes the match
+    automatically (a walkover) - no games, no waiting for the deadline. If both
+    seats are void, the fixture is itself void and passes the walkover on.
+
+    Returns True if anything changed. Run to a fixed point alongside `advance`.
+    """
+    changed = False
+    for fx in fixtures:
+        if fx.decided():
+            continue
+        p1_void = fx.p1 == WALKOVER
+        p2_void = fx.p2 == WALKOVER
+        if p1_void and p2_void:
+            fx.winner = WALKOVER
+            changed = True
+        elif p1_void and fx.p2:
+            fx.winner = fx.p2
+            changed = True
+        elif p2_void and fx.p1:
+            fx.winner = fx.p1
+            changed = True
+    return changed
+
+
 def champion(fixtures: list[Fixture]) -> str | None:
     if not fixtures:
         return None
     last = max(f.round for f in fixtures)
     final = [f for f in fixtures if f.round == last]
-    return final[0].winner if len(final) == 1 else None
+    if len(final) != 1:
+        return None
+    w = final[0].winner
+    # A vacated final (double no-show) resolves to the WALKOVER sentinel, which
+    # is not a champion - the title is left empty.
+    return w if (w and w != WALKOVER) else None
+
+
+def final_decided(fixtures: list[Fixture]) -> bool:
+    """The final has a result (a real winner OR a vacated no-contest), so the
+    tournament is over even when there is no champion to crown."""
+    if not fixtures:
+        return False
+    last = max(f.round for f in fixtures)
+    final = [f for f in fixtures if f.round == last]
+    return len(final) == 1 and final[0].winner is not None
 
 
 # --------------------------------------------------------------------------- #

@@ -23,6 +23,7 @@ from app.services.tournament_engine import (  # noqa: E402
     bracket_size_for,
     build_bracket,
     champion,
+    draw_fixture_games,
     draw_series,
     host_for_game,
     main_size_for,
@@ -74,6 +75,28 @@ def check_pool():
     s = draw_series(rng)
     assert len(set(s)) == SERIES_LENGTH
     print(f"  {len(GAME_POOL)} games: {', '.join(GAME_POOL)}")
+
+
+def check_balanced_game_draw():
+    """A whole bracket should feel random without visibly starving games."""
+    print("--- balanced game draw ---")
+    for fixtures in range(1, 64):
+        for seed in range(20):
+            lineups = draw_fixture_games(random.Random(seed), fixtures)
+            flat = [game for lineup in lineups for game in lineup]
+            counts = Counter(flat)
+            game_counts = [counts[game] for game in GAME_POOL]
+            assert len(lineups) == fixtures
+            assert all(len(lineup) == SERIES_LENGTH == len(set(lineup)) for lineup in lineups)
+            assert max(game_counts) - min(game_counts) <= 1, (
+                f"{fixtures} fixtures, seed {seed}: uneven counts {counts}"
+            )
+            if fixtures <= 56:  # C(8, 3): every lineup can be different.
+                signatures = [frozenset(lineup) for lineup in lineups]
+                assert len(signatures) == len(set(signatures)), (
+                    f"{fixtures} fixtures, seed {seed}: repeated lineup"
+                )
+    print("  1..63 fixtures: counts differ by at most one; lineups unique through 56 fixtures")
 
 
 def check_schedule():
@@ -234,8 +257,54 @@ def check_sweeps_and_hosting():
     print("  2-0 skips game three; hosting alternates p1/p2/p1")
 
 
+def check_walkovers_and_vacated():
+    """Rule 3: a true double no-show never advances the faster check-in. It is a
+    walkover (the next-round opponent takes the slot), and a no-show final leaves
+    the title vacated."""
+    from app.services.tournament_engine import (
+        Fixture, resolve_walkovers, final_decided, WALKOVER,
+    )
+
+    def semi_bracket():
+        return [
+            Fixture(round=1, slot=0, p1="A", p2="B"),
+            Fixture(round=1, slot=1, p1="C", p2="D"),
+            Fixture(round=2, slot=0),
+        ]
+
+    def settle(fx):
+        for _ in range(10):
+            if not (resolve_walkovers(fx) | advance(fx)):
+                break
+
+    # 1. non-final no-contest -> walkover to the present opponent
+    fx = semi_bracket()
+    fx[0].winner = WALKOVER  # R1S0 void
+    fx[1].winner = "C"
+    settle(fx)
+    assert fx[2].winner == "C", "a void semifinal should hand the final to the present opponent"
+    assert champion(fx) == "C"
+
+    # 2. vacated final: both finalists no-show -> no champion, but it IS over
+    fx = semi_bracket()
+    fx[0].winner, fx[1].winner = "A", "C"
+    settle(fx)
+    fx[2].winner = WALKOVER
+    assert champion(fx) is None, "a vacated final has no champion"
+    assert final_decided(fx) is True, "a vacated final still ends the tournament"
+
+    # 3. normal play still crowns a real champion
+    fx = semi_bracket()
+    fx[0].winner, fx[1].winner = "B", "D"
+    settle(fx)
+    fx[2].winner = "D"
+    assert champion(fx) == "D" and final_decided(fx)
+    print("  double no-show -> walkover; no-show final -> vacated; real play -> real champion")
+
+
 if __name__ == "__main__":
     check_pool()
+    check_balanced_game_draw()
     check_schedule()
     check_powerof2_parity()
     check_playin_shapes()
@@ -243,4 +312,5 @@ if __name__ == "__main__":
     check_sweeps_and_hosting()
     check_full_tournaments()
     check_draws_cannot_stall()
+    check_walkovers_and_vacated()
     print("\nPASS: tournament engine verified (play-in)")

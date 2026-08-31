@@ -125,6 +125,11 @@ async def _serialise(
         )
         for e in people
     }
+    # A no-contest fixture advances a WALKOVER sentinel; render that seat as a
+    # plain "Walkover" so the bracket reads clearly instead of a blank slot.
+    by_did[eng.WALKOVER] = PlayerOut(
+        did=eng.WALKOVER, handle="walkover", display_name="Walkover", avatar_url=None
+    )
     rows = await svc.matches(db, t.id)
     out_matches = [
         MatchOut(
@@ -391,6 +396,9 @@ async def watch_match(
         )
         for e in people
     }
+    by_did[eng.WALKOVER] = PlayerOut(
+        did=eng.WALKOVER, handle="walkover", display_name="Walkover", avatar_url=None
+    )
     w1 = sum(1 for r in (m.results or []) if r.get("winner") == m.player1_did)
     w2 = sum(1 for r in (m.results or []) if r.get("winner") == m.player2_did)
 
