@@ -12,7 +12,9 @@
     "render:playin": "remotion render src/index.ts PlayIn out/skycave-playin.mp4",
     "render:playin:wide": "remotion render src/index.ts PlayInWide out/skycave-playin-wide.mp4",
     "render:spectate": "remotion render src/index.ts Spectate out/skycave-spectate.mp4",
-    "render:spectate:wide": "remotion render src/index.ts SpectateWide out/skycave-spectate-wide.mp4"
+    "render:spectate:wide": "remotion render src/index.ts SpectateWide out/skycave-spectate-wide.mp4",
+    "rules:cards": "remotion still src/index.ts RulesIntro out/skycave-rules-1-intro.png --frame=80 && remotion still src/index.ts Rule01 out/skycave-rules-2-keep-playing.png --frame=80 && remotion still src/index.ts Rule02 out/skycave-rules-3-show-up.png --frame=80 && remotion still src/index.ts Rule03 out/skycave-rules-4-checkin-order.png --frame=80 && remotion still src/index.ts Rule04 out/skycave-rules-5-no-show.png --frame=80",
+    "rules:clock": "remotion render src/index.ts Rule01 out/skycave-rules-keep-playing.mp4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.239",

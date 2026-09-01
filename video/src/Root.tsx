@@ -7,6 +7,7 @@ import { PlayIn, PLAYIN_FRAMES } from "./PlayIn";
 import { Spectate, SPECTATE_FRAMES } from "./Spectate";
 import { SpectateThumb } from "./Thumbnail";
 import { CupCard } from "./CupCard";
+import { RulesIntro, Rule01, Rule02, Rule03, Rule04 } from "./RulesCards";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -95,5 +96,14 @@ export const RemotionRoot: React.FC = () => (
         registration countdown. Landscape 16:9 + square for Bluesky. */}
     <Composition id="CupCard" component={CupCard} durationInFrames={1} fps={FPS} width={1600} height={900} />
     <Composition id="CupCardSquare" component={CupCard} durationInFrames={1} fps={FPS} width={1200} height={1200} />
+
+    {/* Tournament rules announcement, a 5-card set (square 1080). Stable Skycave
+        brand (not the weekly skin): dark ground, gold accent, faint bracket.
+        Card 01 ticks the 120s move clock down as a timelapse. */}
+    <Composition id="RulesIntro" component={RulesIntro} durationInFrames={90} fps={FPS} width={1080} height={1080} />
+    <Composition id="Rule01" component={Rule01} durationInFrames={130} fps={FPS} width={1080} height={1080} />
+    <Composition id="Rule02" component={Rule02} durationInFrames={110} fps={FPS} width={1080} height={1080} />
+    <Composition id="Rule03" component={Rule03} durationInFrames={110} fps={FPS} width={1080} height={1080} />
+    <Composition id="Rule04" component={Rule04} durationInFrames={110} fps={FPS} width={1080} height={1080} />
   </>
 );
