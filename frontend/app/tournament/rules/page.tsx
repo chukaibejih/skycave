@@ -70,11 +70,12 @@ export default function RulebookPage() {
           hour before it opens, so you are never caught out.
         </Rule>
 
-        <Rule n="5" title="Check in, do not race">
-          There is no exact kickoff second to hit. Check in any time inside your
-          round&apos;s window; the room opens by itself once both of you have.
-          Never check in, and past the deadline the fixture goes to whoever did.
-          That punishes ghosting without punishing being in the wrong timezone.
+        <Rule n="5" title="Show up, not just check in">
+          Checking in only confirms that you intend to play. It does not
+          guarantee that you will advance. If your opponent does not show up, or
+          does not get ready to play within the time, you receive the win, even
+          if they were the one due to make the first move. What matters is being
+          present and ready to play, not whether you managed to make a move.
         </Rule>
 
         <Rule n="6" title="Best of three">
@@ -95,10 +96,19 @@ export default function RulebookPage() {
           nobody holds the host seat the whole way.
         </Rule>
 
-        <Rule n="9" title="How a fixture is decided">
+        <Rule n="9" title="Stay active, or you forfeit">
+          Once a game has started, you are expected to stay active and take your
+          turns within the time allowed. If it is your turn and you do not make a
+          move before the timer runs out, you may forfeit that game. If you
+          disconnect, you have a short window to return before it is forfeited.
+          This keeps a whole match from being held up because one player has
+          stopped playing.
+        </Rule>
+
+        <Rule n="10" title="How a fixture is decided">
           <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            Most fixtures end on the board: first to two game wins takes it. Two
-            situations need a written rule.
+            Most fixtures end on the board: first to two game wins takes it. When
+            they do not, here is how the seat is settled.
           </p>
           <p className="mt-3 text-sm font-semibold text-[var(--color-text-primary)]">
             If the series runs out of games
@@ -112,19 +122,33 @@ export default function RulebookPage() {
             If the deadline arrives with the fixture still open
           </p>
           <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            The window is the referee. The seat is awarded by the first of these
-            that separates the two players:
+            The seat is awarded by the first of these that separates the two
+            players:
           </p>
           <ol className="mt-2 space-y-1.5 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            <Step n={1}>Whoever is ahead in the series.</Step>
-            <Step n={2}>If the series is level, whoever checked in when the other did not.</Step>
-            <Step n={3}>If that does not settle it, whoever scored more total points.</Step>
-            <Step n={4}>If still level and both showed up, whoever checked in first. Turning up early beats seeding.</Step>
-            <Step n={5}>Only if neither player ever checked in, the higher seed, which is the earlier registrant.</Step>
+            <Step n={1}>Whoever won more games.</Step>
+            <Step n={2}>Whoever showed up and got ready to play when the other did not.</Step>
+            <Step n={3}>If both played, whoever scored more total points.</Step>
           </ol>
+          <p className="mt-3 text-sm font-semibold text-[var(--color-text-primary)]">
+            Check-in order never decides a match
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+            Being the first to check in gives you no advantage. Fixtures are
+            settled by games played and legitimate forfeits, never by who clicked
+            &ldquo;check in&rdquo; first.
+          </p>
+          <p className="mt-3 text-sm font-semibold text-[var(--color-text-primary)]">
+            If neither player shows up to play
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+            The match is a no-contest. Neither player advances, and the
+            next-round opponent receives a walkover. If it happens in the final,
+            no champion is crowned.
+          </p>
         </Rule>
 
-        <Rule n="10" title="The play-in">
+        <Rule n="11" title="The play-in">
           When the field is not a clean bracket size, the last players to register
           play a play-in: a quick qualifier for the final main-draw seats, held
           before Round 1. Win it and you are in; lose it and that is your run.
@@ -132,7 +156,7 @@ export default function RulebookPage() {
           there are no byes, and a real reason to enter early.
         </Rule>
 
-        <Rule n="11" title="Keep it good-natured">
+        <Rule n="12" title="Keep it good-natured">
           Play hard, stay kind: everyone in the draw is a real person, and this
           is a small room. To reach an opponent, use the nudge, which posts a
           friendly poke to them from your own account. Keep the back and forth on
