@@ -2,6 +2,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { ScoreHeader } from "./ScoreHeader";
+import { TurnClock } from "./TurnClock";
 import { FeedbackFlash } from "./Feedback";
 import { useAuth, useRoom } from "@/lib/store";
 
@@ -56,12 +57,21 @@ export function GameShell() {
   // ScoreHeader flow. Pick the board component by game type.
   if (game.mode === "turn_based") {
     const boardProps = { board: boardState, meId, players: room.players, onAction: act, spectator: isSpectator };
-    if (game.game_type === "connect4") return <Connect4 {...boardProps} />;
-    if (game.game_type === "dots_boxes") return <DotsAndBoxes {...boardProps} />;
-    if (game.game_type === "uno") return <Uno {...boardProps} />;
-    if (game.game_type === "mancala") return <Mancala {...boardProps} />;
-    if (game.game_type === "crossing") return <Crossing {...boardProps} />;
-    return <TileTakeover {...boardProps} />;
+    const board =
+      game.game_type === "connect4" ? <Connect4 {...boardProps} /> :
+      game.game_type === "dots_boxes" ? <DotsAndBoxes {...boardProps} /> :
+      game.game_type === "uno" ? <Uno {...boardProps} /> :
+      game.game_type === "mancala" ? <Mancala {...boardProps} /> :
+      game.game_type === "crossing" ? <Crossing {...boardProps} /> :
+      <TileTakeover {...boardProps} />;
+    // The move clock rides above every turn game (Rule 1). Spectators don't need
+    // the pressure cue, so it's players-only.
+    return (
+      <>
+        {!isSpectator && <TurnClock board={boardState} meId={meId} players={room.players} />}
+        {board}
+      </>
+    );
   }
 
   const phase = game.phase;

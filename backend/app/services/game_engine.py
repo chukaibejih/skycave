@@ -377,7 +377,7 @@ _TURN_END_HOLD = 2.6
 # this long to move; if they don't, they forfeit the game and their opponent
 # wins it. This is what stops a match hanging forever on a player who has gone
 # quiet (a stall or a disconnect on their turn). Solo (vs the AI) is exempt.
-TURN_TIMEOUT = 60.0
+TURN_TIMEOUT = 120.0
 
 
 def _arm_move_timer(room: dict[str, Any], gs: dict[str, Any]) -> float | None:

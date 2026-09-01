@@ -97,6 +97,9 @@ export interface BoardState {
   owner: (string | null)[];
   order: string[];
   turn: string;
+  // Epoch seconds the current player must move by (Rule 1 move clock), or null
+  // when no clock applies (solo, or a casual game not on the clock).
+  turn_ends_at?: number | null;
   scores: Record<string, number>;
   // Tile Takeover only (present on tile_takeover boards).
   ncolors: number;
