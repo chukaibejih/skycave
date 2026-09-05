@@ -8,6 +8,7 @@ import { Spectate, SPECTATE_FRAMES } from "./Spectate";
 import { SpectateThumb } from "./Thumbnail";
 import { CupCard } from "./CupCard";
 import { RulesIntro, Rule01, Rule02, Rule03, Rule04 } from "./RulesCards";
+import { TournamentPoolUpdateCard } from "./TournamentPoolUpdateCard";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -105,5 +106,9 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="Rule02" component={Rule02} durationInFrames={110} fps={FPS} width={1080} height={1080} />
     <Composition id="Rule03" component={Rule03} durationInFrames={110} fps={FPS} width={1080} height={1080} />
     <Composition id="Rule04" component={Rule04} durationInFrames={110} fps={FPS} width={1080} height={1080} />
+
+    {/* Single post: Color Clash enters the next tournament pool; Dots and
+        Boxes leaves it. Render a still for the announcement account. */}
+    <Composition id="TournamentPoolUpdateCard" component={TournamentPoolUpdateCard} durationInFrames={90} fps={FPS} width={1080} height={1080} />
   </>
 );

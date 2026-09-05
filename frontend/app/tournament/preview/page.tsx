@@ -1,6 +1,7 @@
 "use client";
 import { TournamentBanner } from "@/components/tournament/TournamentBanner";
 import { TournamentHero } from "@/components/tournament/TournamentHero";
+import { MoveClockNotice, RulesNotice } from "@/components/tournament/RulesNotice";
 import type { Tournament, TournamentMatch, TournamentPlayer } from "@/lib/api";
 
 /**
@@ -112,6 +113,24 @@ export default function TournamentThemePreview() {
             <TournamentBanner preview={s.t} />
           </div>
         ))}
+      </div>
+
+      <div className="mt-10">
+        <RulesNotice />
+      </div>
+
+      <div className="mt-8">
+        <p className="mb-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+          Bracket reminder
+        </p>
+        <RulesNotice compact />
+      </div>
+
+      <div className="mt-8">
+        <p className="mb-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-text-secondary)]">
+          Fixture reminder
+        </p>
+        <MoveClockNotice />
       </div>
 
       <h1 className="mt-14 font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)]">

@@ -30,6 +30,14 @@ export const GameGlyph: React.FC<{ type: string; color: string }> = ({
           {[7, 17].map((x) => [7, 17].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" fill={color} stroke="none" />))}
         </svg>
       );
+    case "freeze":
+      return (
+        <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round">
+          <path d="M4 12h16" strokeOpacity="0.38" />
+          <path d="M12 6v12" strokeDasharray="2 2" />
+          <circle cx="16" cy="12" r="3" fill={color} fillOpacity="0.3" />
+        </svg>
+      );
     case "connect4":
       return (
         <svg width="34" height="34" viewBox="0 0 24 24" stroke={color} strokeWidth={1.8} fill="none">

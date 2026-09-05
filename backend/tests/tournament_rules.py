@@ -69,6 +69,8 @@ def play_out(fixtures, rng, draw_rate=0.0):
 def check_pool():
     print("--- game pool ---")
     assert "uno" in GAME_POOL, "Uno was decided IN the pool"
+    assert "color_clash" in GAME_POOL, "Color Clash should be in the next cup's pool"
+    assert "dots_boxes" not in GAME_POOL, "Dots and Boxes was substituted out"
     for excluded in ("geoguess", "flag_rush", "outline_quiz", "reaction_grid", "mad_math"):
         assert excluded not in GAME_POOL, f"{excluded} must not be in the pool"
     rng = random.Random(1)

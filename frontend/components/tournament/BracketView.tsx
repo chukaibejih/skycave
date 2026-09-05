@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { BackButton } from "@/components/nav/BackButton";
 import { Countdown, LocalTime } from "@/components/tournament/Countdown";
+import { RulesNotice } from "@/components/tournament/RulesNotice";
 import {
   getTournament,
   getMyMatch,
@@ -126,6 +127,8 @@ export function BracketView({ id }: { id: string }) {
         }
       `}</style>
       <Header t={t} />
+
+      <RulesNotice compact />
 
       {t.status !== "finished" && <PlayStrip t={t} />}
 

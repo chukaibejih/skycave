@@ -25,8 +25,9 @@ from datetime import datetime, time, timedelta, timezone
 
 # The pool for tournament fixtures. GeoGuess, Flag Rush and Outline Quiz are out
 # for the first event; Reaction Grid and Mad Math are out until they have been
-# played head to head at all (they have zero 1v1 games ever). Color Clash was
-# subbed out for Freeze (total-accuracy + shared marker) ahead of this cup.
+# played head to head at all (they have zero 1v1 games ever). Freeze stays in
+# the pool for its total-accuracy, shared-marker format; Dots and Boxes makes
+# way for Color Clash for the upcoming cup.
 GAME_POOL = (
     "tile_takeover",
     "connect4",
@@ -34,7 +35,7 @@ GAME_POOL = (
     "freeze",
     "mancala",
     "clay",
-    "dots_boxes",
+    "color_clash",
     "uno",
 )
 

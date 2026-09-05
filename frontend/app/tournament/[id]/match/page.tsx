@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { Countdown } from "@/components/tournament/Countdown";
 import { ChampionMoment } from "@/components/tournament/ChampionMoment";
+import { MoveClockNotice } from "@/components/tournament/RulesNotice";
 import { BackButton } from "@/components/nav/BackButton";
 import { composeIntentUrl } from "@/lib/bluesky";
 import { TOURNEY } from "@/lib/tournamentStatus";
@@ -202,6 +203,8 @@ export default function MatchPage({ params }: { params: Promise<{ id: string }> 
           )}
         </div>
       </section>
+
+      {!m.is_bye && !m.won_match && !m.eliminated && <MoveClockNotice />}
 
       {/* ── What to do next ────────────────────────────────────────────── */}
       <section className="mt-5">

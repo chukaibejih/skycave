@@ -7,6 +7,7 @@ import { BlueskyLogo } from "@/components/ui/BlueskyLogo";
 import { LocalTime } from "@/components/tournament/Countdown";
 import { TournamentShell } from "@/components/tournament/TournamentShell";
 import { TournamentHero } from "@/components/tournament/TournamentHero";
+import { RulesNotice } from "@/components/tournament/RulesNotice";
 import { AuthModal } from "@/components/ui/AuthModal";
 import { GameGlyph, GAME_ACCENT } from "@/components/games/gameVisual";
 import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
@@ -124,6 +125,7 @@ export default function TournamentPage() {
   return (
     <TournamentShell active="now">
       <TournamentHero t={t} />
+      <RulesNotice />
 
       <AnimatePresence mode="wait">
         {t.you_registered && t.you ? (
