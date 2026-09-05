@@ -480,6 +480,12 @@ function FinishedView({
         >
           <SwordsSvg size={16} /> <span>Start Another Series</span>
         </button>
+        <Link
+          href="/"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl font-[var(--font-display)] text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <span aria-hidden>←</span> <span>Back to home</span>
+        </Link>
       </div>
     </motion.div>
   );

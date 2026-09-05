@@ -39,6 +39,7 @@ async def main():
         dry = await internal.rotate_tournament(x_internal_secret="test-secret", dry_run=True, db=s)
         assert dry["status"] == "dry_run", f"Unexpected status: {dry}"
         assert "would_create" in dry and "announcement_text" in dry, dry
+        assert dry["would_create"]["max_players"] == 16, dry
         print("✓ dry run returns proposed creation details without persisting")
 
         # 3. Execution - creates tournament
@@ -53,6 +54,7 @@ async def main():
         assert t_db is not None
         assert t_db.name == "Skycave Weekend Tournament"
         assert t_db.status == "registering"
+        assert t_db.max_players == 16
         print("✓ tournament correctly persisted in DB")
 
         # 4. Idempotency - returns already_exists on subsequent run
