@@ -153,7 +153,7 @@ def compose_roundup(
         return _fit(body + tail), featured
 
     # --- Busy day: a short recap (Option A) ---
-    lines: list[str] = ["YESTERDAY IN THE CAVE \U0001f3ae"]  # 🎮
+    lines: list[str] = ["YESTERDAY IN THE CAVE"]
     body_lines: list[str] = []
 
     if lead:

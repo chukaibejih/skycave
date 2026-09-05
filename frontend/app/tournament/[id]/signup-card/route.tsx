@@ -14,7 +14,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
  * Bluesky feed rather than getting letterboxed.
  *
  * The scene and every colour come from `TOURNEY` (lib/tournamentStatus), so a
- * weekly skin swap re-themes this card with zero changes here: swap the palette,
+ * tournament skin swap re-themes this card with zero changes here: swap the palette,
  * the announcement card follows. The countdown is computed from the tournament's
  * real registration-close time, in Pacific, at render (post) time.
  */
@@ -52,22 +52,19 @@ export async function GET(
   }
   const c = closeParts(closesAt);
 
-  // Perspective grid: verticals fan from a vanishing point at the horizon, a few
-  // horizontals bunch as they recede. Drawn once as SVG so it stays crisp.
-  const GRID_TOP = 760; // where the grid (and horizon) sit
-  const grid = (
+  // The same layered canopy as the live entry points, enlarged for the square
+  // feed card. SVG keeps leaf silhouettes and light shafts crisp at 1200px.
+  const jungle = (
     <svg
       width="1200"
-      height={1200 - GRID_TOP}
-      viewBox={`0 0 1200 ${1200 - GRID_TOP}`}
-      style={{ position: "absolute", left: 0, top: GRID_TOP, display: "flex" }}
+      height="1200"
+      viewBox="0 0 1200 1200"
+      style={{ position: "absolute", left: 0, top: 0, display: "flex" }}
     >
-      {[-900, -520, -260, -90, 90, 260, 520, 900, 1400, -400, 1600].map((x, i) => (
-        <line key={i} x1="600" y1="0" x2={x + 600} y2={440} stroke={TOURNEY.grid} strokeOpacity="0.45" strokeWidth="2" />
-      ))}
-      {[10, 48, 104, 190, 320, 440].map((y, i) => (
-        <line key={`h${i}`} x1="0" y1={y} x2="1200" y2={y} stroke={TOURNEY.grid} strokeOpacity="0.4" strokeWidth="2" />
-      ))}
+      <path d="M0 0H1200V270C1050 208 958 298 797 228C640 159 514 288 356 221C196 153 91 245 0 317Z" fill={TOURNEY.leafDeep} />
+      <path d="M0 165C126 57 242 148 321 262C192 310 80 320 0 366ZM1200 158C1073 53 953 150 871 266C999 313 1102 319 1200 370Z" fill={TOURNEY.leaf} />
+      <path d="M110 0L350 1200H480L373 0ZM724 0L932 1200H1060L970 0Z" fill={TOURNEY.shaft} opacity="0.10" />
+      <path d="M0 955C212 868 365 1009 556 926C750 841 1002 1008 1200 893V1200H0Z" fill={TOURNEY.ground} opacity="0.72" />
     </svg>
   );
 
@@ -85,79 +82,19 @@ export async function GET(
           overflow: "hidden",
         }}
       >
-        {/* star specks */}
-        {[[140, 120], [1050, 90], [880, 220], [300, 260], [1120, 320], [60, 360], [520, 90], [980, 430]].map(
-          ([x, y], i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                left: x,
-                top: y,
-                width: i % 3 === 0 ? 6 : 4,
-                height: i % 3 === 0 ? 6 : 4,
-                borderRadius: 6,
-                background: "#ffffff",
-                opacity: 0.8,
-                display: "flex",
-              }}
-            />
-          )
-        )}
-
-        {/* the banded retro sun, sitting on the horizon and clear of the copy */}
-        <div
-          style={{
-            position: "absolute",
-            left: 545,
-            top: 540,
-            width: 360,
-            height: 360,
-            borderRadius: 360,
-            background: `radial-gradient(circle, ${TOURNEY.sunCore} 0%, ${TOURNEY.sunTop} 44%, ${TOURNEY.sun} 72%, rgba(255,47,135,0) 82%)`,
-            display: "flex",
-          }}
-        />
-        {[700, 720, 738, 753].map((y, i) => (
-          <div
-            key={`band${i}`}
-            style={{
-              position: "absolute",
-              left: 580,
-              top: y,
-              width: 290,
-              height: 9 - i,
-              background: TOURNEY.sky,
-              opacity: 0.92,
-              display: "flex",
-            }}
-          />
-        ))}
-
-        {/* the glowing horizon line */}
+        {jungle}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
-            top: GRID_TOP - 3,
-            height: 6,
-            background: TOURNEY.horizon,
+            bottom: 0,
+            height: 300,
+            background: `linear-gradient(180deg, transparent 0%, ${TOURNEY.mist} 100%)`,
+            opacity: 0.16,
             display: "flex",
           }}
         />
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: GRID_TOP - 60,
-            height: 60,
-            background: `linear-gradient(180deg, rgba(255,79,216,0) 0%, rgba(255,79,216,0.28) 100%)`,
-            display: "flex",
-          }}
-        />
-        {grid}
 
         {/* content */}
         <div

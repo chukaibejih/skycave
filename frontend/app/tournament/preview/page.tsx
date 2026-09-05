@@ -98,7 +98,7 @@ export default function TournamentThemePreview() {
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-lg px-4 pb-16 pt-6">
       <h1 className="font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)]">
-        Tournament card · ocean / beach
+        Tournament card · tropical jungle
       </h1>
       <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
         Preview only. The card as it reads on the hub, in each state.
@@ -115,7 +115,7 @@ export default function TournamentThemePreview() {
       </div>
 
       <h1 className="mt-14 font-[var(--font-display)] text-xl font-bold text-[var(--color-text-primary)]">
-        &ldquo;This weekend&rdquo; hero · ocean / beach
+        &ldquo;This weekend&rdquo; hero · tropical jungle
       </h1>
       <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
         The centrepiece of the tournament page, in each state.

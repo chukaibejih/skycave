@@ -5,10 +5,9 @@ import { statusMeta, TOURNEY } from "@/lib/tournamentStatus";
 import type { Tournament } from "@/lib/api";
 
 /**
- * The centrepiece of the "This weekend" page, themed as the synthwave night the
- * hub card introduces: a deep-purple sky with a banded retro sun on a neon
- * horizon holds the title and status in light ink, and the countdown sits in a
- * dark glass panel below. So the world stays one place from the hub card inward.
+ * The centrepiece of the "This weekend" page, themed as the tropical jungle the
+ * hub card introduces: an emerald canopy, gold light shafts and low mist hold
+ * the title and status in light ink.
  */
 export function TournamentHero({ t }: { t: Tournament }) {
   const s = statusMeta(t);
@@ -17,27 +16,15 @@ export function TournamentHero({ t }: { t: Tournament }) {
   return (
     <div
       className="relative overflow-hidden rounded-[22px] border border-white/15 text-center"
-      style={{ background: TOURNEY.sky, minHeight: 300, boxShadow: "0 16px 44px rgba(10,2,30,0.5)" }}
+      style={{ background: TOURNEY.sky, minHeight: 300, boxShadow: "0 16px 44px rgba(2,35,18,0.58)" }}
     >
-      {/* A dim setting sun tucked into the corner, low enough to keep the
-          centred copy readable. The bright banded sun lives on the hub card
-          (left-aligned copy there), not under this centred title. */}
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -right-3 h-[100px] w-[100px] rounded-full"
-        style={{
-          bottom: 2,
-          background: `radial-gradient(circle, ${TOURNEY.sunTop} 0%, ${TOURNEY.sun} 58%, rgba(255,47,135,0) 78%)`,
-        }}
-        animate={{ y: [0, -3, 0], opacity: [0.62, 0.78, 0.62] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-      />
-      {/* A soft magenta glow low-left, so the night is never flat. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-10 top-16 h-40 w-40 rounded-full blur-3xl"
-        style={{ background: TOURNEY.accent, opacity: 0.2 }}
-      />
+      <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 400 300" preserveAspectRatio="none">
+        <path d="M0 0H400V84C354 61 326 93 282 72C226 45 186 91 132 69C77 46 35 77 0 101Z" fill={TOURNEY.leafDeep} />
+        <path d="M0 50C42 20 79 51 107 83C65 99 31 103 0 119ZM400 50C358 19 321 51 293 83C335 100 371 102 400 119Z" fill={TOURNEY.leaf} />
+        <path d="M52 0L125 300H173L141 0ZM243 0L301 300H348L324 0Z" fill={TOURNEY.shaft} opacity="0.09" />
+        <path d="M0 258C70 230 122 270 186 244C251 219 333 261 400 234V300H0Z" fill={TOURNEY.ground} opacity="0.72" />
+      </svg>
+      <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28" style={{ background: `linear-gradient(180deg, transparent, ${TOURNEY.mist})`, opacity: 0.18 }} animate={{ x: [-10, 10, -10] }} transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }} />
 
       <div className="relative z-10 px-5 pt-8 pb-6">
         <span
@@ -67,7 +54,7 @@ export function TournamentHero({ t }: { t: Tournament }) {
             className="font-[var(--font-display)] text-2xl font-bold sm:text-3xl"
             style={{
               color: s.phase === "finished" ? "#ffd36b" : TOURNEY.ink,
-              textShadow: "0 1px 10px rgba(10,2,30,0.85)",
+              textShadow: "0 1px 10px rgba(2,35,18,0.85)",
             }}
           >
             {s.label}
@@ -84,7 +71,7 @@ export function TournamentHero({ t }: { t: Tournament }) {
                 {s.countdownCaption}
               </p>
             )}
-            {/* The dark glass panel, so the light clock reads on the night. */}
+            {/* The dark jungle glass panel keeps the light clock readable. */}
             <div
               className="relative mx-auto max-w-max overflow-hidden rounded-[18px] px-4 pt-4 pb-3"
               style={{ background: TOURNEY.panel, border: `1px solid ${TOURNEY.accent}` }}
@@ -96,7 +83,7 @@ export function TournamentHero({ t }: { t: Tournament }) {
             </p>
           </div>
         ) : (
-          <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed" style={{ color: TOURNEY.inkSoft, textShadow: "0 1px 10px rgba(10,2,30,0.85)" }}>
+          <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed" style={{ color: TOURNEY.inkSoft, textShadow: "0 1px 10px rgba(2,35,18,0.85)" }}>
             {s.phase === "finished"
               ? "One weekend, one champion. See the whole run."
               : "Play your rounds before the weekend is out."}
@@ -104,26 +91,6 @@ export function TournamentHero({ t }: { t: Tournament }) {
         )}
       </div>
 
-      {/* The glowing horizon and a cyan perspective grid at the foot. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0"
-        style={{ bottom: 64, height: 2, background: TOURNEY.horizon, boxShadow: `0 0 16px ${TOURNEY.horizon}` }}
-      />
-      <svg
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
-        style={{ height: 64 }}
-        viewBox="0 0 400 64"
-        preserveAspectRatio="none"
-      >
-        {[-300, -150, -70, -25, 25, 70, 150, 300].map((x, i) => (
-          <line key={i} x1="200" y1="0" x2={200 + x} y2="64" stroke={TOURNEY.grid} strokeOpacity="0.32" strokeWidth="1" />
-        ))}
-        {[10, 30, 64].map((y, i) => (
-          <line key={`h${i}`} x1="0" y1={y} x2="400" y2={y} stroke={TOURNEY.grid} strokeOpacity="0.28" strokeWidth="1" />
-        ))}
-      </svg>
     </div>
   );
 }

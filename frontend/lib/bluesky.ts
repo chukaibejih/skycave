@@ -74,9 +74,7 @@ export async function resolveActor(handle: string): Promise<BskyActor | null> {
 // only when they fit under Bluesky's 300-grapheme composer limit, so a long
 // share never lands over the limit (the tag is dropped rather than truncating
 // the player's own text).
-// The 🎮 rides along so shares land in the Bluesky "Video Games" feed (it
-// curates on that emoji), same as first-party posts do via the sidecar.
-export const SHARE_TAGS = "#skycave 🎮";
+export const SHARE_TAGS = "#skycave";
 export function composeIntentUrl(text: string): string {
   const full = `${text}\n\n${SHARE_TAGS}`;
   // Array.from counts by code point (emoji = 1), conservative vs graphemes.

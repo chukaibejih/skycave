@@ -9,9 +9,8 @@ import type { Tournament, TournamentMatch } from "@/lib/api";
 
 /**
  * The tournament's entry point on the hub, rebuilt per season as a scene rather
- * than a card. This week it is a bright beach: a sky with a low sun, a sea with
- * drifting foam, a strip of sand. It shares nothing with the dark championship
- * card of week one on purpose, so the hub feels like a new place each weekend.
+ * than a card. This week it is a tropical jungle: a layered canopy, warm shafts
+ * of light and mist on the forest floor.
  *
  * Everything is driven from TOURNEY, so next week's scene is a palette swap.
  * Pass `preview` to render a specific (mock) tournament for design review.
@@ -23,12 +22,12 @@ import type { Tournament, TournamentMatch } from "@/lib/api";
  * watch (they play it), so the strip is purely additive.
  */
 
-const BASE_SHADOW = "0 16px 44px rgba(4, 48, 63, 0.32)";
-// The final-stretch pulse: a warm coral halo, at home on the bright scene.
+const BASE_SHADOW = "0 16px 44px rgba(2, 35, 18, 0.48)";
+// The final-stretch pulse: a warm coral halo against the dark canopy.
 const CORAL_PULSE = [
-  "0 16px 44px rgba(4,48,63,0.28), 0 0 0px 0px rgba(229,83,61,0)",
-  "0 18px 50px rgba(229,83,61,0.30), 0 0 30px 6px rgba(229,83,61,0.45)",
-  "0 16px 44px rgba(4,48,63,0.28), 0 0 0px 0px rgba(229,83,61,0)",
+  "0 16px 44px rgba(2,35,18,0.48), 0 0 0px 0px rgba(229,83,61,0)",
+  "0 18px 50px rgba(2,35,18,0.58), 0 0 30px 6px rgba(229,83,61,0.45)",
+  "0 16px 44px rgba(2,35,18,0.48), 0 0 0px 0px rgba(229,83,61,0)",
 ];
 const URGENT_MS = 12 * 60 * 60 * 1000;
 
@@ -111,38 +110,21 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
       >
         {/* SCENE — the participant's entrance (whole scene is the primary link). */}
         <Link href={href} className="group relative block" style={{ minHeight: 268, background: TOURNEY.sky }}>
-          {/* The banded retro sun, low on the horizon, with a soft bob. */}
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute right-8 h-[120px] w-[120px] rounded-full"
-            style={{
-              bottom: "30%",
-              background: `radial-gradient(circle, ${TOURNEY.sunCore} 0%, ${TOURNEY.sunTop} 44%, ${TOURNEY.sun} 72%, rgba(255,47,135,0) 82%)`,
-            }}
-            animate={{ y: [0, -4, 0], opacity: [0.9, 1, 0.9] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          />
-
-          {/* The glowing horizon, then the cyan perspective grid below it. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0"
-            style={{ bottom: "34%", height: 2, background: TOURNEY.horizon, boxShadow: `0 0 16px ${TOURNEY.horizon}` }}
-          />
+          {/* Layered canopy and broad leaves frame the entrance without sitting
+              beneath its copy. The gold shafts make the dense scene feel open. */}
           <svg
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
-            style={{ height: "34%" }}
-            viewBox="0 0 400 120"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 400 268"
             preserveAspectRatio="none"
           >
-            {[-360, -200, -100, -40, 40, 100, 200, 360, 560, -560].map((x, i) => (
-              <line key={i} x1="200" y1="0" x2={200 + x} y2="120" stroke={TOURNEY.grid} strokeOpacity="0.4" strokeWidth="1" />
-            ))}
-            {[6, 24, 52, 90, 120].map((y, i) => (
-              <line key={`h${i}`} x1="0" y1={y} x2="400" y2={y} stroke={TOURNEY.grid} strokeOpacity="0.32" strokeWidth="1" />
-            ))}
+            <path d="M0 0H400V72C342 92 314 48 254 69C190 91 142 43 86 72C52 90 23 80 0 94Z" fill={TOURNEY.leafDeep} opacity="0.95" />
+            <path d="M0 42C36 16 73 36 98 61C70 73 34 78 0 91ZM400 37C362 15 328 38 301 65C340 79 372 77 400 94Z" fill={TOURNEY.leaf} />
+            <path d="M4 152C40 118 73 138 95 181C55 187 27 178 4 198ZM396 150C362 117 328 141 307 184C346 190 375 178 396 199Z" fill={TOURNEY.leafDeep} opacity="0.9" />
+            <path d="M95 0L155 268H201L173 0Z" fill={TOURNEY.shaft} opacity="0.10" />
+            <path d="M248 0L298 268H338L324 0Z" fill={TOURNEY.shaft} opacity="0.08" />
           </svg>
+          <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-24" style={{ background: `linear-gradient(180deg, transparent, ${TOURNEY.mist})`, opacity: 0.16 }} animate={{ x: [-8, 8, -8] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} />
 
           <div className="relative z-10 flex min-h-[268px] flex-col p-5 sm:p-6">
             <div className="flex items-center gap-2">
@@ -193,8 +175,8 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
               <motion.span
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="inline-flex h-11 items-center justify-center rounded-[13px] px-5 text-sm font-bold shadow-[0_6px_16px_rgba(4,48,63,0.25)]"
-                style={{ background: urgent ? TOURNEY.coral : TOURNEY.sun, color: "#12042e" }}
+                className="inline-flex h-11 items-center justify-center rounded-[13px] px-5 text-sm font-bold shadow-[0_6px_16px_rgba(2,35,18,0.38)]"
+                style={{ background: urgent ? TOURNEY.coral : TOURNEY.shaft, color: "#06331f" }}
               >
                 {cta}
                 <span aria-hidden className="ml-1.5 transition-transform duration-300 group-hover:translate-x-1">
@@ -239,7 +221,7 @@ export function TournamentBanner({ preview }: { preview?: Tournament } = {}) {
                       </span>
                       <span
                         className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm"
-                        style={{ background: TOURNEY.sun, color: "#12042e" }}
+                        style={{ background: TOURNEY.shaft, color: "#06331f" }}
                       >
                         Watch →
                       </span>

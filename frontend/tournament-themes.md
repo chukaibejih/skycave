@@ -1,13 +1,14 @@
-# Skycave Tournament — Weekly Theme Roadmap
+# Skycave Tournament — Theme Roadmap
 
-The tournament world reskins every weekend so the hub feels like a new place each
-time. This file is the plan, so no one has to invent a palette on a Monday.
+The tournament world reskins for each fortnightly cup so the hub feels like a
+new place each time. This file is the plan, so no one has to invent a palette
+on launch day.
 
 ## How a swap works
 - **One source of truth:** `lib/tournamentStatus.ts` → the `TOURNEY` object. Its
   colours flow through the hub card (`TournamentBanner`), the "This weekend" hero
   (`TournamentHero`), and all the tournament chrome (tabs, buttons, rules page).
-- **Minimum swap (10 min):** replace `TOURNEY` with the week's palette below.
+- **Minimum swap (10 min):** replace `TOURNEY` with the upcoming cup's palette below.
 - **Full overhaul (the good version):** also redraw the *scene* in
   `TournamentBanner` + `TournamentHero` to the week's concept (beach = sky/sun/
   sea/sand; a jungle or a galaxy wants its own shapes). The scene is what makes it
@@ -27,17 +28,17 @@ Text-contrast rule of thumb: on a **bright** scene use the dark `ink`; on a
 | # | Weekend | Theme | One-line vibe |
 |---|---------|-------|----------------|
 | — | Aug 13–16 | **Ocean / Beach** (LIVE) | turquoise water, warm sand, a low sun |
-| 1 | Aug 20–23 | **Neon Arcade** | synthwave night, magenta + cyan grid |
-| 2 | Aug 27–30 | **Tropical Jungle** | emerald canopy, gold light shafts |
-| 3 | Sep 3–6 | **Cosmic Galaxy** | deep space, nebula, a field of stars |
-| 4 | Sep 10–13 | **Blossom Garden** | blush pink, sage, soft and bright |
-| 5 | Sep 17–20 | **Desert Dusk** | terracotta dunes, dusty-rose sky |
-| 6 | Sep 24–27 | **Deep Sea** | dark water, bioluminescent glow |
-| 7 | Oct 1–4 | **Autumn Woods** | amber, rust, gold, falling leaves |
-| 8 | Oct 8–11 | **Vineyard** | deep plum and wine, harvest gold |
-| 9 | Oct 15–18 | **Misty Pines** | slate-green fog, an ember of warmth |
-| 10 | Oct 22–25 | **Spooky Season** | haunted purple, toxic green, pumpkin |
-| ★ | Oct 29–Nov 1 | **Halloween Night** | the big one: full moon, ghost-green, pumpkin |
+| 1 | Aug 27–30 | **Neon Arcade** | synthwave night, magenta + cyan grid |
+| 2 | Sep 10–13 | **Tropical Jungle** | emerald canopy, gold light shafts |
+| 3 | Sep 24–27 | **Cosmic Galaxy** | deep space, nebula, a field of stars |
+| 4 | Oct 8–11 | **Blossom Garden** | blush pink, sage, soft and bright |
+| 5 | Oct 22–25 | **Desert Dusk** | terracotta dunes, dusty-rose sky |
+| 6 | Nov 5–8 | **Deep Sea** | dark water, bioluminescent glow |
+| 7 | Nov 19–22 | **Autumn Woods** | amber, rust, gold, falling leaves |
+| 8 | Dec 3–6 | **Vineyard** | deep plum and wine, harvest gold |
+| 9 | Dec 17–20 | **Misty Pines** | slate-green fog, an ember of warmth |
+| 10 | Dec 31–Jan 3 | **Spooky Season** | haunted purple, toxic green, pumpkin |
+| ★ | TBD — special event | **Halloween Night** | the big one: full moon, ghost-green, pumpkin |
 
 ---
 
@@ -96,9 +97,11 @@ Scene: a full moon over a hill, bats, a jack-o'-lantern grin, ghost-green fog.
 ---
 
 ## Notes
-- Seasonal on purpose: Aug is still summer (beach, neon, jungle), September
-  cools (garden, desert, deep sea), October turns (autumn, vineyard, mist) and
-  ends on Halloween. Feel free to reorder within a month.
+- The calendar follows the fortnightly tournament cadence. It begins with an
+  August summer run (beach, neon), then moves through jungle and galaxy before
+  October's garden and desert. Feel free to reorder themes to suit the season.
+- **Halloween Night** needs a dedicated late-October event; it does not fall on
+  this fortnightly cycle after the schedule correction.
 - Keep the **red/coral urgency pulse** on every theme — it is a state signal, not
   part of the palette, so "last call" always reads the same.
 - If a week is busy, the minimum swap (palette only, beach scene recoloured) still

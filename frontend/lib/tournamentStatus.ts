@@ -16,30 +16,30 @@ import type { Tournament } from "@/lib/api";
  * hub card) always wears this; only the status label shifts colour to carry the
  * state of the event. Swapping the whole world for a new week is this one object.
  *
- * This week: Neon Arcade - a synthwave night. Deep purple sky, a banded retro
- * sun, a cyan perspective grid, magenta horizon glow. DARK scene, so the ink is
- * light. (Past palettes, including ocean/beach, live in git history, not here.)
+ * This week: Tropical Jungle — an emerald canopy, gold light shafts and low
+ * mist. DARK scene, so the ink is light. (Past palettes live in git history,
+ * not here.)
  *
  * The scene is dark, so text colours are routed through `ink` / `inkSoft` rather
  * than hardcoded: swapping this object re-themes the whole tournament world,
  * card and announcement image included.
  */
 export const TOURNEY = {
-  accent: "#ff2fb9", // neon magenta, the world's signature (chrome on dark pages)
-  accentSoft: "#45e0ff", // electric cyan for text and pips on dark chrome
-  gradient: "linear-gradient(135deg, #ff2fb9 0%, #a13bff 52%, #39d0ff 100%)", // for buttons
-  ink: "#f7f2ff", // near-white: this is a DARK scene, so ink is light
-  inkSoft: "#c8b6f0", // muted lavender for secondary lines on the night
-  panel: "rgba(12,4,32,0.6)", // dark glass behind the countdown, so light numerals read
+  accent: "#1fbf7a", // canopy emerald, the world's signature
+  accentSoft: "#7ff0b0", // fresh leaf-green for text and pips
+  gradient: "linear-gradient(135deg, #1fbf7a 0%, #0f7a48 52%, #7ff0b0 100%)",
+  ink: "#eafff4", // near-white against the dark canopy
+  inkSoft: "#b8ddc4", // muted mist for secondary lines
+  panel: "rgba(3, 28, 16, 0.66)", // deep jungle glass behind the countdown
 
-  // A synthwave night, not a beach. These build the scene.
-  sky: "linear-gradient(180deg, #1b0640 0%, #2a0a55 56%, #3a0a5c 100%)", // the night
-  horizon: "#ff4fd8", // the glowing horizon line where grid meets sky
-  grid: "#39d0ff", // the cyan perspective grid
-  sun: "#ff2f87", // the retro sun, lower band
-  sunTop: "#ff9a3c", // the retro sun, upper band
-  sunCore: "#ffe14d", // its hot centre
-  coral: "#ff2f87", // urgency pop, still hot on the dark scene
+  // Tropical Jungle: a shaded canopy lit by gold shafts, with mist below.
+  sky: "linear-gradient(180deg, #052817 0%, #073b22 50%, #0f5a34 100%)",
+  leaf: "#0a4a2a",
+  leafDeep: "#042315",
+  shaft: "#ffe9a3",
+  mist: "#a6e7c3",
+  ground: "#062d1b",
+  coral: "#e5533d", // urgency remains a universal state signal
 } as const;
 
 export type TournamentPhase = "open" | "live" | "finals" | "finished";
